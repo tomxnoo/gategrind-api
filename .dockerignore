@@ -1,0 +1,10 @@
+# flyctl launch added from .cache/pypoetry/virtualenvs/python-template-ziSNDrjU-py3.10/.gitignore
+# created by virtualenv automatically
+.cache/pypoetry/virtualenvs/python-template-ziSNDrjU-py3.10/**/*
+
+# flyctl launch added from .gitignore
+**/__pycache__
+**/*.pyc
+**/.env
+**/*.db
+fly.toml
