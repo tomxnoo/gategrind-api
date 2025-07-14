@@ -57,29 +57,20 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
     async def accept_callback(self, interaction: discord.Interaction):
         user_id = self.user.id
         quest_tier = self.quest.get("Tier")
-
-        if quest_tier:
-            await activate_daily_quest(user_id, quest_tier, self.bot)
+    
+        if not quest_tier:
+            raise ValueError("Quest tier not found. Please try again.")
+            
+        await activate_daily_quest(user_id, quest_tier, self.bot)
             
             # Reset page index to 0 since active quest will be first
-            user_quest_pages[user_id] = 0
+        user_quest_pages[user_id] = 0
             
-            # Use universal header and sub-header layout
-            embed = self.render_quest_accepted_embed(self.user, self.quest)
-            view = BackToMenuFromAcceptView(self.bot, self.user)
+        embed = self.render_quest_accepted_embed(self.user, self.quest)
+        view = BackToMenuFromAcceptView(self.bot, self.user)
             
-            # Add small delay to ensure loading animation stops properly
-            await asyncio.sleep(0.1)
-            
-            await interaction.edit_original_response(embed=embed, view=view)
-        else:
-            await interaction.edit_original_response(
-                embed=discord.Embed(
-                    title="❌ Error",
-                    description="Quest tier not found. Please try again.",
-                    color=discord.Color.red()
-                )
-            )
+        await asyncio.sleep(0.1)
+        await interaction.edit_original_response(embed=embed, view=view)
 
     def render_quest_accepted_embed(self, user: Union[discord.User, discord.Member], quest: dict) -> discord.Embed:
         """Render quest accepted embed with universal header and sub-header"""
@@ -122,6 +113,17 @@ class BackToMenuButton(discord.ui.Button):
     def __init__(self, parent_view):
         super().__init__(label="Back to Menu", style=discord.ButtonStyle.secondary)
         self.parent_view = parent_view
+
+    @interaction_handler(ephemeral=False, with_loading=True)
+    async def callback(self, interaction: discord.Interaction):
+        from features.quests.ui.quest_panel import QuestPanel
+        
+        # Add a small delay to ensure loading animation stops
+        await asyncio.sleep(0.1)
+        
+        embed = await QuestPanel.render_embed(self.parent_view.bot, self.parent_view.user)
+        view = await QuestPanel.build_view(self.parent_view.bot, self.parent_view.user)
+        await interaction.edit_original_response(embed=embed, view=view)
 
     async def callback(self, interaction: discord.Interaction):
         from shared.utils.headers import render_loading_embed
