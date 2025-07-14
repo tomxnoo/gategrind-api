@@ -94,6 +94,7 @@ EXTS = [
     'features.user.cog',  # Add this line
     'features.moderation.message_management_cog',
     'features.moderation.reroll_reset_cog',
+    'features.moderation.quest_completion_cog',  # Add this line
     'features.fitness.fitness_sync_cog',
     'features.fitness.fitness_api_cog',
 ]
