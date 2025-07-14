@@ -1,5 +1,7 @@
 import discord
+import asyncio  # Add this missing import
 from typing import Callable, List, Dict, Any, Union
+from shared.utils.ui_helpers import interaction_handler
 
 class QuestSelectorView(discord.ui.View):
     def __init__(self, bot, user_id: int, get_quests_func: Callable, page_dict: dict, detail_view_class, quest_type: str):
@@ -14,6 +16,7 @@ class QuestSelectorView(discord.ui.View):
         self.details_btn = ViewDetailsButton(self)
         self.next_btn = NextQuestButton(self)
         self.menu_btn = BackToMenuButton(self)
+        
         self.add_item(self.prev_btn)
         self.add_item(self.details_btn)
         self.add_item(self.next_btn)
@@ -22,6 +25,11 @@ class QuestSelectorView(discord.ui.View):
     async def refresh_panel(self, interaction: discord.Interaction):
         if not interaction.user:
             return
+        
+        # Remove these lines since buttons no longer need user attribute:
+        # self.details_btn.user = interaction.user
+        # self.menu_btn.user = interaction.user
+        
         self.page_dict.setdefault(self.user_id, 0)
         quests = await self.get_quests_func(self.user_id, self.bot)
         if not quests:
@@ -82,35 +90,110 @@ class ViewDetailsButton(discord.ui.Button):
     def __init__(self, parent_view):
         super().__init__(label="View Details", style=discord.ButtonStyle.success)
         self.parent_view = parent_view
+        # Remove user attribute since we'll get it from interaction
+    
+    # Remove the @interaction_handler decorator and handle loading manually
     async def callback(self, interaction: discord.Interaction):
-        user_id = interaction.user.id
-        quests = await self.parent_view.get_quests_func(user_id, self.parent_view.bot)
-        if not quests:
-            await interaction.response.send_message("❌ No quests to view.", ephemeral=True)
-            return
-        selected = self.parent_view.page_dict.get(user_id, 0)
-        if selected < 0:
-            selected = 0
-        if selected >= len(quests):
-            selected = len(quests) - 1
-        quest = quests[selected]
-        active_quests = [q for q in quests if q.get("active")]
-        view = self.parent_view.detail_view_class(self.parent_view.bot, interaction.user, quest, disable_accept=len(active_quests) > 0, quest_type=self.parent_view.quest_type)
-        embed = await self.parent_view.build_embed(self.parent_view.bot, quest, interaction.user)
-        if interaction.response.is_done():
+        try:
+            await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
+        
+        # Create loading animation manually using interaction.user
+        from shared.utils.ui_helpers import create_loading_animation
+        loading_task, stop_loading = await create_loading_animation(interaction, interaction.user)
+        
+        try:
+            user_id = interaction.user.id
+            quests = await self.parent_view.get_quests_func(user_id, self.parent_view.bot)
+            if not quests:
+                stop_loading()
+                await asyncio.wait_for(loading_task, timeout=1.0)
+                await interaction.edit_original_response(
+                    embed=discord.Embed(description="❌ No quests to view.", color=discord.Color.red()),
+                    view=None
+                )
+                return
+            
+            selected = self.parent_view.page_dict.get(user_id, 0)
+            if selected < 0:
+                selected = 0
+            if selected >= len(quests):
+                selected = len(quests) - 1
+            quest = quests[selected]
+            active_quests = [q for q in quests if q.get("active")]
+            view = self.parent_view.detail_view_class(self.parent_view.bot, interaction.user, quest, disable_accept=len(active_quests) > 0, quest_type=self.parent_view.quest_type)
+            embed = await self.parent_view.build_embed(self.parent_view.bot, quest, interaction.user)
+            
+            # Stop loading animation
+            stop_loading()
+            try:
+                await asyncio.wait_for(loading_task, timeout=1.0)
+            except asyncio.TimeoutError:
+                loading_task.cancel()
+            
+            # Add small delay to ensure loading animation stops properly
+            await asyncio.sleep(0.1)
+            
             await interaction.edit_original_response(embed=embed, view=view)
-        else:
-            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            import sentry_sdk
+            sentry_sdk.capture_exception(e)
+            stop_loading()
+            try:
+                await asyncio.wait_for(loading_task, timeout=1.0)
+            except asyncio.TimeoutError:
+                loading_task.cancel()
+            await interaction.edit_original_response(
+                content=f"Error: {e}", embed=None, view=None
+            )
 
 class BackToMenuButton(discord.ui.Button):
     def __init__(self, parent_view):
         super().__init__(label="Back to Menu", style=discord.ButtonStyle.danger)
         self.parent_view = parent_view
+        # Remove user attribute since we'll get it from interaction
+    
+    # Remove the @interaction_handler decorator and handle loading manually
     async def callback(self, interaction: discord.Interaction):
-        from features.quests.ui.quest_panel import QuestPanel
-        view = await QuestPanel.build_view(self.parent_view.bot, interaction.user)
-        embed = await QuestPanel.render_embed(self.parent_view.bot, interaction.user)
-        await interaction.response.edit_message(embed=embed, view=view)
+        try:
+            await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
+        
+        # Create loading animation manually using interaction.user
+        from shared.utils.ui_helpers import create_loading_animation
+        loading_task, stop_loading = await create_loading_animation(interaction, interaction.user)
+        
+        try:
+            from features.quests.ui.quest_panel import QuestPanel
+            view = await QuestPanel.build_view(self.parent_view.bot, interaction.user)
+            embed = await QuestPanel.render_embed(self.parent_view.bot, interaction.user)
+            
+            # Stop loading animation
+            stop_loading()
+            try:
+                await asyncio.wait_for(loading_task, timeout=1.0)
+            except asyncio.TimeoutError:
+                loading_task.cancel()
+            
+            # Add small delay to ensure loading animation stops properly
+            await asyncio.sleep(0.1)
+            
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except Exception as e:
+            import sentry_sdk
+            sentry_sdk.capture_exception(e)
+            stop_loading()
+            try:
+                await asyncio.wait_for(loading_task, timeout=1.0)
+            except asyncio.TimeoutError:
+                loading_task.cancel()
+            await interaction.edit_original_response(
+                content=f"Error: {e}", embed=None, view=None
+            )
 
 class QuestAcceptDeclineView(discord.ui.View):
     def __init__(self, bot, user: Union[discord.User, discord.Member], quest: dict, disable_accept=False, quest_type="daily"):
@@ -155,6 +238,7 @@ class QuestAcceptDeclineView(discord.ui.View):
         self.add_item(accept_btn)
         self.add_item(decline_btn)
         self.add_item(abandon_btn)
+    @interaction_handler(ephemeral=False, with_loading=True)
     async def accept_callback(self, interaction: discord.Interaction):
         # Implement in subclass or instance
         pass

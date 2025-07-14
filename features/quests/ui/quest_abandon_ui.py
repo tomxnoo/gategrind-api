@@ -139,32 +139,49 @@ class AbandonQuestsView(discord.ui.View):
 
     @interaction_handler(ephemeral=False, with_loading=True)
     async def confirm_abandon_daily(self, interaction: discord.Interaction):
-        try:
-            # Logic to abandon daily quests
-            from features.quests.logic.daily_quests.daily_quest_logic import abandon_daily_quests
-            await abandon_daily_quests(self.user.id, self.bot)  # Fixed parameter order
-            
-            # Mark as abandoned and update buttons
-            self.daily_abandoned = True
-            
-            # Add a small delay to ensure loading animation stops
-            await asyncio.sleep(0.1)
-            
-            # Show confirmation
-            embed = build_abandon_quests_embed(self.user, confirm_type="daily_done")
-            self.add_buttons()
-            await interaction.edit_original_response(embed=embed, view=self)
-        except Exception as e:
-            # Fallback error handling
-            sentry_sdk.capture_exception(e)
-            try:
-                await interaction.edit_original_response(
-                    content=f"Error abandoning daily quests: {e}", 
-                    embed=None, 
-                    view=None
-                )
-            except Exception:
-                pass
+        # Logic to abandon daily quests
+        from features.quests.logic.daily_quests.daily_quest_logic import abandon_daily_quests
+        await abandon_daily_quests(self.user.id, self.bot)
+        
+        # Mark as abandoned and update buttons
+        self.daily_abandoned = True
+        
+        # Add a small delay to ensure loading animation stops
+        await asyncio.sleep(0.1)
+        
+        # Show confirmation
+        embed = build_abandon_quests_embed(self.user, confirm_type="daily_done")
+        self.add_buttons()
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    @interaction_handler(ephemeral=False, with_loading=True)
+    async def confirm_abandon_weekly(self, interaction: discord.Interaction):
+        # Logic to abandon weekly contract
+        from features.quests.logic.weekly_quests.weekly_quest_logic import abandon_weekly_contract
+        await abandon_weekly_contract(self.bot, self.user.id)
+        
+        # Mark as abandoned and update buttons
+        self.weekly_abandoned = True
+        
+        # Add a small delay to ensure loading animation stops
+        await asyncio.sleep(0.1)
+        
+        # Show confirmation
+        embed = build_abandon_quests_embed(self.user, confirm_type="weekly_done")
+        self.add_buttons()
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    @interaction_handler(ephemeral=False, with_loading=True)
+    async def back_to_menu(self, interaction: discord.Interaction):
+        await invalidate_user_json_cache(self.bot, self.user.id)
+        
+        # Add a small delay to ensure loading animation stops
+        await asyncio.sleep(0.1)
+        
+        from features.quests.ui.quest_panel import QuestPanel
+        embed = await QuestPanel.render_embed(self.bot, self.user)
+        view = await QuestPanel.build_view(self.bot, self.user)
+        await interaction.edit_original_response(embed=embed, view=view)
 
     async def cancel_abandon_daily(self, interaction: discord.Interaction):
         # Return to main abandon view
@@ -178,65 +195,11 @@ class AbandonQuestsView(discord.ui.View):
         self.show_confirm_cancel("weekly")
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @interaction_handler(ephemeral=False, with_loading=True)
-    async def confirm_abandon_weekly(self, interaction: discord.Interaction):
-        try:
-            # Logic to abandon weekly contract
-            from features.quests.logic.weekly_quests.weekly_quest_logic import abandon_weekly_contract
-            await abandon_weekly_contract(self.bot, self.user.id)  # This one is correct
-            
-            # Mark as abandoned and update buttons
-            self.weekly_abandoned = True
-            
-            # Add a small delay to ensure loading animation stops
-            await asyncio.sleep(0.1)
-            
-            # Show confirmation
-            embed = build_abandon_quests_embed(self.user, confirm_type="weekly_done")
-            self.add_buttons()
-            await interaction.edit_original_response(embed=embed, view=self)
-        except Exception as e:
-            # Fallback error handling
-            sentry_sdk.capture_exception(e)
-            try:
-                await interaction.edit_original_response(
-                    content=f"Error abandoning weekly contract: {e}", 
-                    embed=None, 
-                    view=None
-                )
-            except Exception:
-                pass
-
     async def cancel_abandon_weekly(self, interaction: discord.Interaction):
         # Return to main abandon view
         embed = build_abandon_quests_embed(self.user)
         self.add_buttons()
         await interaction.response.edit_message(embed=embed, view=self)
-
-    @interaction_handler(ephemeral=False, with_loading=True)
-    async def back_to_menu(self, interaction: discord.Interaction):
-        try:
-            await invalidate_user_json_cache(self.bot, self.user.id)
-            await asyncio.sleep(1.2)
-            
-            # Add a small delay to ensure loading animation stops
-            await asyncio.sleep(0.1)
-            
-            from features.quests.ui.quest_panel import QuestPanel
-            embed = await QuestPanel.render_embed(self.bot, self.user)
-            view = await QuestPanel.build_view(self.bot, self.user)
-            await interaction.edit_original_response(embed=embed, view=view)
-        except Exception as e:
-            # Fallback error handling
-            sentry_sdk.capture_exception(e)
-            try:
-                await interaction.edit_original_response(
-                    content=f"Error returning to menu: {e}", 
-                    embed=None, 
-                    view=None
-                )
-            except Exception:
-                pass
 
 class AbandonQuestSelect(discord.ui.Select):
     def __init__(self, bot, user: Union[discord.User, discord.Member], quests=None):

@@ -139,6 +139,10 @@ class WeeklyQuestAcceptDeclineView(QuestAcceptDeclineView):
         if tier is None:
             tier = 1
         await activate_weekly_contract(user_id, tier, bot=self.bot)
+        
+        # Reset page index to 0 since active quest will be first
+        _weekly_pages[user_id] = 0
+        
         contracts = await get_weekly_contracts(user_id, self.bot)
         active_contract = next((c for c in contracts if c.get("active")), None)
         if active_contract is None:
