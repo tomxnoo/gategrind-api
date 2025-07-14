@@ -53,7 +53,6 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
     def __init__(self, bot, user: Union[discord.User, discord.Member], quest: dict, disable_accept=False, quest_type="daily"):
         super().__init__(bot, user, quest, disable_accept, quest_type)
     
-    @interaction_handler(ephemeral=False, with_loading=True)
     async def accept_callback(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=False)
@@ -67,8 +66,12 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
             raise ValueError("Quest tier not found. Please try again.")
             
         await activate_daily_quest(user_id, quest_tier, self.bot)
+        
+        # Invalidate cache to ensure fresh data
+        from core.redis_cache import invalidate_user_json_cache
+        await invalidate_user_json_cache(self.bot, user_id)
             
-            # Reset page index to 0 since active quest will be first
+        # Reset page index to 0 since active quest will be first
         user_quest_pages[user_id] = 0
             
         embed = self.render_quest_accepted_embed(self.user, self.quest)
@@ -127,6 +130,9 @@ class BackToMenuButton(discord.ui.Button):
         
         # Invalidate cache to ensure fresh data
         await invalidate_user_json_cache(self.parent_view.bot, self.parent_view.user.id)
+        
+        # Reset the page index to show the active quest first
+        user_quest_pages[self.parent_view.user.id] = 0
         
         # Use QuestPanel's static methods instead of refresh_panel
         embed = await QuestPanel.render_embed(self.parent_view.bot, self.parent_view.user)
