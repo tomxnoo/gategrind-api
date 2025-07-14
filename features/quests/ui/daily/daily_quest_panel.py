@@ -12,6 +12,7 @@ from features.quests.ui.daily.daily_quest_ansi import render_daily_quest_ansi_bl
 from features.quests.ui.quest_panel_common import QuestSelectorView, QuestAcceptDeclineView
 from shared.utils.headers import get_system_status_header
 from shared.utils.ui_styles import get_panel_sub_header
+from shared.utils.ui_helpers import interaction_handler
 from core.redis_cache import get_or_cache_user_json_data
 
 # Global state for user quest pages
@@ -52,31 +53,25 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
     def __init__(self, bot, user: Union[discord.User, discord.Member], quest: dict, disable_accept=False, quest_type="daily"):
         super().__init__(bot, user, quest, disable_accept, quest_type)
     
+    @interaction_handler(ephemeral=False, with_loading=True)
     async def accept_callback(self, interaction: discord.Interaction):
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-
         user_id = self.user.id
         quest_tier = self.quest.get("Tier")
 
         if quest_tier:
-            try:
-                await activate_daily_quest(user_id, quest_tier, self.bot)
-                # Use universal header and sub-header layout
-                embed = self.render_quest_accepted_embed(self.user, self.quest)
-                view = BackToMenuFromAcceptView(self.bot, self.user)
-                await interaction.edit_original_response(embed=embed, view=view)
-            except Exception as e:
-                sentry_sdk.capture_exception(e)
-                await interaction.edit_original_response(
-                    embed=discord.Embed(
-                        title="❌ Error",
-                        description="Failed to accept quest. Please try again.",
-                        color=discord.Color.red()
-                    )
-                )
+            await activate_daily_quest(user_id, quest_tier, self.bot)
+            
+            # Reset page index to 0 since active quest will be first
+            user_quest_pages[user_id] = 0
+            
+            # Use universal header and sub-header layout
+            embed = self.render_quest_accepted_embed(self.user, self.quest)
+            view = BackToMenuFromAcceptView(self.bot, self.user)
+            
+            # Add small delay to ensure loading animation stops properly
+            await asyncio.sleep(0.1)
+            
+            await interaction.edit_original_response(embed=embed, view=view)
         else:
             await interaction.edit_original_response(
                 embed=discord.Embed(
@@ -85,7 +80,7 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
                     color=discord.Color.red()
                 )
             )
-    
+
     def render_quest_accepted_embed(self, user: Union[discord.User, discord.Member], quest: dict) -> discord.Embed:
         """Render quest accepted embed with universal header and sub-header"""
         header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()

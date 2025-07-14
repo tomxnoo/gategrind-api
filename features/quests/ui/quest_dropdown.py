@@ -47,11 +47,19 @@ class QuestActionDropdown(discord.ui.Select):
         value = self.values[0]
         try:
             if value == "view_daily":
+                # Reset page index to show active quest first
+                from features.quests.ui.daily.daily_quest_panel import user_quest_pages
+                user_quest_pages[interaction.user.id] = 0
+                
                 view = DailyQuestSelectorView(self.bot, interaction.user.id)
                 await view.refresh_panel(interaction)
                 view.message = interaction.message
             elif value == "view_weekly":
-                from features.quests.ui.weekly.weekly_contract_panel import WeeklyQuestSelectorView, get_weekly_contracts
+                from features.quests.ui.weekly.weekly_contract_panel import WeeklyQuestSelectorView, get_weekly_contracts, _weekly_pages
+                
+                # Reset page index to show active quest first
+                _weekly_pages[interaction.user.id] = 0
+                
                 view = WeeklyQuestSelectorView(self.bot, interaction.user.id)
                 await view.refresh_panel(interaction)
             elif value == "reroll_quests":
@@ -110,11 +118,19 @@ class QuestDropdown(Select):
         value = self.values[0]
         try:
             if value == "view_daily":
+                # Reset page index to show active quest first
+                from features.quests.ui.daily.daily_quest_panel import user_quest_pages
+                user_quest_pages[interaction.user.id] = 0
+                
                 view = DailyQuestSelectorView(self.bot, interaction.user.id)
                 await view.refresh_panel(interaction)
                 view.message = interaction.message
             elif value == "view_weekly":
-                from features.quests.ui.weekly.weekly_contract_panel import WeeklyQuestSelectorView, get_weekly_contracts
+                from features.quests.ui.weekly.weekly_contract_panel import WeeklyQuestSelectorView, get_weekly_contracts, _weekly_pages
+                
+                # Reset page index to show active quest first
+                _weekly_pages[interaction.user.id] = 0
+                
                 view = WeeklyQuestSelectorView(self.bot, interaction.user.id)
                 await view.refresh_panel(interaction)
             elif value == "reroll_quests":
