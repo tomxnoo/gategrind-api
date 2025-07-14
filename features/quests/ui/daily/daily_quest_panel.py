@@ -55,6 +55,11 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
     
     @interaction_handler(ephemeral=False, with_loading=True)
     async def accept_callback(self, interaction: discord.Interaction):
+        try:
+            await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
+            
         user_id = self.user.id
         quest_tier = self.quest.get("Tier")
     
@@ -69,7 +74,6 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
         embed = self.render_quest_accepted_embed(self.user, self.quest)
         view = BackToMenuFromAcceptView(self.bot, self.user)
             
-        await asyncio.sleep(0.1)
         await interaction.edit_original_response(embed=embed, view=view)
 
     def render_quest_accepted_embed(self, user: Union[discord.User, discord.Member], quest: dict) -> discord.Embed:
@@ -114,29 +118,21 @@ class BackToMenuButton(discord.ui.Button):
         super().__init__(label="Back to Menu", style=discord.ButtonStyle.secondary)
         self.parent_view = parent_view
 
-    @interaction_handler(ephemeral=False, with_loading=True)
     async def callback(self, interaction: discord.Interaction):
         from features.quests.ui.quest_panel import QuestPanel
+        from core.redis_cache import invalidate_user_json_cache
         
-        # Add a small delay to ensure loading animation stops
-        await asyncio.sleep(0.1)
+        # Use manual defer() instead of @interaction_handler
+        await interaction.response.defer(ephemeral=False)
         
+        # Invalidate cache to ensure fresh data
+        await invalidate_user_json_cache(self.parent_view.bot, self.parent_view.user.id)
+        
+        # Use QuestPanel's static methods instead of refresh_panel
         embed = await QuestPanel.render_embed(self.parent_view.bot, self.parent_view.user)
         view = await QuestPanel.build_view(self.parent_view.bot, self.parent_view.user)
         await interaction.edit_original_response(embed=embed, view=view)
 
-    async def callback(self, interaction: discord.Interaction):
-        from shared.utils.headers import render_loading_embed
-
-        await interaction.response.defer()
-
-        loading_embed = render_loading_embed(self.parent_view.user)
-        await interaction.edit_original_response(embed=loading_embed, view=None)
-
-        await asyncio.sleep(1)  # Simulate loading
-
-        view = DailyQuestSelectorView(self.parent_view.bot, self.parent_view.user.id)
-        await view.refresh_panel(interaction)
 
 # Legacy compatibility - keep old classes for any existing references
 class AcceptQuestButton(discord.ui.Button):

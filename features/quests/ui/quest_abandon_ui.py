@@ -137,8 +137,11 @@ class AbandonQuestsView(discord.ui.View):
         self.show_confirm_cancel("daily")
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @interaction_handler(ephemeral=False, with_loading=True)
+    # Remove @interaction_handler decorator and use manual defer instead
     async def confirm_abandon_daily(self, interaction: discord.Interaction):
+        # Use manual defer() instead of @interaction_handler
+        await interaction.response.defer(ephemeral=False)
+        
         # Logic to abandon daily quests
         from features.quests.logic.daily_quests.daily_quest_logic import abandon_daily_quests
         await abandon_daily_quests(self.user.id, self.bot)
@@ -146,16 +149,19 @@ class AbandonQuestsView(discord.ui.View):
         # Mark as abandoned and update buttons
         self.daily_abandoned = True
         
-        # Add a small delay to ensure loading animation stops
-        await asyncio.sleep(0.1)
+        # Remove the asyncio.sleep as it's no longer needed
+        # await asyncio.sleep(0.1)
         
         # Show confirmation
         embed = build_abandon_quests_embed(self.user, confirm_type="daily_done")
         self.add_buttons()
         await interaction.edit_original_response(embed=embed, view=self)
 
-    @interaction_handler(ephemeral=False, with_loading=True)
+    # Remove @interaction_handler decorator and use manual defer instead
     async def confirm_abandon_weekly(self, interaction: discord.Interaction):
+        # Use manual defer() instead of @interaction_handler
+        await interaction.response.defer(ephemeral=False)
+        
         # Logic to abandon weekly contract
         from features.quests.logic.weekly_quests.weekly_quest_logic import abandon_weekly_contract
         await abandon_weekly_contract(self.bot, self.user.id)
@@ -163,22 +169,20 @@ class AbandonQuestsView(discord.ui.View):
         # Mark as abandoned and update buttons
         self.weekly_abandoned = True
         
-        # Add a small delay to ensure loading animation stops
-        await asyncio.sleep(0.1)
-        
         # Show confirmation
         embed = build_abandon_quests_embed(self.user, confirm_type="weekly_done")
         self.add_buttons()
         await interaction.edit_original_response(embed=embed, view=self)
 
-    @interaction_handler(ephemeral=False, with_loading=True)
+    # Remove @interaction_handler decorator and use manual defer instead
     async def back_to_menu(self, interaction: discord.Interaction):
+        # Use manual defer() instead of @interaction_handler
+        await interaction.response.defer(ephemeral=False)
+        
         await invalidate_user_json_cache(self.bot, self.user.id)
         
-        # Add a small delay to ensure loading animation stops
-        await asyncio.sleep(0.1)
-        
         from features.quests.ui.quest_panel import QuestPanel
+        # Use QuestPanel's static methods instead of refresh_panel
         embed = await QuestPanel.render_embed(self.bot, self.user)
         view = await QuestPanel.build_view(self.bot, self.user)
         await interaction.edit_original_response(embed=embed, view=view)
