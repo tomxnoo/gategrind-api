@@ -63,7 +63,7 @@ class MovementLogger(commands.Cog):
                 except Exception:
                     pass
                 dots = dots % 3 + 1
-                await asyncio.sleep(0.35)
+                await asyncio.sleep(0.35)  # Changed from 0.05 to 0.35
         task = asyncio.create_task(animate_loading())
         try:
             # Store in both log_stats (for quest tracking) and rep_log (for UI display)

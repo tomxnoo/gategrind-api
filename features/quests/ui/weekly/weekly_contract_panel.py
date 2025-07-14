@@ -129,16 +129,22 @@ class WeeklyQuestSelectorView(QuestSelectorView):
 class WeeklyQuestAcceptDeclineView(QuestAcceptDeclineView):
     def __init__(self, bot, user: Union[discord.User, discord.Member], quest: dict, disable_accept=False, quest_type="weekly"):
         super().__init__(bot, user, quest, disable_accept, quest_type)
+    
     async def accept_callback(self, interaction: discord.Interaction):
         try:
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer(ephemeral=False)
         except Exception:
             pass
+        
         user_id = self.user.id
         tier = self.quest.get("Tier") or self.quest.get("tier")
         if tier is None:
             tier = 1
         await activate_weekly_contract(user_id, tier, bot=self.bot)
+        
+        # Invalidate cache to ensure fresh data
+        from core.redis_cache import invalidate_user_json_cache
+        await invalidate_user_json_cache(self.bot, user_id)
         
         # Reset page index to 0 since active quest will be first
         _weekly_pages[user_id] = 0
@@ -175,15 +181,15 @@ class BackToWeeklyMenuButton(discord.ui.Button):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
-        from shared.utils.headers import render_loading_embed
-        import asyncio
-
-        await interaction.response.defer()
-
-        loading_embed = render_loading_embed(self.parent_view.user)
-        await interaction.edit_original_response(embed=loading_embed, view=None)
+        from core.redis_cache import invalidate_user_json_cache
         
-        await asyncio.sleep(1)
+        await interaction.response.defer(ephemeral=False)
+        
+        # Invalidate cache to ensure fresh data
+        await invalidate_user_json_cache(self.parent_view.bot, self.parent_view.user.id)
+        
+        # Reset page index to show active quest first
+        _weekly_pages[self.parent_view.user.id] = 0
 
         view = WeeklyQuestSelectorView(self.parent_view.bot, self.parent_view.user.id)
         await view.refresh_panel(interaction)

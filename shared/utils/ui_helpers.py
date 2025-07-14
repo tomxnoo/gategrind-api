@@ -4,6 +4,12 @@ import sentry_sdk
 from typing import Union, Callable
 from shared.utils.headers import render_loading_embed
 
+# DEFAULT UI TRANSITION DELAY: 0.35 seconds
+# This is the standard delay used throughout the codebase for UI transitions
+# to prevent loading animation race conditions and ensure smooth UI updates.
+# Use this value or higher for any asyncio.sleep() calls in UI components.
+DEFAULT_UI_DELAY = 0.35
+
 async def create_loading_animation(interaction: discord.Interaction, user: Union[discord.User, discord.Member]):
     """Creates and returns a loading animation task that can be started and stopped."""
     loading = True
@@ -13,11 +19,15 @@ async def create_loading_animation(interaction: discord.Interaction, user: Union
         while loading:
             loading_embed = render_loading_embed(user, dot_count=dots)
             try:
-                await interaction.edit_original_response(embed=loading_embed, view=None)
+                # Only update if still loading to prevent race conditions
+                if loading:
+                    await interaction.edit_original_response(embed=loading_embed, view=None)
             except Exception:
                 pass
             dots = dots % 3 + 1
-            await asyncio.sleep(0.35)
+            # Check loading status before sleeping to exit faster
+            if loading:
+                await asyncio.sleep(DEFAULT_UI_DELAY)  # Use the standard delay
     
     task = asyncio.create_task(animate_loading())
     

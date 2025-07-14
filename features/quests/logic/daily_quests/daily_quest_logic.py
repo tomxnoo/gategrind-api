@@ -81,8 +81,13 @@ async def update_quest_progress(user_id: int, movement: str, reps_done: int, bot
         quests = user_data.get("daily_quests", {}).get("quests", [])
         completed_quests = []
 
+        # Fix: Only update progress for ACTIVE quests, not all quests
         for quest in quests:
-            if quest.get("active") and not quest.get("_completed_flag") and movement in quest.get("movements", []):
+            # Only process active, non-completed quests that contain this movement
+            if (quest.get("active") and 
+                not quest.get("_completed_flag") and 
+                not quest.get("Completed") and 
+                movement in quest.get("movements", [])):
                 
                 target_sets = quest["target"]["sets"]
                 target_reps = quest["target"]["reps"]
@@ -107,15 +112,19 @@ async def update_quest_progress(user_id: int, movement: str, reps_done: int, bot
 
                 if all_movements_done:
                     quest["_completed_flag"] = True
+                    quest["Completed"] = True
                     quest["active"] = False
-                    await add_xp(None, user_id, quest["xp_reward"], bot=bot)  # Pass None for connection if not available
+                    quest["Active"] = False
+                    
+                    # Fix: Use proper connection for add_xp
+                    await add_xp(conn, user_id, quest["xp_reward"], bot=bot)
                     completed_quests.append(quest)
                     
                     # Hook for weekly contract
-                    from .weekly_contract_logic import update_weekly_contract_progress
-                    await update_weekly_contract_progress(user_id, quest_completed=True, bot=bot)
+                    from features.user.logic.user_data import update_weekly_progress
+                    await update_weekly_progress(user_id, quest_done=True, bot=bot)
 
-        await update_user_json_data(conn, user_id, user_data, bot=bot)  # TODO: Add bot if set_user_json_data supports it
+        await update_user_json_data(conn, user_id, user_data, bot=bot)
         return completed_quests
 
 async def abandon_daily_quest(user_id: int, bot=None):

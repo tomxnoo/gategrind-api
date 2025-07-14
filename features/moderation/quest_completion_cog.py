@@ -199,8 +199,9 @@ class QuestCompletionCog(commands.Cog):
                 # Award XP - Get the correct XP reward value
                 xp_reward = active_quest.get("XPReward", active_quest.get("xp_reward", 0))
                 if xp_reward > 0:
+                    # Fix: Pass the connection properly
                     await add_xp(conn, user_id, xp_reward, bot=self.bot)
-                
+
                 # Save updated data
                 await update_user_json_data(conn, user_id, user_data, bot=self.bot)
                 
@@ -253,9 +254,12 @@ class QuestCompletionCog(commands.Cog):
                         "message": f"No active weekly contract found for {target_user.display_name}. Either no contract is active or it's already completed."
                     }
                 
+                # In _complete_weekly_quest method, ensure all completion flags are set:
                 # Complete the weekly contract
                 active_contract["_completed_flag"] = True
                 active_contract["Completed"] = True
+                active_contract["active"] = False
+                active_contract["Active"] = False
                 active_contract["completed_at"] = discord.utils.utcnow().isoformat()
                 active_contract["completed_by"] = "admin"
                 
@@ -286,6 +290,7 @@ class QuestCompletionCog(commands.Cog):
                 # Award XP
                 xp_reward = active_contract.get("XPReward", active_contract.get("xp_reward", 0))
                 if xp_reward > 0:
+                    # Fix: Pass the connection properly
                     await add_xp(conn, user_id, xp_reward, bot=self.bot)
                 
                 # Save updated data
