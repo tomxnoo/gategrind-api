@@ -14,90 +14,101 @@ from shared.utils.ui_styles import get_panel_sub_header
 from shared.utils.panel_registry import register
 from shared.utils.common_views import EphemeralPanelView
 
-def create_xp_bar(current_xp: int, next_level_xp: int, length: int = 10) -> str:
-    """Generates a dynamic ASCII progress bar for XP."""
+def create_xp_bar(current_xp: int, next_level_xp: int, length: int = 12) -> str:
+    """Generates a dynamic ASCII progress bar for XP with improved styling."""
     if not next_level_xp or next_level_xp == 0:
-        return f"[{'█' * length}]"
+        return f"[{'█' * length}] MAX LEVEL"
     progress = min(1.0, current_xp / next_level_xp)
     filled_length = int(length * progress)
     bar = '█' * filled_length + '░' * (length - filled_length)
-    return f"[{bar}] {current_xp}/{next_level_xp} XP"
+    percentage = int(progress * 100)
+    return f"[{bar}] {current_xp}/{next_level_xp} XP ({percentage}%)"
+
+def create_stat_bar(value: int, max_value: int = 100, length: int = 8) -> str:
+    """Creates a visual bar for stats."""
+    if max_value == 0:
+        return "[░░░░░░░░]"
+    progress = min(1.0, value / max_value)
+    filled_length = int(length * progress)
+    bar = '▰' * filled_length + '▱' * (length - filled_length)
+    return f"[{bar}]"
 
 async def build_profile_embed(bot, user: Union[discord.User, discord.Member]) -> discord.Embed:
-    """Builds the main profile embed with unified information."""
+    """Builds the main profile embed with modern, mobile-friendly design."""
     profile_data = await data_manager.get_user_profile(bot, user.id)
     if not profile_data:
-        embed = discord.Embed(description="Could not load profile. User data might not be initialized.", color=discord.Color.red())
+        header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = get_panel_sub_header("profile")
+        desc = f"```ansi\n{header}\n{sub_header}\n\n❌ ERROR: Profile data not found\n\nPlease contact system administrator.\n```"
+        embed = discord.Embed(description=desc, color=discord.Color.red())
         embed.set_footer(text="Shadow Archive • Profile Node")
         return embed
 
-    # Identity Section (no class, only level)
+    # Build the main embed with universal header
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
     sub_header = get_panel_sub_header("profile")
-    embed = discord.Embed(
-        description=f"```ansi\n{sub_header}\n```",
-        color=discord.Color.blurple()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-
-    level = profile_data.get('level', 0)
-    embed.add_field(
-        name="🧑‍💼 Identity",
-        value=f"**Level:** `{level}`",
-        inline=True
-    )
-
-    # XP Progress Bar
-    xp_bar = create_xp_bar(profile_data.get('xp', 0), profile_data.get('xp_max', 100))
-    embed.add_field(
-        name="🌟 XP Progress",
-        value=f"{xp_bar}",
-        inline=True
-    )
-
-    sub_header = get_panel_sub_header("profile")
-    embed = discord.Embed(
-        description=f"```ansi\n{sub_header}\n```",
-        color=discord.Color.blurple()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-
-    # Core Info
-    # XP Progress
-    # Identity and XP Progress will be added below
-
-    # Stats
+    
+    # Get profile data
+    level = profile_data.get('level', 1)
+    current_xp = profile_data.get('xp', 0)
+    max_xp = profile_data.get('xp_max', 100)
     stats = profile_data.get('stats', {})
-    # Core Stats (only STR, END, SPR)
+    fitness = profile_data.get('health_fitness', {})
+    
+    # Create XP progress section
+    xp_bar = create_xp_bar(current_xp, max_xp)
+    
+    # Build the main description with ANSI formatting
+    desc_content = f"""{header}
+{sub_header}
+
+🧑‍💼 OPERATIVE PROFILE
+├─ Level: {level}
+└─ {xp_bar}
+
+📊 CORE ATTRIBUTES"""
+    
+    # Add stats with visual bars
     stat_keys = ["STR", "END", "SPR"]
     stat_emojis = {"STR": "💪", "END": "🛡️", "SPR": "✨"}
     stat_labels = {"STR": "Strength", "END": "Endurance", "SPR": "Spirit"}
-    stats_lines = []
-    for key in stat_keys:
+    
+    for i, key in enumerate(stat_keys):
         val = stats.get(key, 1)
         emoji = stat_emojis.get(key, "•")
         label = stat_labels.get(key, key)
-        stats_lines.append(f"{emoji} **{label}:** `{val}`")
-    stats_str = "\n".join(stats_lines)
-    embed.add_field(
-        name="📊 Core Stats",
-        value=stats_str,
-        inline=False
-    )
-
-    # Health & Fitness
-    fitness = profile_data.get('health_fitness', {})
-    if fitness:
-        fitness_lines = [f"🏃‍♂️ **{key.replace('_', ' ').title()}:** `{value}`" for key, value in fitness.items()]
-        fitness_str = "\n".join(fitness_lines)
+        stat_bar = create_stat_bar(val, 50)  # Assuming max stat of 50 for visual purposes
+        
+        if i == len(stat_keys) - 1:  # Last item
+            desc_content += f"\n└─ {emoji} {label}: {val} {stat_bar}"
+        else:
+            desc_content += f"\n├─ {emoji} {label}: {val} {stat_bar}"
+    
+    # Add fitness section if available
+    if fitness and any(fitness.values()):
+        desc_content += "\n\n💖 HEALTH & FITNESS"
+        fitness_items = list(fitness.items())
+        for i, (key, value) in enumerate(fitness_items):
+            formatted_key = key.replace('_', ' ').title()
+            if i == len(fitness_items) - 1:  # Last item
+                desc_content += f"\n└─ 🏃‍♂️ {formatted_key}: {value}"
+            else:
+                desc_content += f"\n├─ 🏃‍♂️ {formatted_key}: {value}"
     else:
-        fitness_str = "No health data."
-    embed.add_field(
-        name="💖 Health & Fitness",
-        value=fitness_str,
-        inline=False
+        desc_content += "\n\n💖 HEALTH & FITNESS\n└─ 📊 No fitness data recorded"
+    
+    # Create the embed
+    embed = discord.Embed(
+        description=f"```ansi\n{desc_content}\n```",
+        color=0x9146FF  # Using the primary color from ui_styles
     )
-
-    embed.set_footer(text="Shadow Archive • Profile Node")
+    
+    # Set thumbnail
+    embed.set_thumbnail(url=user.display_avatar.url)
+    
+    # Add footer
+    embed.set_footer(text="Shadow Archive • Profile Node", icon_url=user.display_avatar.url)
+    
     return embed
 
 @register
@@ -116,24 +127,65 @@ class ProfilePanel:
         # Add the panel switch dropdown
         for item in EphemeralPanelView(bot, user).children:
             view.add_item(item)
-        # Add the Reset Data button
+        # Add action buttons in a more organized layout
         view.add_item(HistoryButton(bot, user))
+        view.add_item(StatsButton(bot, user))
         view.add_item(ResetDataButton(bot, user))
         return view
 
-# --- Reset Data Button ---
-class ResetDataButton(discord.ui.Button):
+# --- Enhanced Action Buttons ---
+class StatsButton(discord.ui.Button):
     def __init__(self, bot, user):
-        super().__init__(label="Reset Data", style=discord.ButtonStyle.danger, emoji="♻️")
+        super().__init__(label="Detailed Stats", style=discord.ButtonStyle.primary, emoji="📈")
         self.bot = bot
         self.user = user
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        # You may want to add a confirmation step here in production
-        await data_manager.reset_user_profile(self.bot, self.user.id)
-        embed = discord.Embed(description="✅ Your profile data has been reset.", color=discord.Color.green())
-        await interaction.edit_original_response(embed=embed, view=None)
+        loading_embed = render_loading_embed(self.user)
+        await interaction.edit_original_response(embed=loading_embed, view=None)
+        
+        # Build detailed stats embed
+        profile_data = await data_manager.get_user_profile(self.bot, self.user.id)
+        header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = get_panel_sub_header("profile")
+        
+        if profile_data:
+            stats = profile_data.get('stats', {})
+            level = profile_data.get('level', 1)
+            
+            desc_content = f"""{header}
+{sub_header}
+
+📊 DETAILED STATISTICS
+├─ Operative Level: {level}
+├─ Total XP: {profile_data.get('xp', 0)}
+├─ XP to Next Level: {profile_data.get('xp_max', 100) - profile_data.get('xp', 0)}
+└─ Profile Created: {profile_data.get('created_at', 'Unknown')}
+
+💪 ATTRIBUTE BREAKDOWN"""
+            
+            for key, value in stats.items():
+                desc_content += f"\n├─ {key}: {value}"
+            
+            desc_content = desc_content.rstrip('├─').rstrip('\n') + "\n└─ " + desc_content.split('\n')[-1].replace('├─ ', '')
+        else:
+            desc_content = f"""{header}
+{sub_header}
+
+❌ No detailed statistics available"""
+        
+        embed = discord.Embed(
+            description=f"```ansi\n{desc_content}\n```",
+            color=0x9146FF
+        )
+        embed.set_footer(text="Shadow Archive • Statistics Division")
+        
+        # Add back button
+        back_view = discord.ui.View(timeout=120)
+        back_view.add_item(BackToProfileButton(self.bot, self.user))
+        
+        await interaction.edit_original_response(embed=embed, view=back_view)
 
 class HistoryButton(discord.ui.Button):
     def __init__(self, bot, user):
@@ -148,6 +200,99 @@ class HistoryButton(discord.ui.Button):
 
         history_view = HistoryPanel(self.bot, self.user)
         await history_view.show_completed_quests(interaction)
+
+class ResetDataButton(discord.ui.Button):
+    def __init__(self, bot, user):
+        super().__init__(label="Reset Data", style=discord.ButtonStyle.danger, emoji="♻️")
+        self.bot = bot
+        self.user = user
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        # Create confirmation embed
+        header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = "[ DATA RESET CONFIRMATION ]\nSystem: SHADOW_PACT // Data Reset [PENDING]\n──────────────────────────"
+        
+        desc_content = f"""{header}
+{sub_header}
+
+⚠️  WARNING: DATA RESET REQUESTED
+
+This action will permanently delete:
+├─ All profile statistics
+├─ All quest history
+├─ All fitness data
+└─ All progress records
+
+This action cannot be undone."""
+        
+        embed = discord.Embed(
+            description=f"```ansi\n{desc_content}\n```",
+            color=discord.Color.red()
+        )
+        embed.set_footer(text="Shadow Archive • Data Management")
+        
+        # Create confirmation view
+        confirm_view = ResetConfirmationView(self.bot, self.user)
+        await interaction.edit_original_response(embed=embed, view=confirm_view)
+
+# --- Enhanced Views ---
+class ResetConfirmationView(discord.ui.View):
+    def __init__(self, bot, user):
+        super().__init__(timeout=60)
+        self.bot = bot
+        self.user = user
+    
+    @discord.ui.button(label="Confirm Reset", style=discord.ButtonStyle.danger, emoji="✅")
+    async def confirm_reset(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        await data_manager.reset_user_profile(self.bot, self.user.id)
+        
+        header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = "[ DATA RESET COMPLETE ]\nSystem: SHADOW_PACT // Data Reset [SUCCESS]\n──────────────────────────"
+        
+        desc_content = f"""{header}
+{sub_header}
+
+✅ RESET SUCCESSFUL
+
+All profile data has been cleared.
+You may now start fresh."""
+        
+        embed = discord.Embed(
+            description=f"```ansi\n{desc_content}\n```",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text="Shadow Archive • Data Management")
+        
+        back_view = discord.ui.View(timeout=120)
+        back_view.add_item(BackToProfileButton(self.bot, self.user))
+        
+        await interaction.edit_original_response(embed=embed, view=back_view)
+    
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
+    async def cancel_reset(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        
+        # Return to profile
+        embed = await build_profile_embed(self.bot, self.user)
+        view = await ProfilePanel.build_view(self.bot, self.user)
+        await interaction.edit_original_response(embed=embed, view=view)
+
+class BackToProfileButton(discord.ui.Button):
+    def __init__(self, bot, user):
+        super().__init__(label="Back to Profile", style=discord.ButtonStyle.secondary, emoji="🔙")
+        self.bot = bot
+        self.user = user
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        loading_embed = render_loading_embed(self.user)
+        await interaction.edit_original_response(embed=loading_embed, view=None)
+
+        embed = await build_profile_embed(self.bot, self.user)
+        view = await ProfilePanel.build_view(self.bot, self.user)
+        await interaction.edit_original_response(embed=embed, view=view)
 
 class HistoryPanel(discord.ui.View):
     def __init__(self, bot, user):
