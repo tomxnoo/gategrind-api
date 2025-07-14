@@ -194,12 +194,51 @@ class HistoryButton(discord.ui.Button):
         self.user = user
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        loading_embed = render_loading_embed(self.user)
-        await interaction.edit_original_response(embed=loading_embed, view=None)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            loading_embed = render_loading_embed(self.user)
+            await interaction.edit_original_response(embed=loading_embed, view=None)
 
-        history_view = HistoryPanel(self.bot, self.user)
-        await history_view.show_completed_quests(interaction)
+            # Create history view and load data with error handling
+            history_view = HistoryPanel(self.bot, self.user)
+            
+            try:
+                quests, history_view.total_pages = await data_manager.get_completed_quests(self.bot, self.user.id, history_view.page)
+                embed = history_view.build_history_embed("Completed Quests", quests)
+                
+                # Build the view components
+                history_view.clear_items()
+                history_view.add_item(ToggleHistoryViewButton(history_view, "Quests", "quests", True))
+                history_view.add_item(ToggleHistoryViewButton(history_view, "Logs", "logs", False))
+                history_view.add_item(PaginationButton(history_view, "⬅️ Prev", "prev", history_view.page == 1))
+                history_view.add_item(PaginationButton(history_view, "Next ➡️", "next", history_view.page >= history_view.total_pages))
+                history_view.add_item(BackToProfileButton(self.bot, self.user))
+                
+                # Final update with the history panel
+                await interaction.edit_original_response(embed=embed, view=history_view)
+                
+            except Exception as e:
+                # If data loading fails, show error and return to profile
+                header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+                error_embed = discord.Embed(
+                    description=f"```ansi\n{header}\n\n❌ ERROR: Failed to load history data\n\nPlease try again later.\n```",
+                    color=discord.Color.red()
+                )
+                error_embed.set_footer(text="Shadow Archive • Error Handler")
+                
+                back_view = discord.ui.View(timeout=120)
+                back_view.add_item(BackToProfileButton(self.bot, self.user))
+                await interaction.edit_original_response(embed=error_embed, view=back_view)
+                
+        except Exception as e:
+            # Fallback error handling
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred while loading history.", ephemeral=True)
+                else:
+                    await interaction.edit_original_response(content="❌ An error occurred while loading history.", embed=None, view=None)
+            except:
+                pass  # If even error handling fails, just log it
 
 class ResetDataButton(discord.ui.Button):
     def __init__(self, bot, user):
@@ -347,10 +386,8 @@ class HistoryPanel(discord.ui.View):
         self.add_item(PaginationButton(self, "Next ➡️", "next", self.page >= self.total_pages))
         self.add_item(BackToProfileButton(self.bot, self.user))
 
-        if interaction.response.is_done():
-            await interaction.edit_original_response(embed=embed, view=self)
-        else:
-            await interaction.response.edit_message(embed=embed, view=self)
+        # Always use edit_original_response since interactions are already deferred
+        await interaction.edit_original_response(embed=embed, view=self)
 
 class ToggleHistoryViewButton(discord.ui.Button):
     def __init__(self, parent_view, label, view_type, is_active):
