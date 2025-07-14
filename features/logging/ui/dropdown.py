@@ -70,18 +70,39 @@ class LogMovementDropdown(Select):
             min_values=1,
             max_values=1,
             options=options,
-            custom_id=f"log_movement:{user_id}"
+            # Remove custom_id to avoid conflicts
+            # custom_id=f"log_movement:{user_id}"
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.user_id:
-            return await interaction.response.send_message(
-                "This menu isn't for you.", ephemeral=True
-            )
+        try:
+            if interaction.user.id != self.user_id:
+                return await interaction.response.send_message(
+                    "This menu isn't for you.", ephemeral=True
+                )
 
-        movement = self.values[0]
-        modal = LogModal(movement, self.user_id)
-        await interaction.response.send_modal(modal)
+            movement = self.values[0]
+            modal = LogModal(movement, self.user_id)
+            await interaction.response.send_modal(modal)
+            
+        except discord.InteractionResponded:
+            # Interaction was already responded to
+            pass
+        except discord.NotFound:
+            # Interaction token expired
+            await interaction.followup.send(
+                "❌ This interaction has expired. Please try again.", ephemeral=True
+            )
+        except Exception as e:
+            print(f"[ERROR] LogMovementDropdown callback failed: {e}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ Failed to open movement logging modal. Please try again.", ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    "❌ Failed to open movement logging modal. Please try again.", ephemeral=True
+                )
 
 # View for Log Panel (dropdown + switcher)
 class LogMovementView(View):
