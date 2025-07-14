@@ -15,11 +15,12 @@ from shared.utils.headers import render_loading_embed
 class QuestCompletionCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.processing_users = set()  # Track users currently being processed
 
     @commands.command(name="complete_quest", aliases=["cq"])
     @commands.is_owner()  # Only bot owner can use this command
-    async def complete_quest_admin(self, ctx, user: Optional[discord.User] = None, quest_index: Optional[int] = None):
-        """Complete a quest for a user (admin/test only). Usage: !complete_quest @user [quest_index]"""
+    async def complete_quest_admin(self, ctx, user: Optional[discord.User] = None, quest_type: Optional[str] = None):
+        """Complete a quest for a user. Usage: !cq @user 1 (daily) or !cq @user 2 (weekly)"""
         # Delete the user's command message for cleaner chat
         try:
             await ctx.message.delete()
@@ -31,68 +32,48 @@ class QuestCompletionCog(commands.Cog):
         user_id = user.id if user else ctx.author.id
         target_user = user if user else ctx.author
         
+        # Spam protection
+        if user_id in self.processing_users:
+            embed = discord.Embed(
+                title="⏳ Processing in Progress",
+                description=f"Quest completion for {target_user.display_name} is already being processed.",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed, delete_after=5)
+            return
+        
         try:
-            # Show loading UI for quest completion operations
-            if quest_index is not None:
-                loading_embed = render_loading_embed(target_user, dot_count=1)
-                loading_message = await ctx.send(embed=loading_embed, delete_after=30)
+            self.processing_users.add(user_id)
             
-            # Get user's current quests
-            quests = await get_today_quests(user_id, bot=self.bot)
-            
-            if not quests:
-                if quest_index is not None:
-                    await loading_message.delete()
+            # Parse quest type (1 = daily, 2 = weekly)
+            if quest_type not in ["1", "2"]:
                 embed = discord.Embed(
-                    title="❌ No Quests Found",
-                    description=f"No daily quests found for {target_user.display_name}.",
-                    color=discord.Color.red()
-                )
-                await ctx.send(embed=embed, delete_after=10)
-                return
-            
-            # If no quest index specified, show available quests
-            if quest_index is None:
-                embed = discord.Embed(
-                    title="📋 Available Quests",
-                    description=f"Quests for {target_user.display_name}:",
+                    title="📋 Quest Completion Help",
+                    description=f"**Usage for {target_user.display_name}:**\n\n"
+                               "🔹 `!cq @user 1` - Complete currently active daily quest\n"
+                               "🔹 `!cq @user 2` - Complete currently active weekly quest",
                     color=discord.Color.blue()
                 )
-                
-                for i, quest in enumerate(quests, 1):
-                    status = "✅ Completed" if quest.get("_completed_flag") or quest.get("Completed") else ("🔥 Active" if quest.get("active") or quest.get("Active") else "⏸️ Inactive")
-                    quest_name = quest.get("QuestName", quest.get("name", f"Quest {i}"))
-                    movements = ", ".join(quest.get("Movements", quest.get("movements", [])))
-                    xp_reward = quest.get("XPReward", quest.get("xp_reward", 0))
-                    embed.add_field(
-                        name=f"{i}. {quest_name} ({status})",
-                        value=f"Movements: {movements}\nXP Reward: {xp_reward}",
-                        inline=False
-                    )
-                
-                embed.set_footer(text="Use !complete_quest @user <quest_number> to complete a specific quest")
-                await ctx.send(embed=embed, delete_after=30)
+                embed.set_footer(text="Choose 1 for daily or 2 for weekly quest completion")
+                await ctx.send(embed=embed, delete_after=20)
                 return
             
-            # Validate quest index
-            if quest_index < 1 or quest_index > len(quests):
+            # Show loading UI
+            loading_embed = render_loading_embed(target_user, dot_count=1)
+            loading_message = await ctx.send(embed=loading_embed, delete_after=30)
+            
+            if quest_type == "1":
+                # Complete daily quest
+                result = await self._complete_daily_quest(user_id, target_user)
+            else:
+                # Complete weekly quest
+                result = await self._complete_weekly_quest(user_id, target_user)
+            
+            if not result["success"]:
                 await loading_message.delete()
                 embed = discord.Embed(
-                    title="❌ Invalid Quest Index",
-                    description=f"Please choose between 1 and {len(quests)}.",
-                    color=discord.Color.red()
-                )
-                await ctx.send(embed=embed, delete_after=10)
-                return
-            
-            quest = quests[quest_index - 1]
-            
-            # Check if already completed
-            if quest.get("_completed_flag") or quest.get("Completed"):
-                await loading_message.delete()
-                embed = discord.Embed(
-                    title="❌ Quest Already Completed",
-                    description=f"Quest {quest_index} is already completed.",
+                    title="❌ Quest Completion Failed",
+                    description=result["message"],
                     color=discord.Color.red()
                 )
                 await ctx.send(embed=embed, delete_after=10)
@@ -102,71 +83,21 @@ class QuestCompletionCog(commands.Cog):
             processing_embed = render_loading_embed(target_user, dot_count=3)
             await loading_message.edit(embed=processing_embed)
             
-            # Complete the quest
-            async with self.bot.db_pool.acquire() as conn:
-                user_data = await get_unified_user_data(conn, user_id, self.bot)
-                
-                # Mark quest as completed (handle both field name formats)
-                quest["_completed_flag"] = True
-                quest["Completed"] = True
-                quest["active"] = False
-                quest["Active"] = False
-                
-                # Complete all progress for the quest (handle both field name formats)
-                movements = quest.get("Movements", quest.get("movements", []))
-                targets = quest.get("Targets", quest.get("target", {}))
-                progress = quest.get("Progress", quest.get("progress", {}))
-                
-                for movement in movements:
-                    if movement in progress:
-                        # Handle both progress formats
-                        if isinstance(progress[movement], dict):
-                            progress[movement]["sets"] = targets.get(movement, targets.get("sets", 1))
-                            progress[movement]["reps"] = 0
-                        else:
-                            progress[movement] = targets.get(movement, 0)
-                
-                # Add to completed quests history
-                if "completed_quests" not in user_data:
-                    user_data["completed_quests"] = []
-                
-                completed_quest_entry = {
-                    "quest": quest.copy(),
-                    "completed_at": discord.utils.utcnow().isoformat(),
-                    "completed_by": "admin"
-                }
-                user_data["completed_quests"].append(completed_quest_entry)
-                
-                # Award XP - Get the correct XP reward value
-                xp_reward = quest.get("XPReward", quest.get("xp_reward", 0))
-                if xp_reward > 0:
-                    # Call add_xp with connection for proper transaction handling
-                    await add_xp(conn, user_id, xp_reward, bot=self.bot)
-                
-                # Save updated data - THIS WAS MISSING!
-                await update_user_json_data(conn, user_id, user_data, bot=self.bot)
-                
-                # Invalidate cache to ensure fresh data
-                await invalidate_user_json_cache(self.bot, user_id)
-                await get_or_cache_user_json_data(self.bot, user_id)
-            
             # Small delay to show the processing step
             await asyncio.sleep(0.5)
-            
-            quest_name = quest.get("QuestName", quest.get("name", f"Quest {quest_index}"))
             
             # Create success embed
             embed = discord.Embed(
                 title="✅ Quest Completed!",
-                description=f"**{quest_name}** has been completed for {target_user.display_name}",
+                description=f"**{result['quest_name']}** has been completed for {target_user.display_name}",
                 color=discord.Color.green()
             )
-            embed.add_field(name="XP Awarded", value=f"+{xp_reward} XP", inline=True)
+            embed.add_field(name="XP Awarded", value=f"+{result['xp_reward']} XP", inline=True)
             embed.add_field(name="Completed By", value="Admin Override", inline=True)
             embed.add_field(name="Status", value="✅ Logged to History", inline=True)
             embed.set_footer(text="Quest completion processed successfully")
             
-            # Replace loading message with success message (auto-delete after 15 seconds)
+            # Replace loading message with success message
             await loading_message.edit(embed=embed)
             await asyncio.sleep(15)
             try:
@@ -174,11 +105,11 @@ class QuestCompletionCog(commands.Cog):
             except discord.NotFound:
                 pass
             
-            print(f"[DEBUG] Admin completed quest {quest_index} for user {user_id} (+{xp_reward} XP)")
+            print(f"[DEBUG] Admin completed {result['quest_type']} quest for user {user_id} (+{result['xp_reward']} XP)")
             
         except Exception as e:
             # Clean up loading message on error
-            if quest_index is not None and 'loading_message' in locals():
+            if 'loading_message' in locals():
                 try:
                     await loading_message.delete()
                 except:
@@ -192,129 +123,168 @@ class QuestCompletionCog(commands.Cog):
             error_embed.set_footer(text="Please try again or check logs for details")
             await ctx.send(embed=error_embed, delete_after=10)
             print(f"[ERROR] Failed to complete quest: {e}")
-
-    # Alternative slash command version for true ephemeral responses
-    @app_commands.command(name="complete_quest", description="Complete a quest for a user (admin only)")
-    @app_commands.describe(
-        user="The user to complete a quest for",
-        quest_index="The quest number to complete (1-based index)"
-    )
-    async def complete_quest_slash(self, interaction: discord.Interaction, user: discord.User, quest_index: int = None):
-        """Slash command version with true ephemeral support"""
-        # Check if user is bot owner
-        if interaction.user.id != self.bot.owner_id:
-            await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
-            return
-        
-        user_id = user.id
-        target_user = user
-        
+        finally:
+            # Always remove from processing set
+            self.processing_users.discard(user_id)
+    
+    async def _complete_daily_quest(self, user_id: int, target_user: discord.User) -> dict:
+        """Complete the currently active daily quest"""
         try:
-            # Defer the response as ephemeral
-            await interaction.response.defer(ephemeral=True)
-            
-            # Show loading UI for quest completion operations
-            if quest_index is not None:
-                loading_embed = render_loading_embed(target_user, dot_count=1)
-                await interaction.followup.send(embed=loading_embed, ephemeral=True)
-            
-            # Get user's current quests
+            # Get user's current daily quests
             quests = await get_today_quests(user_id, bot=self.bot)
             
             if not quests:
-                embed = discord.Embed(
-                    title="❌ No Quests Found",
-                    description=f"No daily quests found for {target_user.display_name}.",
-                    color=discord.Color.red()
-                )
-                await interaction.edit_original_response(embed=embed)
-                return
+                return {
+                    "success": False,
+                    "message": f"No daily quests found for {target_user.display_name}."
+                }
             
-            # If no quest index specified, show available quests
-            if quest_index is None:
-                embed = discord.Embed(
-                    title="📋 Available Quests",
-                    description=f"Quests for {target_user.display_name}:",
-                    color=discord.Color.blue()
-                )
-                
-                for i, quest in enumerate(quests, 1):
-                    status = "✅ Completed" if quest.get("_completed_flag") or quest.get("Completed") else ("🔥 Active" if quest.get("active") or quest.get("Active") else "⏸️ Inactive")
-                    quest_name = quest.get("QuestName", quest.get("name", f"Quest {i}"))
-                    movements = ", ".join(quest.get("Movements", quest.get("movements", [])))
-                    xp_reward = quest.get("XPReward", quest.get("xp_reward", 0))
-                    embed.add_field(
-                        name=f"{i}. {quest_name} ({status})",
-                        value=f"Movements: {movements}\nXP Reward: {xp_reward}",
-                        inline=False
-                    )
-                
-                embed.set_footer(text="Use /complete_quest user:<user> quest_index:<number> to complete a specific quest")
-                await interaction.edit_original_response(embed=embed)
-                return
+            # Find the first active (incomplete) daily quest
+            active_quest = None
+            quest_index = -1
+            for i, quest in enumerate(quests):
+                if not (quest.get("_completed_flag") or quest.get("Completed")):
+                    active_quest = quest
+                    quest_index = i
+                    break
             
-            # Validate quest index
-            if quest_index < 1 or quest_index > len(quests):
-                embed = discord.Embed(
-                    title="❌ Invalid Quest Index",
-                    description=f"Please choose between 1 and {len(quests)}.",
-                    color=discord.Color.red()
-                )
-                await interaction.edit_original_response(embed=embed)
-                return
+            if not active_quest:
+                return {
+                    "success": False,
+                    "message": f"No active daily quests found for {target_user.display_name}. All quests are already completed."
+                }
             
-            quest = quests[quest_index - 1]
-            
-            # Check if already completed
-            if quest.get("_completed_flag") or quest.get("Completed"):
-                embed = discord.Embed(
-                    title="❌ Quest Already Completed",
-                    description=f"Quest {quest_index} is already completed.",
-                    color=discord.Color.red()
-                )
-                await interaction.edit_original_response(embed=embed)
-                return
-            
-            # Update loading message with more dots for animation
-            processing_embed = render_loading_embed(target_user, dot_count=3)
-            await interaction.edit_original_response(embed=processing_embed)
-            
-            # Complete the quest (same logic as prefix command)
+            # Complete the quest
             async with self.bot.db_pool.acquire() as conn:
                 user_data = await get_unified_user_data(conn, user_id, self.bot)
                 
-                # Mark quest as completed
-                quest["_completed_flag"] = True
-                quest["Completed"] = True
-                quest["active"] = False
-                quest["Active"] = False
-                
-                # Complete all progress for the quest
-                movements = quest.get("Movements", quest.get("movements", []))
-                targets = quest.get("Targets", quest.get("target", {}))
-                progress = quest.get("Progress", quest.get("progress", {}))
-                
-                for movement in movements:
-                    if movement in progress:
-                        if isinstance(progress[movement], dict):
-                            progress[movement]["sets"] = targets.get(movement, targets.get("sets", 1))
-                            progress[movement]["reps"] = 0
-                        else:
-                            progress[movement] = targets.get(movement, 0)
+                # Update the quest in the actual daily_quests array
+                daily_quests_data = user_data.get("daily_quests", {})
+                if "quests" in daily_quests_data and quest_index < len(daily_quests_data["quests"]):
+                    stored_quest = daily_quests_data["quests"][quest_index]
+                    
+                    # Mark quest as completed
+                    stored_quest["_completed_flag"] = True
+                    stored_quest["Completed"] = True
+                    stored_quest["active"] = False
+                    stored_quest["Active"] = False
+                    stored_quest["completed_at"] = discord.utils.utcnow().isoformat()
+                    stored_quest["completed_by"] = "admin"
+                    
+                    # Complete all progress for the quest
+                    movements = stored_quest.get("Movements", stored_quest.get("movements", []))
+                    targets = stored_quest.get("Targets", stored_quest.get("target", {}))
+                    progress = stored_quest.get("Progress", stored_quest.get("progress", {}))
+                    
+                    for movement in movements:
+                        if movement in progress:
+                            if isinstance(progress[movement], dict):
+                                progress[movement]["sets"] = targets.get(movement, targets.get("sets", 1))
+                                progress[movement]["reps"] = 0
+                            else:
+                                progress[movement] = targets.get(movement, 0)
                 
                 # Add to completed quests history
                 if "completed_quests" not in user_data:
                     user_data["completed_quests"] = []
                 
                 completed_quest_entry = {
-                    "quest": quest.copy(),
+                    "quest": active_quest.copy(),
                     "completed_at": discord.utils.utcnow().isoformat(),
-                    "completed_by": "admin"
+                    "completed_by": "admin",
+                    "quest_type": "daily"
+                }
+                user_data["completed_quests"].append(completed_quest_entry)
+                
+                # Award XP - Get the correct XP reward value
+                xp_reward = active_quest.get("XPReward", active_quest.get("xp_reward", 0))
+                if xp_reward > 0:
+                    await add_xp(conn, user_id, xp_reward, bot=self.bot)
+                
+                # Save updated data
+                await update_user_json_data(conn, user_id, user_data, bot=self.bot)
+                
+                # Invalidate cache to ensure fresh data
+                await invalidate_user_json_cache(self.bot, user_id)
+            
+            quest_name = active_quest.get("QuestName", active_quest.get("name", "Daily Quest"))
+            
+            return {
+                "success": True,
+                "quest_name": quest_name,
+                "xp_reward": xp_reward,
+                "quest_type": "daily"
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error completing daily quest: {str(e)}"
+            }
+    
+    async def _complete_weekly_quest(self, user_id: int, target_user: discord.User) -> dict:
+        """Complete the currently active weekly quest"""
+        try:
+            async with self.bot.db_pool.acquire() as conn:
+                user_data = await get_unified_user_data(conn, user_id, self.bot)
+                
+                # Get weekly contracts
+                weekly_contracts = user_data.get("weekly_contracts", {}).get("contracts", [])
+                
+                if not weekly_contracts:
+                    return {
+                        "success": False,
+                        "message": f"No weekly contracts found for {target_user.display_name}."
+                    }
+                
+                # Find the active weekly contract
+                active_contract = None
+                contract_index = -1
+                for i, contract in enumerate(weekly_contracts):
+                    if contract.get("active") or contract.get("Active"):
+                        if not (contract.get("_completed_flag") or contract.get("Completed")):
+                            active_contract = contract
+                            contract_index = i
+                            break
+                
+                if not active_contract:
+                    return {
+                        "success": False,
+                        "message": f"No active weekly contract found for {target_user.display_name}. Either no contract is active or it's already completed."
+                    }
+                
+                # Complete the weekly contract
+                active_contract["_completed_flag"] = True
+                active_contract["Completed"] = True
+                active_contract["completed_at"] = discord.utils.utcnow().isoformat()
+                active_contract["completed_by"] = "admin"
+                
+                # Complete all objectives
+                objectives = active_contract.get("Objectives", [])
+                progress = active_contract.get("Progress", {})
+                
+                for obj in objectives:
+                    obj_type = obj.get("type")
+                    target = obj.get("target", 0)
+                    if obj_type:
+                        progress[obj_type] = target
+                
+                active_contract["Progress"] = progress
+                
+                # Add to completed quests history
+                if "completed_quests" not in user_data:
+                    user_data["completed_quests"] = []
+                
+                completed_quest_entry = {
+                    "quest": active_contract.copy(),
+                    "completed_at": discord.utils.utcnow().isoformat(),
+                    "completed_by": "admin",
+                    "quest_type": "weekly"
                 }
                 user_data["completed_quests"].append(completed_quest_entry)
                 
                 # Award XP
-                xp_reward = quest.get("XPReward", quest.get("xp_reward", 0))
+                xp_reward = active_contract.get("XPReward", active_contract.get("xp_reward", 0))
                 if xp_reward > 0:
                     await add_xp(conn, user_id, xp_reward, bot=self.bot)
                 
@@ -323,28 +293,83 @@ class QuestCompletionCog(commands.Cog):
                 
                 # Invalidate cache
                 await invalidate_user_json_cache(self.bot, user_id)
-                await get_or_cache_user_json_data(self.bot, user_id)
             
-            # Small delay for UX
-            await asyncio.sleep(0.5)
+            contract_name = active_contract.get("ContractName", active_contract.get("name", "Weekly Contract"))
             
-            quest_name = quest.get("QuestName", quest.get("name", f"Quest {quest_index}"))
+            return {
+                "success": True,
+                "quest_name": contract_name,
+                "xp_reward": xp_reward,
+                "quest_type": "weekly"
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error completing weekly contract: {str(e)}"
+            }
+
+    # Alternative slash command version for true ephemeral responses
+    @app_commands.command(name="complete_quest", description="Complete a quest for a user (admin only)")
+    @app_commands.describe(
+        user="The user to complete a quest for",
+        quest_type="1 for daily quest, 2 for weekly quest"
+    )
+    async def complete_quest_slash(self, interaction: discord.Interaction, user: discord.User, quest_type: int):
+        """Slash command version with true ephemeral support"""
+        # Check if user is bot owner
+        if interaction.user.id != self.bot.owner_id:
+            await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
+            return
+        
+        if quest_type not in [1, 2]:
+            await interaction.response.send_message("❌ Quest type must be 1 (daily) or 2 (weekly).", ephemeral=True)
+            return
+        
+        user_id = user.id
+        
+        # Spam protection
+        if user_id in self.processing_users:
+            await interaction.response.send_message(
+                f"⏳ Quest completion for {user.display_name} is already being processed.",
+                ephemeral=True
+            )
+            return
+        
+        try:
+            self.processing_users.add(user_id)
+            
+            # Defer the response as ephemeral
+            await interaction.response.defer(ephemeral=True)
+            
+            if quest_type == 1:
+                result = await self._complete_daily_quest(user_id, user)
+            else:
+                result = await self._complete_weekly_quest(user_id, user)
+            
+            if not result["success"]:
+                embed = discord.Embed(
+                    title="❌ Quest Completion Failed",
+                    description=result["message"],
+                    color=discord.Color.red()
+                )
+                await interaction.edit_original_response(embed=embed)
+                return
             
             # Create success embed
             embed = discord.Embed(
                 title="✅ Quest Completed!",
-                description=f"**{quest_name}** has been completed for {target_user.display_name}",
+                description=f"**{result['quest_name']}** has been completed for {user.display_name}",
                 color=discord.Color.green()
             )
-            embed.add_field(name="XP Awarded", value=f"+{xp_reward} XP", inline=True)
+            embed.add_field(name="XP Awarded", value=f"+{result['xp_reward']} XP", inline=True)
             embed.add_field(name="Completed By", value="Admin Override", inline=True)
             embed.add_field(name="Status", value="✅ Logged to History", inline=True)
             embed.set_footer(text="Quest completion processed successfully")
             
-            # Update with success message
             await interaction.edit_original_response(embed=embed)
             
-            print(f"[DEBUG] Admin completed quest {quest_index} for user {user_id} (+{xp_reward} XP)")
+            print(f"[DEBUG] Admin completed {result['quest_type']} quest for user {user_id} (+{result['xp_reward']} XP)")
             
         except Exception as e:
             error_embed = discord.Embed(
@@ -355,6 +380,9 @@ class QuestCompletionCog(commands.Cog):
             error_embed.set_footer(text="Please try again or check logs for details")
             await interaction.edit_original_response(embed=error_embed)
             print(f"[ERROR] Failed to complete quest: {e}")
+        finally:
+            # Always remove from processing set
+            self.processing_users.discard(user_id)
 
 
 async def setup(bot):

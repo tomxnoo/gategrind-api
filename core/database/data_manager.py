@@ -77,19 +77,31 @@ async def get_completed_quests(bot, user_id: int, page: int = 1, page_size: int 
     try:
         json_data = await get_or_cache_user_json_data(bot, user_id)
         
-        # Filter for quests that are marked as completed
-        all_quests = [
-            q for q in json_data.get("daily_quests", {}).get("quests", []) 
-            if isinstance(q, dict) and q.get("_completed_flag")
-        ]
+        # FIXED: Look in the completed_quests array instead of daily_quests.quests
+        all_completed_quests = json_data.get("completed_quests", [])
         
-        total_items = len(all_quests)
+        # Also include any completed quests from daily_quests for backward compatibility
+        daily_quests = json_data.get("daily_quests", {}).get("quests", [])
+        for quest in daily_quests:
+            if isinstance(quest, dict) and quest.get("_completed_flag"):
+                # Add to completed quests if not already there
+                quest_entry = {
+                    "quest": quest,
+                    "completed_at": quest.get("completed_at", "Unknown"),
+                    "completed_by": quest.get("completed_by", "Unknown")
+                }
+                all_completed_quests.append(quest_entry)
+        
+        # Sort by completion date (newest first)
+        all_completed_quests.sort(key=lambda x: x.get("completed_at", ""), reverse=True)
+        
+        total_items = len(all_completed_quests)
         total_pages = (total_items + page_size - 1) // page_size or 1
         
         start_index = (page - 1) * page_size
         end_index = start_index + page_size
         
-        return all_quests[start_index:end_index], total_pages
+        return all_completed_quests[start_index:end_index], total_pages
     except Exception as e:
         sentry_sdk.capture_exception(e)
         logger.error(f"Error fetching completed quests for user {user_id}: {e}")
