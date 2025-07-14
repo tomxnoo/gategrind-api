@@ -91,8 +91,9 @@ EXTS = [
     'features.buffs.cog',
     'features.logging.cog',
     'features.quests.cog',
+    'features.user.cog',  # Add this line
     'features.moderation.message_management_cog',
-    'features.moderation.reroll_reset_cog',  # <-- Added here
+    'features.moderation.reroll_reset_cog',
     'features.fitness.fitness_sync_cog',
     'features.fitness.fitness_api_cog',
 ]

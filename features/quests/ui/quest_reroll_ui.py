@@ -202,33 +202,28 @@ class BackToMenuView(discord.ui.View):
         self.add_item(self.back_button)
 
     async def back_to_menu(self, interaction: discord.Interaction):
-        # Show loading UI, then return to quest panel with dropdowns/buttons
-        # Show loading UI loop, then quest panel
+        # Use manual defer() instead of trying to edit without deferring
+        await interaction.response.defer(ephemeral=False)
+        
         loading = True
         async def animate_loading():
             dots = 1
             while loading:
                 loading_embed = render_loading_embed(self.user, dot_count=dots)
                 try:
-                    if not interaction.response.is_done():
-                        await interaction.response.edit_message(embed=loading_embed, view=None)
-                    else:
-                        await interaction.edit_original_response(embed=loading_embed, view=None)
+                    await interaction.edit_original_response(embed=loading_embed, view=None)
                 except Exception:
                     pass
                 dots = dots % 3 + 1
                 await asyncio.sleep(0.35)
         loading_task = asyncio.create_task(animate_loading())
         try:
-            await asyncio.sleep(1.2)  # Simulate loading delay
-            from ui.quest_panel import QuestPanel
+            await asyncio.sleep(1.2)
+            from features.quests.ui.quest_panel import QuestPanel
             view = await QuestPanel.build_view(self.bot, self.user)
-            embed = await build_quest_panel_embed(self.bot, self.user)
+            embed = await QuestPanel.render_embed(self.bot, self.user)
             loading = False
-            if not interaction.response.is_done():
-                await interaction.response.edit_message(embed=embed, view=view)
-            else:
-                await interaction.edit_original_response(embed=embed, view=view)
+            await interaction.edit_original_response(embed=embed, view=view)
         except Exception as e:
             import sentry_sdk
             from discord.errors import NotFound
@@ -237,15 +232,11 @@ class BackToMenuView(discord.ui.View):
                 sentry_sdk.capture_message("404 NotFound: Webhook or interaction expired in back_to_menu")
                 return
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.edit_message(content="An error occurred while returning to the quest panel.", embed=None, view=None)
-                else:
-                    await interaction.edit_original_response(content="An error occurred while returning to the quest panel.", embed=None, view=None)
+                await interaction.edit_original_response(content="An error occurred while returning to the quest panel.", embed=None, view=None)
             except Exception:
                 pass
             raise
         finally:
-            loading = False
             try:
                 loading_task.cancel()
                 await loading_task
