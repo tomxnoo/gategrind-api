@@ -111,7 +111,7 @@ class IncursionDetailsView(discord.ui.View):
         color = type_colors.get(self.incursion.incursion_type, "\x1b[1;37m")
         
         # Get participant count
-        participant_count = await manager.get_participant_count(self.incursion.id)
+        participant_count = await manager.get_participant_count(self.incursion.incursion_id)
         
         content = (
             "```ansi\n"
@@ -121,7 +121,7 @@ class IncursionDetailsView(discord.ui.View):
             "──────────────────────────\n\n"
             f"{color}● {self.incursion.title}\x1b[0m\n"
             f"  Type: {self.incursion.incursion_type.value.upper()}\n"
-            f"  Exercise: {self.incursion.exercise_type}\n\n"
+            f"  Exercise: {self.incursion.target_exercise}\n\n"
             f"\x1b[1;37mDescription:\x1b[0m\n"
             f"{self.incursion.description}\n\n"
             f"\x1b[1;37mYour Progress:\x1b[0m\n"
@@ -136,10 +136,10 @@ class IncursionDetailsView(discord.ui.View):
         )
         
         # Add special effects for anomalies
-        if self.incursion.incursion_type == IncursionType.ANOMALY and self.incursion.special_effects:
+        if self.incursion.incursion_type == IncursionType.ANOMALY and self.incursion.metadata.get('special_effects'):
             content += (
                 f"\x1b[1;35m⚠️ ANOMALY EFFECTS:\x1b[0m\n"
-                f"{self.incursion.special_effects}\n\n"
+                f"{self.incursion.metadata['special_effects']}\n\n"
             )
         
         content += (
