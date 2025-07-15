@@ -17,7 +17,7 @@ class ParticipationModal(discord.ui.Modal):
         
         # Rep count input
         self.rep_input = discord.ui.TextInput(
-            label=f"How many {incursion.exercise_type} did you complete?",
+            label=f"How many {incursion.target_exercise} did you complete?",  # Changed from exercise_type
             placeholder="Enter number of reps (e.g., 25)",
             required=True,
             max_length=10

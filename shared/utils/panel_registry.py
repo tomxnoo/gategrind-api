@@ -23,17 +23,16 @@ def get_registered_panels() -> list[Type]:
     """
     Returns the list of panel classes in a specific order.
     """
-    # Define the desired order for your 4 panels
-    desired_order = ["profile", "log_reps", "quest_log", "buffs"]
-
+    # Define the desired order for your panels
+    desired_order = ["profile", "log_reps", "quest_log", "buffs", "incursions"]
+    
     ordered_panels = []
-
+    
     # Add panels in the desired order
     for key in desired_order:
         if key in _PANEL_REGISTRY:
             ordered_panels.append(_PANEL_REGISTRY[key])
-
-    # Don't add any remaining panels to keep it clean
+    
     return ordered_panels
 
 

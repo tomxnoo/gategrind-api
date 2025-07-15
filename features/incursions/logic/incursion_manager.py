@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import json  # Add this import
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 import asyncpg
@@ -53,6 +54,9 @@ class IncursionManager:
         
         expires_at = datetime.now() + timedelta(hours=duration_hours)
         
+        # Convert metadata dict to JSON string for database storage
+        metadata_json = json.dumps(metadata)
+        
         async with self.db_pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
@@ -65,7 +69,7 @@ class IncursionManager:
                 """,
                 incursion_id, incursion_type.value, title, description, 
                 target_exercise, target_reps, reward_type.value, reward_value,
-                reward_description, expires_at, metadata
+                reward_description, expires_at, metadata_json  # Use JSON string instead of dict
             )
             
         logger.info(f"Created new incursion: {incursion_id}")
@@ -123,6 +127,14 @@ class IncursionManager:
     
     def _row_to_incursion(self, row) -> Incursion:
         """Convert database row to Incursion object"""
+        # Parse metadata JSON string back to dict
+        metadata = {}
+        if row['metadata']:
+            try:
+                metadata = json.loads(row['metadata']) if isinstance(row['metadata'], str) else row['metadata']
+            except (json.JSONDecodeError, TypeError):
+                metadata = {}
+        
         return Incursion(
             id=row['id'],
             incursion_id=row['incursion_id'],
@@ -138,5 +150,10 @@ class IncursionManager:
             created_at=row['created_at'],
             expires_at=row['expires_at'],
             is_active=row['is_active'],
-            metadata=row['metadata'] or {}
+            metadata=metadata
         )
+    
+    async def get_user_progress(self, user_id: int) -> Dict[int, int]:
+        """Get user's progress for all active incursions"""
+        # For now, return empty dict - this will be implemented with user participation tracking
+        return {}

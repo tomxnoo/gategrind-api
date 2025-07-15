@@ -97,6 +97,7 @@ EXTS = [
     'features.moderation.quest_completion_cog',  # Add this line
     'features.fitness.fitness_sync_cog',
     'features.fitness.fitness_api_cog',
+    'features.incursions.cog',  # <-- ADD THIS LINE
 ]
 
 @bot.event
