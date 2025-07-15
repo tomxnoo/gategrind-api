@@ -2,11 +2,11 @@ import asyncio
 import random
 import json
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 import logging
 from features.incursions.logic.incursion_manager import IncursionManager
 from features.incursions.logic.content_generator import IncursionContentGenerator
-from features.incursions.models.incursion import IncursionType
+from features.incursions.models.incursion import IncursionType, Incursion
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,9 @@ class IncursionScheduler:
         self._scheduler_task = None
         # Testing configuration - can be toggled via admin commands
         self.testing_mode = True  # Set to False for production
+        
+        # Configure the main channel for incursion announcements
+        self.bot.main_channel_id = 1390756464250847353
     
     def set_testing_mode(self, enabled: bool):
         """Enable or disable testing mode"""
@@ -135,11 +138,18 @@ class IncursionScheduler:
         # Clamp to 30 minutes - 3 hours
         return max(0.5, min(3.0, final_duration))
     
-    async def _should_spawn_incursion(self, active_incursions: List[Incursion]) -> bool:
+    async def _should_spawn_incursion(self) -> bool:
         """Determine if a new incursion should be spawned"""
+        # Get active incursions first
+        active_incursions = await self.manager.get_active_incursions()
+        
         if self.testing_mode:
             # In testing mode, always spawn if no active incursions
             return len(active_incursions) == 0
+        
+        # Don't spawn if we already have 3+ active incursions
+        if len(active_incursions) >= 3:
+            return False
         
         # Base spawn chance (2-3%)
         spawn_chance = random.uniform(2.0, 3.0)
@@ -149,7 +159,7 @@ class IncursionScheduler:
             spawn_chance *= 1.5
             
             # Add escalation bonus: +0.5% per hour since last incursion (max +2%)
-            hours_since_last = await self.incursion_manager.get_hours_since_last_incursion()
+            hours_since_last = await self.manager.get_hours_since_last_incursion()
             escalation_bonus = min(hours_since_last * 0.5, 2.0)  # Cap at +2%
             spawn_chance += escalation_bonus
             

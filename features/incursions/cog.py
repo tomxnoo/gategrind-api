@@ -2,7 +2,7 @@
 # For maintainers: If you need to use Pycord-specific features, refer to https://docs.pycord.dev/en/master/
 import discord  # Pycord (discord.py compatible)
 from discord.ext import commands
-from typing import Optional
+from typing import Optional, List  # Added List import
 
 from features.incursions.logic.incursion_manager import IncursionManager
 from features.incursions.logic.scheduler import IncursionScheduler
@@ -149,7 +149,10 @@ class IncursionsCog(commands.Cog):
             )
             await ctx.send(embed=embed, delete_after=10)
 
-    @incursion_admin.command(name="testing")
+    # Remove these problematic subcommand decorators:
+    # @incursion_admin.command(name="testing")  # DELETE THIS LINE
+    @commands.command(name="incursion_testing")  # Change to regular command
+    @commands.is_owner()
     async def toggle_testing_mode(self, ctx, mode: str = None):
         """Toggle testing mode on/off"""
         if mode is None:
@@ -168,7 +171,9 @@ class IncursionsCog(commands.Cog):
         else:
             await ctx.send("❌ Invalid mode. Use: `on`, `off`, `enable`, `disable`, `true`, or `false`")
     
-    @incursion_admin.command(name="status")
+    # @incursion_admin.command(name="status")  # DELETE THIS LINE  
+    @commands.command(name="incursion_status")  # Change to regular command
+    @commands.is_owner()
     async def scheduler_status(self, ctx):
         """Show detailed scheduler status"""
         status = "Running" if self.scheduler.is_running else "Stopped"
