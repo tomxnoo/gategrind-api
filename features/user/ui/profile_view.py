@@ -141,20 +141,19 @@ class StatsButton(discord.ui.Button):
         self.user = user
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        loading_embed = render_loading_embed(self.user)
-        await interaction.edit_original_response(embed=loading_embed, view=None)
+        from shared.utils.ui_helpers import run_with_animation
         
-        # Build detailed stats embed
-        profile_data = await data_manager.get_user_profile(self.bot, self.user.id)
-        header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
-        sub_header = get_panel_sub_header("profile")
-        
-        if profile_data:
-            stats = profile_data.get('stats', {})
-            level = profile_data.get('level', 1)
+        async def do_work():
+            # Build detailed stats embed
+            profile_data = await data_manager.get_user_profile(self.bot, self.user.id)
+            header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+            sub_header = get_panel_sub_header("profile")
             
-            desc_content = f"""{header}
+            if profile_data:
+                stats = profile_data.get('stats', {})
+                level = profile_data.get('level', 1)
+                
+                desc_content = f"""{header}
 {sub_header}
 
 📊 DETAILED STATISTICS
@@ -164,28 +163,30 @@ class StatsButton(discord.ui.Button):
 └─ Profile Created: {profile_data.get('created_at', 'Unknown')}
 
 💪 ATTRIBUTE BREAKDOWN"""
-            
-            for key, value in stats.items():
-                desc_content += f"\n├─ {key}: {value}"
-            
-            desc_content = desc_content.rstrip('├─').rstrip('\n') + "\n└─ " + desc_content.split('\n')[-1].replace('├─ ', '')
-        else:
-            desc_content = f"""{header}
+                
+                for key, value in stats.items():
+                    desc_content += f"\n├─ {key}: {value}"
+                
+                desc_content = desc_content.rstrip('├─').rstrip('\n') + "\n└─ " + desc_content.split('\n')[-1].replace('├─ ', '')
+            else:
+                desc_content = f"""{header}
 {sub_header}
 
 ❌ No detailed statistics available"""
+            
+            embed = discord.Embed(
+                description=f"```ansi\n{desc_content}\n```",
+                color=0x9146FF
+            )
+            embed.set_footer(text="Shadow Archive • Statistics Division")
+            
+            # Add back button
+            back_view = discord.ui.View(timeout=120)
+            back_view.add_item(BackToProfileButton(self.bot, self.user))
+            
+            return embed, back_view
         
-        embed = discord.Embed(
-            description=f"```ansi\n{desc_content}\n```",
-            color=0x9146FF
-        )
-        embed.set_footer(text="Shadow Archive • Statistics Division")
-        
-        # Add back button
-        back_view = discord.ui.View(timeout=120)
-        back_view.add_item(BackToProfileButton(self.bot, self.user))
-        
-        await interaction.edit_original_response(embed=embed, view=back_view)
+        await run_with_animation(interaction, do_work())
 
 class HistoryButton(discord.ui.Button):
     def __init__(self, bot, user):
@@ -194,11 +195,9 @@ class HistoryButton(discord.ui.Button):
         self.user = user
 
     async def callback(self, interaction: discord.Interaction):
-        try:
-            await interaction.response.defer(ephemeral=True)
-            loading_embed = render_loading_embed(self.user)
-            await interaction.edit_original_response(embed=loading_embed, view=None)
-
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
             # Create history view and load data with error handling
             history_view = HistoryPanel(self.bot, self.user)
             
@@ -214,8 +213,7 @@ class HistoryButton(discord.ui.Button):
                 history_view.add_item(PaginationButton(history_view, "Next ➡️", "next", history_view.page >= history_view.total_pages))
                 history_view.add_item(BackToProfileButton(self.bot, self.user))
                 
-                # Final update with the history panel
-                await interaction.edit_original_response(embed=embed, view=history_view)
+                return embed, history_view
                 
             except Exception as e:
                 # If data loading fails, show error and return to profile
@@ -228,95 +226,44 @@ class HistoryButton(discord.ui.Button):
                 
                 back_view = discord.ui.View(timeout=120)
                 back_view.add_item(BackToProfileButton(self.bot, self.user))
-                await interaction.edit_original_response(embed=error_embed, view=back_view)
-                
-        except Exception as e:
-            # Fallback error handling
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message("❌ An error occurred while loading history.", ephemeral=True)
-                else:
-                    await interaction.edit_original_response(content="❌ An error occurred while loading history.", embed=None, view=None)
-            except:
-                pass  # If even error handling fails, just log it
+                return error_embed, back_view
+        
+        await run_with_animation(interaction, do_work())
 
 class ResetDataButton(discord.ui.Button):
     def __init__(self, bot, user):
-        super().__init__(label="Reset Data", style=discord.ButtonStyle.danger, emoji="♻️")
+        super().__init__(label="Reset Data", style=discord.ButtonStyle.danger, emoji="🗑️")
         self.bot = bot
         self.user = user
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        # Create confirmation embed
+        
+        # Show confirmation view
         header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
-        sub_header = "[ DATA RESET CONFIRMATION ]\nSystem: SHADOW_PACT // Data Reset [PENDING]\n──────────────────────────"
+        sub_header = "[ DATA RESET WARNING ]\nSystem: SHADOW_PACT // Data Reset [CONFIRM]\n──────────────────────────"
         
         desc_content = f"""{header}
 {sub_header}
 
-⚠️  WARNING: DATA RESET REQUESTED
+⚠️ WARNING: IRREVERSIBLE ACTION
 
-This action will permanently delete:
+This will permanently delete:
 ├─ All profile statistics
-├─ All quest history
-├─ All fitness data
-└─ All progress records
+├─ Quest completion history
+├─ Movement logs
+└─ Achievement progress
 
-This action cannot be undone."""
+Are you absolutely certain?"""
         
         embed = discord.Embed(
             description=f"```ansi\n{desc_content}\n```",
-            color=discord.Color.red()
+            color=discord.Color.orange()
         )
         embed.set_footer(text="Shadow Archive • Data Management")
         
-        # Create confirmation view
-        confirm_view = ResetConfirmationView(self.bot, self.user)
-        await interaction.edit_original_response(embed=embed, view=confirm_view)
-
-# --- Enhanced Views ---
-class ResetConfirmationView(discord.ui.View):
-    def __init__(self, bot, user):
-        super().__init__(timeout=60)
-        self.bot = bot
-        self.user = user
-    
-    @discord.ui.button(label="Confirm Reset", style=discord.ButtonStyle.danger, emoji="✅")
-    async def confirm_reset(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True)
-        await data_manager.reset_user_profile(self.bot, self.user.id)
-        
-        header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
-        sub_header = "[ DATA RESET COMPLETE ]\nSystem: SHADOW_PACT // Data Reset [SUCCESS]\n──────────────────────────"
-        
-        desc_content = f"""{header}
-{sub_header}
-
-✅ RESET SUCCESSFUL
-
-All profile data has been cleared.
-You may now start fresh."""
-        
-        embed = discord.Embed(
-            description=f"```ansi\n{desc_content}\n```",
-            color=discord.Color.green()
-        )
-        embed.set_footer(text="Shadow Archive • Data Management")
-        
-        back_view = discord.ui.View(timeout=120)
-        back_view.add_item(BackToProfileButton(self.bot, self.user))
-        
-        await interaction.edit_original_response(embed=embed, view=back_view)
-    
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
-    async def cancel_reset(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True)
-        
-        # Return to profile
-        embed = await build_profile_embed(self.bot, self.user)
-        view = await ProfilePanel.build_view(self.bot, self.user)
-        await interaction.edit_original_response(embed=embed, view=view)
+        confirmation_view = ResetConfirmationView(self.bot, self.user)
+        await interaction.edit_original_response(embed=embed, view=confirmation_view)
 
 class BackToProfileButton(discord.ui.Button):
     def __init__(self, bot, user):
@@ -325,13 +272,14 @@ class BackToProfileButton(discord.ui.Button):
         self.user = user
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        loading_embed = render_loading_embed(self.user)
-        await interaction.edit_original_response(embed=loading_embed, view=None)
-
-        embed = await build_profile_embed(self.bot, self.user)
-        view = await ProfilePanel.build_view(self.bot, self.user)
-        await interaction.edit_original_response(embed=embed, view=view)
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            embed = await build_profile_embed(self.bot, self.user)
+            view = await ProfilePanel.build_view(self.bot, self.user)
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())
 
 class HistoryPanel(discord.ui.View):
     def __init__(self, bot, user):
@@ -396,12 +344,17 @@ class ToggleHistoryViewButton(discord.ui.Button):
         self.view_type = view_type
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        self.parent_view.page = 1
-        if self.view_type == "quests":
-            await self.parent_view.show_completed_quests(interaction)
-        else:
-            await self.parent_view.show_movement_logs(interaction)
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            self.parent_view.page = 1
+            if self.view_type == "quests":
+                await self.parent_view.show_completed_quests(interaction)
+            else:
+                await self.parent_view.show_movement_logs(interaction)
+            return None, None  # show_completed_quests/show_movement_logs handle the update
+        
+        await run_with_animation(interaction, do_work())
 
 class PaginationButton(discord.ui.Button):
     def __init__(self, parent_view, label, direction, disabled):
@@ -410,16 +363,21 @@ class PaginationButton(discord.ui.Button):
         self.direction = direction
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        if self.direction == "prev":
-            self.parent_view.page = max(1, self.parent_view.page - 1)
-        else:
-            self.parent_view.page += 1
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            if self.direction == "prev":
+                self.parent_view.page = max(1, self.parent_view.page - 1)
+            else:
+                self.parent_view.page += 1
 
-        if self.parent_view.current_view == "quests":
-            await self.parent_view.show_completed_quests(interaction)
-        else:
-            await self.parent_view.show_movement_logs(interaction)
+            if self.parent_view.current_view == "quests":
+                await self.parent_view.show_completed_quests(interaction)
+            else:
+                await self.parent_view.show_movement_logs(interaction)
+            return None, None  # parent methods handle the update
+        
+        await run_with_animation(interaction, do_work())
 
 class ViewChartButton(discord.ui.Button):
     def __init__(self, parent_view):
@@ -427,17 +385,20 @@ class ViewChartButton(discord.ui.Button):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        summary = await data_manager.get_movement_summary_last_7_days(self.parent_view.bot, self.parent_view.user.id)
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            summary = await data_manager.get_movement_summary_last_7_days(self.parent_view.bot, self.parent_view.user.id)
 
-        header = get_system_status_header(self.parent_view.user).replace('```ansi', '').replace('```', '').strip()
-        embed = discord.Embed(title="📈 Movement Progress (Last 7 Days)", description=f"```ansi\n{header}\n```", color=0x2b2d31)
+            header = get_system_status_header(self.parent_view.user).replace('```ansi', '').replace('```', '').strip()
+            embed = discord.Embed(title="📈 Movement Progress (Last 7 Days)", description=f"```ansi\n{header}\n```", color=0x2b2d31)
 
-        chart_str = self.build_ascii_chart(summary)
-        embed.add_field(name="Total Reps per Day", value=f"```\n{chart_str}\n```", inline=False)
-
-        # We only update the embed, keeping the view the same
-        await interaction.edit_original_response(embed=embed)
+            chart_str = self.build_ascii_chart(summary)
+            embed.add_field(name="Total Reps per Day", value=f"```\n{chart_str}\n```", inline=False)
+            
+            return embed, self.parent_view
+        
+        await run_with_animation(interaction, do_work())
 
     def build_ascii_chart(self, summary: Dict[str, int], max_width=20) -> str:
         if not any(summary.values()):
@@ -451,17 +412,50 @@ class ViewChartButton(discord.ui.Button):
             chart.append(f"{day[-5:]}: {bar} ({reps})")
         return "\n".join(chart)
 
-class BackToProfileButton(discord.ui.Button):
+class ResetConfirmationView(discord.ui.View):
     def __init__(self, bot, user):
-        super().__init__(label="Back to Profile", style=discord.ButtonStyle.danger)
+        super().__init__(timeout=60)
         self.bot = bot
         self.user = user
+    
+    @discord.ui.button(label="Confirm Reset", style=discord.ButtonStyle.danger, emoji="✅")
+    async def confirm_reset(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            await data_manager.reset_user_profile(self.bot, self.user.id)
+            
+            header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+            sub_header = "[ DATA RESET COMPLETE ]\nSystem: SHADOW_PACT // Data Reset [SUCCESS]\n──────────────────────────"
+            
+            desc_content = f"""{header}
+{sub_header}
 
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        loading_embed = render_loading_embed(self.user)
-        await interaction.edit_original_response(embed=loading_embed, view=None)
+✅ RESET SUCCESSFUL
 
-        embed = await build_profile_embed(self.bot, self.user)
-        view = ProfilePanel.build_view(self.bot, self.user)
-        await interaction.edit_original_response(embed=embed, view=await view)
+All profile data has been cleared.
+You may now start fresh."""
+            
+            embed = discord.Embed(
+                description=f"```ansi\n{desc_content}\n```",
+                color=discord.Color.green()
+            )
+            embed.set_footer(text="Shadow Archive • Data Management")
+            
+            back_view = discord.ui.View(timeout=120)
+            back_view.add_item(BackToProfileButton(self.bot, self.user))
+            
+            return embed, back_view
+        
+        await run_with_animation(interaction, do_work())
+    
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
+    async def cancel_reset(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            embed = await build_profile_embed(self.bot, self.user)
+            view = await ProfilePanel.build_view(self.bot, self.user)
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())

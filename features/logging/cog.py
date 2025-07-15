@@ -31,6 +31,8 @@ class MovementLogger(commands.Cog):
 
     @commands.Cog.listener()
     async def on_log_reps(self, interaction: discord.Interaction, movement: str, reps: int):
+        from shared.utils.ui_helpers import run_with_animation
+        
         user = interaction.user
         user_id = user.id
         data = await load_user_data(user_id)
@@ -46,26 +48,7 @@ class MovementLogger(commands.Cog):
                     f"⏳ Cooldown active! Try again in {minutes}m {seconds}s.", ephemeral=True
                 )
 
-        # Defer immediately to avoid Discord timeout and allow loading UI
-        if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True)
-
-        # --- RPG LOADING FEEDBACK (animated, cycles until content ready) ---
-        loading = True
-        import asyncio
-        from shared.utils.headers import render_loading_embed
-        async def animate_loading():
-            dots = 1
-            while loading:
-                loading_embed = render_loading_embed(user, dot_count=dots)
-                try:
-                    await interaction.edit_original_response(embed=loading_embed, view=None)
-                except Exception:
-                    pass
-                dots = dots % 3 + 1
-                await asyncio.sleep(0.35)  # Changed from 0.05 to 0.35
-        task = asyncio.create_task(animate_loading())
-        try:
+        async def do_work():
             # Store in both log_stats (for quest tracking) and rep_log (for UI display)
             stats = data.setdefault("log_stats", {})
             stats.setdefault(movement, 0)
@@ -96,36 +79,35 @@ class MovementLogger(commands.Cog):
             embed, view = await render_log_complete_embed(
                 user, movement, reps, xp_earned, user_data=data, daily_quests=daily_quests, weekly_contracts=weekly_contracts
             )
-        finally:
-            loading = False
-            if task and not task.done():
-                try:
-                    task.cancel()
-                    await asyncio.wait_for(task, timeout=0.5)
-                except (asyncio.CancelledError, asyncio.TimeoutError):
-                    pass
-                except Exception:
-                    pass
-            await asyncio.sleep(0.05)
-        await save_user_data(user_id, data)
-        # Write-through: Invalidate cache after DB write
-        from core.redis_cache import invalidate_user_json_cache, get_or_cache_user_json_data
-        await invalidate_user_json_cache(self.bot, user_id)
-        await get_or_cache_user_json_data(self.bot, user_id)
-        await interaction.edit_original_response(embed=embed, view=view)
-
+            
+            await save_user_data(user_id, data)
+            # Write-through: Invalidate cache after DB write
+            from core.redis_cache import invalidate_user_json_cache, get_or_cache_user_json_data
+            await invalidate_user_json_cache(self.bot, user_id)
+            await get_or_cache_user_json_data(self.bot, user_id)
+            
+            return embed, view
+        
+        # Use run_with_animation for the main work
+        await run_with_animation(interaction, do_work())
+        
+        # Handle follow-up notifications after the main response
+        data = await load_user_data(user_id)  # Reload data after processing
+        xp_result = data.get('last_xp_result', {})
+        
         # Send level up notification if user leveled up
         if xp_result.get("leveled_up", False):
-            # Use new UI embed for level up
             level_up_embed = await render_level_up_embed(self.bot, user, xp_result["new_level"])
             await interaction.followup.send(embed=level_up_embed, ephemeral=True)
 
         # Send quest completion notifications as follow-up ephemeral messages
+        completed_quests = data.get('last_completed_quests', [])
         for quest in completed_quests:
             completion_embed = render_quest_completion_panel(quest, user if isinstance(user, discord.User) else user._user)
             await interaction.followup.send(embed=completion_embed, ephemeral=True)
 
         # Send weekly contract completion notifications as follow-up ephemeral messages
+        weekly_completed = data.get('last_weekly_completed', [])
         for contract in weekly_completed:
             weekly_completion_embed = create_weekly_contract_completion_embed(contract)
             await interaction.followup.send(embed=weekly_completion_embed, ephemeral=True)

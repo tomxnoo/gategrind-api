@@ -137,55 +137,46 @@ class AbandonQuestsView(discord.ui.View):
         self.show_confirm_cancel("daily")
         await interaction.response.edit_message(embed=embed, view=self)
 
-    # Remove @interaction_handler decorator and use manual defer instead
     async def confirm_abandon_daily(self, interaction: discord.Interaction):
-        # Use manual defer() instead of @interaction_handler
-        await interaction.response.defer(ephemeral=False)
+        from shared.utils.ui_helpers import run_with_animation
         
-        # Logic to abandon daily quests
-        from features.quests.logic.daily_quests.daily_quest_logic import abandon_daily_quests
-        await abandon_daily_quests(self.user.id, self.bot)
+        async def do_work():
+            from features.quests.logic.daily_quests.daily_quest_logic import abandon_daily_quests
+            await abandon_daily_quests(self.user.id, self.bot)
+            
+            self.daily_abandoned = True
+            embed = build_abandon_quests_embed(self.user, confirm_type="daily_done")
+            self.add_buttons()
+            return embed, self
         
-        # Mark as abandoned and update buttons
-        self.daily_abandoned = True
-        
-        # Remove the asyncio.sleep as it's no longer needed
-        # await asyncio.sleep(0.1)
-        
-        # Show confirmation
-        embed = build_abandon_quests_embed(self.user, confirm_type="daily_done")
-        self.add_buttons()
-        await interaction.edit_original_response(embed=embed, view=self)
-
-    # Remove @interaction_handler decorator and use manual defer instead
+        await run_with_animation(interaction, do_work())
+    
     async def confirm_abandon_weekly(self, interaction: discord.Interaction):
-        # Use manual defer() instead of @interaction_handler
-        await interaction.response.defer(ephemeral=False)
+        from shared.utils.ui_helpers import run_with_animation
         
-        # Logic to abandon weekly contract
-        from features.quests.logic.weekly_quests.weekly_quest_logic import abandon_weekly_contract
-        await abandon_weekly_contract(self.bot, self.user.id)
+        async def do_work():
+            from features.quests.logic.weekly_quests.weekly_quest_logic import abandon_weekly_contract
+            await abandon_weekly_contract(self.bot, self.user.id)
+            
+            self.weekly_abandoned = True
+            embed = build_abandon_quests_embed(self.user, confirm_type="weekly_done")
+            self.add_buttons()
+            return embed, self
         
-        # Mark as abandoned and update buttons
-        self.weekly_abandoned = True
-        
-        # Show confirmation
-        embed = build_abandon_quests_embed(self.user, confirm_type="weekly_done")
-        self.add_buttons()
-        await interaction.edit_original_response(embed=embed, view=self)
-
-    # Remove @interaction_handler decorator and use manual defer instead
+        await run_with_animation(interaction, do_work())
+    
     async def back_to_menu(self, interaction: discord.Interaction):
-        # Use manual defer() instead of @interaction_handler
-        await interaction.response.defer(ephemeral=False)
+        from shared.utils.ui_helpers import run_with_animation
         
-        await invalidate_user_json_cache(self.bot, self.user.id)
+        async def do_work():
+            await invalidate_user_json_cache(self.bot, self.user.id)
+            
+            from features.quests.ui.quest_panel import QuestPanel
+            embed = await QuestPanel.render_embed(self.bot, self.user)
+            view = await QuestPanel.build_view(self.bot, self.user)
+            return embed, view
         
-        from features.quests.ui.quest_panel import QuestPanel
-        # Use QuestPanel's static methods instead of refresh_panel
-        embed = await QuestPanel.render_embed(self.bot, self.user)
-        view = await QuestPanel.build_view(self.bot, self.user)
-        await interaction.edit_original_response(embed=embed, view=view)
+        await run_with_animation(interaction, do_work())
 
     async def cancel_abandon_daily(self, interaction: discord.Interaction):
         # Return to main abandon view
@@ -218,18 +209,27 @@ class AbandonQuestSelect(discord.ui.Select):
         self.user = user
         self.quests = quests or []
 
-    @interaction_handler(ephemeral=True, with_loading=True)
     async def callback(self, interaction: discord.Interaction):
-        selected_index = int(self.values[0])
-        if 0 <= selected_index < len(self.quests):
-            selected_quest = self.quests[selected_index]
-            
-            # Show confirmation view
-            embed = await build_quest_abandon_embed(self.bot, self.user, selected_quest)
-            view = AbandonQuestConfirmationView(self.bot, self.user, selected_quest)
-            await interaction.edit_original_response(embed=embed, view=view)
-        else:
-            await interaction.edit_original_response(content="Invalid selection. Please try again.")
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            selected_index = int(self.values[0])
+            if 0 <= selected_index < len(self.quests):
+                selected_quest = self.quests[selected_index]
+                
+                # Show confirmation view
+                embed = await build_quest_abandon_embed(self.bot, self.user, selected_quest)
+                view = AbandonQuestConfirmationView(self.bot, self.user, selected_quest)
+                return embed, view
+            else:
+                embed = discord.Embed(
+                    title="❌ Invalid Selection",
+                    description="Invalid selection. Please try again.",
+                    color=discord.Color.red()
+                )
+                return embed, None
+        
+        await run_with_animation(interaction, do_work())
 
 class AbandonQuestConfirmationView(discord.ui.View):
     def __init__(self, bot, user: Union[discord.User, discord.Member], quest):
@@ -248,30 +248,39 @@ class AbandonQuestConfirmationView(discord.ui.View):
         cancel_btn.callback = self.cancel_abandon
         self.add_item(cancel_btn)
 
-    @interaction_handler(ephemeral=True, with_loading=True)
     async def confirm_abandon(self, interaction: discord.Interaction):
-        # Logic to abandon the specific quest
-        quest_id = self.quest.get('id') or self.quest.get('quest_id')
-        quest_type = self.quest.get('type', 'daily')
+        from shared.utils.ui_helpers import run_with_animation
         
-        if quest_type == 'daily':
-            from features.quests.logic.daily_quests.daily_quest_logic import abandon_specific_quest
-            await abandon_specific_quest(self.bot, self.user.id, quest_id)
-        elif quest_type == 'weekly':
-            from features.quests.logic.weekly_quests.weekly_quest_logic import abandon_specific_contract
-            await abandon_specific_contract(self.bot, self.user.id, quest_id)
+        async def do_work():
+            # Logic to abandon the specific quest
+            quest_id = self.quest.get('id') or self.quest.get('quest_id')
+            quest_type = self.quest.get('type', 'daily')
+            
+            if quest_type == 'daily':
+                from features.quests.logic.daily_quests.daily_quest_logic import abandon_specific_quest
+                await abandon_specific_quest(self.bot, self.user.id, quest_id)
+            elif quest_type == 'weekly':
+                from features.quests.logic.weekly_quests.weekly_quest_logic import abandon_specific_contract
+                await abandon_specific_contract(self.bot, self.user.id, quest_id)
+            
+            # Show confirmation
+            embed = await build_quest_abandon_confirm_embed(self.bot, self.user, self.quest)
+            
+            # Invalidate cache
+            await invalidate_user_json_cache(self.bot, self.user.id)
+            
+            return embed, None
         
-        # Show confirmation
-        embed = await build_quest_abandon_confirm_embed(self.bot, self.user, self.quest)
-        await interaction.edit_original_response(embed=embed, view=None)
-        
-        # Invalidate cache
-        await invalidate_user_json_cache(self.bot, self.user.id)
+        await run_with_animation(interaction, do_work())
 
-    @interaction_handler(ephemeral=True)
     async def cancel_abandon(self, interaction: discord.Interaction):
-        # Return to quest panel
-        from features.quests.ui.quest_panel import QuestPanel
-        embed = await QuestPanel.render_embed(self.bot, self.user)
-        view = await QuestPanel.build_view(self.bot, self.user)
-        await interaction.edit_original_response(embed=embed, view=view)
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            # Return to quest panel
+            from features.quests.ui.quest_panel import QuestPanel
+            embed = await QuestPanel.render_embed(self.bot, self.user)
+            view = await QuestPanel.build_view(self.bot, self.user)
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())

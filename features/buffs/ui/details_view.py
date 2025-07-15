@@ -3,6 +3,7 @@
 import discord  # Pycord (discord.py compatible)
 from core.config import BUFF_DEFINITIONS
 from features.buffs.ui.view import build_buff_details_embed
+from shared.utils.ui_helpers import run_with_animation
 
 # --- Local BackButton for returning to previous view (no global BackButton found) ---
 class BackButton(discord.ui.Button):
@@ -14,10 +15,21 @@ class BackButton(discord.ui.Button):
         if not interaction.user:
             await interaction.response.send_message("No user found for this interaction.", ephemeral=True)
             return
-        if self.previous_view:
-            await interaction.response.edit_message(view=self.previous_view)
-        else:
-            await interaction.response.edit_message(content="No previous view to return to.", view=None)
+        
+        async def do_work():
+            if self.previous_view:
+                # Return the previous view to be displayed
+                return None, self.previous_view
+            else:
+                # Return a message indicating no previous view
+                embed = discord.Embed(
+                    title="❌ Error",
+                    description="No previous view to return to.",
+                    color=discord.Color.red()
+                )
+                return embed, None
+        
+        await run_with_animation(interaction, do_work)
 
 class BuffDetailsView(discord.ui.View):
     """A view to show the details of a specific buff and a back button."""

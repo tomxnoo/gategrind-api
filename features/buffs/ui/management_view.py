@@ -196,38 +196,56 @@ class AllBuffDetailsView(discord.ui.View):
         embed, _ = await render_buff_panel(self.bot, interaction.user)
         view = create_buff_management_view(self.bot, self.user)
         await interaction.response.edit_message(embed=embed, view=view)
+    
     async def toggle_active_only(self, interaction: discord.Interaction):
-        if not interaction.user or interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ Not your buff details!", ephemeral=True)
-            return
-        self.showing_active_only = not self.showing_active_only
-        self.current_page = 0
-        self.update_buttons()
-        embed = self.create_embed()
-        await interaction.response.defer()
-        await interaction.edit_original_response(embed=embed, view=self)
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            if not interaction.user or interaction.user.id != self.user_id:
+                raise ValueError("Not your buff details!")
+            
+            self.showing_active_only = not self.showing_active_only
+            self.current_page = 0
+            self.update_buttons()
+            embed = self.create_embed()
+            return embed, self
+        
+        await run_with_animation(interaction, do_work())
+    
     async def previous_page(self, interaction: discord.Interaction):
-        if not interaction.user or interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ Not your buff details!", ephemeral=True)
-            return
-        if self.current_page > 0:
-            self.current_page -= 1
-            self.update_buttons()
-            embed = self.create_embed()
-            await interaction.response.defer()
-            await interaction.edit_original_response(embed=embed, view=self)
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            if not interaction.user or interaction.user.id != self.user_id:
+                raise ValueError("Not your buff details!")
+            
+            if self.current_page > 0:
+                self.current_page -= 1
+                self.update_buttons()
+                embed = self.create_embed()
+                return embed, self
+            return None, None
+        
+        await run_with_animation(interaction, do_work())
+    
     async def next_page(self, interaction: discord.Interaction):
-        if not interaction.user or interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ Not your buff details!", ephemeral=True)
-            return
-        current_list = self.active_buffs if self.showing_active_only else self.all_buffs
-        max_pages = len(current_list) + 1 if len(current_list) > 1 else len(current_list)
-        if self.current_page < max_pages - 1:
-            self.current_page += 1
-            self.update_buttons()
-            embed = self.create_embed()
-            await interaction.response.defer()
-            await interaction.edit_original_response(embed=embed, view=self)
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            if not interaction.user or interaction.user.id != self.user_id:
+                raise ValueError("Not your buff details!")
+            
+            current_list = self.active_buffs if self.showing_active_only else self.all_buffs
+            max_pages = len(current_list) + 1 if len(current_list) > 1 else len(current_list)
+            
+            if self.current_page < max_pages - 1:
+                self.current_page += 1
+                self.update_buttons()
+                embed = self.create_embed()
+                return embed, self
+            return None, None
+        
+        await run_with_animation(interaction, do_work())
 
 class BackToBuffsButton(discord.ui.Button):
     def __init__(self, bot, user: Union[discord.User, discord.Member]):
@@ -238,46 +256,16 @@ class BackToBuffsButton(discord.ui.Button):
         self.bot = bot
         self.user = user
         self.user_id = user.id
+        
     async def callback(self, interaction: discord.Interaction):
-        import asyncio
-        from shared.utils.headers import render_loading_embed
-        loading = True
-        task = None
-        async def animate_loading():
-            dots = 1
-            while loading:
-                if not interaction.user:
-                    break
-                loading_embed = render_loading_embed(interaction.user, dot_count=dots)
-                try:
-                    await interaction.edit_original_response(embed=loading_embed, view=None)
-                except Exception:
-                    pass
-                dots = dots % 3 + 1
-                await asyncio.sleep(0.35)
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer()
-            task = asyncio.create_task(animate_loading())
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
             from features.buffs.ui.view import render_buff_panel
             embed, view = await render_buff_panel(self.bot, interaction.user)
-            loading = False
-            if task:
-                task.cancel()
-                await asyncio.sleep(0.1)
-            await interaction.edit_original_response(embed=embed, view=view)
-        except Exception as e:
-            loading = False
-            if task:
-                task.cancel()
-            import traceback
-            tb = traceback.format_exc()
-            error_embed = discord.Embed(
-                title="❌ BUFF PANEL ERROR",
-                description=f"```\n{tb}\n```",
-                color=discord.Color.red()
-            )
-            await interaction.edit_original_response(embed=error_embed, view=None)
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())
 
 def create_buff_management_view(bot, user: Union[discord.User, discord.Member]) -> BuffManagementView:
     return BuffManagementView(bot, user)

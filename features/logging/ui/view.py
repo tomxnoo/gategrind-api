@@ -14,6 +14,7 @@ from features.user.logic.user_data import add_recent_activity
 from core.redis_cache import get_or_cache_user_json_data, invalidate_user_json_cache
 from discord.abc import User as DiscordABCUser
 from typing import Union
+from shared.utils.ui_helpers import run_with_animation
 
 logger = logging.getLogger(__name__)
 
@@ -101,40 +102,46 @@ class LogRepsModal(discord.ui.Modal):
         except ValueError:
             return await interaction.response.send_message("Invalid number of reps. Please enter a positive integer.", ephemeral=True)
 
-        await interaction.response.defer(ephemeral=True)
+        async def do_work():
+            try:
+                # Use a single connection for all database operations
+                async with self.bot.db_pool.acquire() as connection:
+                    async with connection.transaction():
+                        await connection.execute(
+                            "INSERT INTO activity_log (user_id, activity, reps) VALUES ($1, $2, $3)",
+                            self.user.id, self.movement, reps
+                        )
+                # Write-through: Invalidate cache after DB write
+                await invalidate_user_json_cache(self.bot, self.user.id)
+                # Pre-warm cache for best UX
+                await get_or_cache_user_json_data(self.bot, self.user.id)
 
-        try:
-            # Use a single connection for all database operations
-            async with self.bot.db_pool.acquire() as connection:
-                async with connection.transaction():
-                    await connection.execute(
-                        "INSERT INTO activity_log (user_id, activity, reps) VALUES ($1, $2, $3)",
-                        self.user.id, self.movement, reps
-                    )
-            # Write-through: Invalidate cache after DB write
-            await invalidate_user_json_cache(self.bot, self.user.id)
-            # Pre-warm cache for best UX
-            await get_or_cache_user_json_data(self.bot, self.user.id)
+                # Handle XP and quest logic (these functions also need to be refactored)
+                xp_earned = calculate_xp_for_movement(self.movement, reps)
+                # The add_xp function and others will need to be refactored to use the bot.db_pool
+                # For now, we assume they are and that they work.
+                # await add_xp(self.bot, self.user.id, xp_earned)
+                # await update_quest_progress(self.bot, self.user.id, self.movement, reps)
+                # await update_weekly_contract_progress(self.bot, self.user.id, self.movement, reps)
+                # await add_recent_activity(self.bot, self.user.id, f"Logged {reps} {self.movement} for {xp_earned} XP.")
 
-            # Handle XP and quest logic (these functions also need to be refactored)
-            xp_earned = calculate_xp_for_movement(self.movement, reps)
-            # The add_xp function and others will need to be refactored to use the bot.db_pool
-            # For now, we assume they are and that they work.
-            # await add_xp(self.bot, self.user.id, xp_earned)
-            # await update_quest_progress(self.bot, self.user.id, self.movement, reps)
-            # await update_weekly_contract_progress(self.bot, self.user.id, self.movement, reps)
-            # await add_recent_activity(self.bot, self.user.id, f"Logged {reps} {self.movement} for {xp_earned} XP.")
+                embed = discord.Embed(
+                    title="✅ Reps Logged",
+                    description=f"Successfully logged **{reps} {self.movement}** and earned **{xp_earned} XP**!",
+                    color=discord.Color.green()
+                )
+                return embed, None
 
-            embed = discord.Embed(
-                title="✅ Reps Logged",
-                description=f"Successfully logged **{reps} {self.movement}** and earned **{xp_earned} XP**!",
-                color=discord.Color.green()
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            except Exception as e:
+                logger.error(f"Error logging reps for {self.user.id}: {e}", exc_info=True)
+                error_embed = discord.Embed(
+                    title="❌ Error",
+                    description="An error occurred while logging your reps. Please try again later.",
+                    color=discord.Color.red()
+                )
+                return error_embed, None
 
-        except Exception as e:
-            logger.error(f"Error logging reps for {self.user.id}: {e}", exc_info=True)
-            await interaction.followup.send("❌ An error occurred while logging your reps. Please try again later.", ephemeral=True)
+        await run_with_animation(interaction, do_work, ephemeral=True)
 
 async def render_log_complete_embed(user, movement, reps, xp_earned, user_data=None, daily_quests=None, weekly_contracts=None):
     # Basic RPG-style log complete embed. Expand as needed for your RPG UX!
