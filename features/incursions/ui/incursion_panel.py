@@ -12,6 +12,7 @@ from shared.utils.ui_helpers import run_with_animation, DEFAULT_UI_DELAY
 from shared.utils.panel_registry import register
 from features.incursions.logic.incursion_manager import IncursionManager
 from features.incursions.models.incursion import IncursionType  # Remove IncursionStatus
+from features.incursions.ui.participation_modal import ParticipationModal  # Add missing import
 
 @register
 class IncursionPanel:
@@ -23,93 +24,50 @@ class IncursionPanel:
     emoji = "🌑"
     
     @staticmethod
+    @staticmethod
     async def render_embed(bot, user: Union[discord.User, discord.Member]) -> discord.Embed:
         """Render the main incursion panel embed"""
-        header = get_system_status_header(user)
+        # Fix header implementation to match other panels
+        header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
         sub_header = get_panel_sub_header("incursions")
         
-        # Get active incursions
-        manager = IncursionManager(bot)  # Pass bot, not bot.db_pool
+        # Get active incursions - FIXED: Pass bot object instead of bot.db_pool
+        manager = IncursionManager(bot)
         active_incursions = await manager.get_active_incursions()
-        user_progress = await manager.get_user_progress(user.id)
         
-        # Build content
         if not active_incursions:
-            content = (
-                "```ansi\n"
-                f"{header}\n"
-                "🌑 [ SHADOW INCURSIONS MODULE ]\n"
-                "System: SHADOW_PACT // Incursion Access [GRANTED]\n"
-                "──────────────────────────\n\n"
-                "\x1b[2;37m● Status: No active incursions detected\x1b[0m\n"
-                "\x1b[2;37m● Shadow Realm: Dormant\x1b[0m\n"
-                "\x1b[2;37m● Next Scan: Automated\x1b[0m\n\n"
-                "The shadows lie still... for now.\n"
-                "──────────────────────────\n"
-                "```"
-            )
+            content = f"```ansi\n{header}\n{sub_header}\n\n\x1b[1;31mNo active incursions found.\x1b[0m\n\nShadow Incursions are temporary challenges that appear\nperiodically. Check back later for new opportunities.\n```"
         else:
-            content_lines = [
-                "```ansi",
-                header,
-                "🌑 [ SHADOW INCURSIONS MODULE ]",
-                "System: SHADOW_PACT // Incursion Access [GRANTED]",
-                "──────────────────────────",
-                ""
-            ]
+            current_incursion = active_incursions[0]
+            # Fix ZeroDivisionError: Add safety check for target_reps
+            if current_incursion.target_reps > 0:
+                progress_percent = min(100, (current_incursion.current_reps / current_incursion.target_reps) * 100)
+            else:
+                progress_percent = 0
             
-            for i, incursion in enumerate(active_incursions[:3]):  # Show max 3
-                # Get user's progress for this incursion
-                progress = user_progress.get(incursion.id, 0)
-                progress_pct = min(100, (progress / incursion.target_reps) * 100) if incursion.target_reps > 0 else 0
-                
-                # Progress bar
-                filled = int(progress_pct / 10)
-                bar = "█" * filled + "░" * (10 - filled)
-                
-                # Type styling
-                type_colors = {
-                    IncursionType.SURGE: "\x1b[1;32m",      # Bright green
-                    IncursionType.CHALLENGE: "\x1b[1;33m",  # Bright yellow  
-                    IncursionType.ANOMALY: "\x1b[1;35m"     # Bright magenta
-                }
-                color = type_colors.get(incursion.incursion_type, "\x1b[1;37m")
-                
-                # Time remaining
-                time_left = incursion.expires_at - datetime.now(timezone.utc)
-                hours_left = int(time_left.total_seconds() / 3600)
-                
-                content_lines.extend([
-                    f"{color}● {incursion.title}\x1b[0m",
-                    f"  Type: {incursion.incursion_type.value.upper()} | {hours_left}h remaining",
-                    f"  Progress: [{bar}] {progress}/{incursion.target_reps} ({progress_pct:.0f}%)",
-                    f"  Reward: {incursion.reward_description}",
-                    ""
-                ])
+            # Create visual progress bar with custom emojis
+            filled_squares = int(progress_percent / 10)  # Each square represents 10%
+            empty_squares = 10 - filled_squares
+            progress_bar = "🟩" * filled_squares + "⬜️" * empty_squares
             
-            if len(active_incursions) > 3:
-                content_lines.append(f"\x1b[2;37m... and {len(active_incursions) - 3} more\x1b[0m")
+            # Get participant count
+            participant_count = await manager.get_participant_count(current_incursion.incursion_id)
             
-            content_lines.extend([
-                "──────────────────────────",
-                "```"
-            ])
-            content = "\n".join(content_lines)
+            content = f"```ansi\n{header}\n{sub_header}\n\n\x1b[1;35m{current_incursion.title}\x1b[0m\nType: {current_incursion.incursion_type.value.upper()} | {current_incursion.target_exercise}\n\nProgress: [{progress_bar}] {progress_percent:.0f}%\n\nCurrent: {current_incursion.current_reps}/{current_incursion.target_reps} reps\nReward: {current_incursion.reward_description}\nParticipants: {participant_count}\n```"
         
         embed = discord.Embed(
             description=content,
-            color=int(PRIMARY_COLOR.replace("#", ""), 16)
+            color=discord.Color.dark_purple()
         )
-        
-        if active_incursions:
-            embed.set_footer(text="💡 Use buttons below to interact with incursions")
-        
+        # Fix footer to match panel design
+        embed.set_footer(text="Shadow Archive • Incursion Command Node")
         return embed
     
     @staticmethod
-    async def build_view(bot, user: Union[discord.User, discord.Member]) -> discord.ui.View:
+    async def build_view(bot, user: Union[discord.User, discord.Member], **kwargs) -> discord.ui.View:
         """Build the interactive view for the incursion panel"""
-        manager = IncursionManager(bot)  # Changed from bot.db_pool to bot
+        # FIXED: Pass bot object instead of bot.db_pool
+        manager = IncursionManager(bot)
         active_incursions = await manager.get_active_incursions()
         
         view = IncursionPanelView(bot, user, active_incursions)
@@ -126,21 +84,24 @@ class IncursionPanelView(discord.ui.View):
         self.active_incursions = active_incursions
         self.current_page = 0
         
-        # Add navigation buttons if there are incursions
+        # Add dropdown FIRST (above buttons like other panels)
+        from shared.utils.common_views import EphemeralPanelSelect
+        self.add_item(EphemeralPanelSelect(bot, user.id))
+        
+        # Then add action buttons
         if active_incursions:
+            self.add_item(ViewDetailsButton(self))
+            self.add_item(ParticipateButton(self))
+            
             if len(active_incursions) > 1:
                 self.add_item(PrevIncursionButton(self))
                 self.add_item(NextIncursionButton(self))
-            
-            self.add_item(ViewDetailsButton(self))
-            self.add_item(ParticipateButton(self))
         
-        # Add refresh button
         self.add_item(RefreshButton(self))
         
-        # Add panel selector (standard across all panels)
-        from shared.utils.common_views import EphemeralPanelSelect
-        self.add_item(EphemeralPanelSelect(self.bot, self.user_id))
+        # REMOVED: Duplicate EphemeralPanelSelect that was causing the error
+        # from shared.utils.common_views import EphemeralPanelSelect
+        # self.add_item(EphemeralPanelSelect(self.bot, self.user_id))
 
 class PrevIncursionButton(discord.ui.Button):
     def __init__(self, parent_view):
@@ -230,8 +191,8 @@ class RefreshButton(discord.ui.Button):
             return
         
         async def do_work():
-            # Refresh the incursions data
-            manager = IncursionManager(self.parent_view.bot.db_pool)
+            # Refresh the incursions data - FIXED: Pass bot object instead of bot.db_pool
+            manager = IncursionManager(self.parent_view.bot)
             self.parent_view.active_incursions = await manager.get_active_incursions()
             self.parent_view.current_page = 0
             
