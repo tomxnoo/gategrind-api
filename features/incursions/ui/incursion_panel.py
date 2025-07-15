@@ -2,6 +2,7 @@
 # For maintainers: If you need to use Pycord-specific features, refer to https://docs.pycord.dev/en/master/
 import discord  # Pycord (discord.py compatible)
 import asyncio
+import sentry_sdk
 from typing import Union, List, Optional
 from datetime import datetime, timezone
 
@@ -152,11 +153,36 @@ class ViewDetailsButton(discord.ui.Button):
             return
         
         async def do_work():
-            current_incursion = self.parent_view.active_incursions[self.parent_view.current_page]
-            from features.incursions.ui.incursion_details import IncursionDetailsView
-            view = IncursionDetailsView(self.parent_view.bot, interaction.user, current_incursion, self.parent_view)
-            embed = await view.render_details_embed()
-            return embed, view
+            try:
+                current_incursion = self.parent_view.active_incursions[self.parent_view.current_page]
+                sentry_sdk.add_breadcrumb(
+                    message=f"ViewDetailsButton: Loading details for incursion {current_incursion.incursion_id}",
+                    level="info"
+                )
+                
+                from features.incursions.ui.incursion_details import IncursionDetailsView
+                view = IncursionDetailsView(self.parent_view.bot, interaction.user, current_incursion, self.parent_view)
+                
+                sentry_sdk.add_breadcrumb(
+                    message="ViewDetailsButton: IncursionDetailsView created, rendering embed",
+                    level="info"
+                )
+                
+                embed = await view.render_details_embed()
+                
+                sentry_sdk.add_breadcrumb(
+                    message="ViewDetailsButton: Embed rendered successfully",
+                    level="info"
+                )
+                
+                return embed, view
+            except Exception as e:
+                sentry_sdk.capture_exception(e)
+                sentry_sdk.add_breadcrumb(
+                    message=f"ViewDetailsButton: Error occurred - {str(e)}",
+                    level="error"
+                )
+                raise
         
         await run_with_animation(interaction, do_work())
 
