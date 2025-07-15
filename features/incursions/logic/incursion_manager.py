@@ -157,3 +157,40 @@ class IncursionManager:
         """Get user's progress for all active incursions"""
         # For now, return empty dict - this will be implemented with user participation tracking
         return {}
+    
+    async def get_participant_count(self, incursion_id: str) -> int:
+        """Get the number of participants for an incursion"""
+        async with self.db_pool.acquire() as conn:
+            result = await conn.fetchval(
+                """
+                SELECT COUNT(DISTINCT user_id) 
+                FROM user_incursion_participation 
+                WHERE incursion_id = $1
+                """,
+                incursion_id
+            )
+            return result or 0
+    
+    async def get_incursion_leaderboard(self, incursion_id: str, limit: int = 10) -> List[Dict]:
+        """Get leaderboard for an incursion"""
+        async with self.db_pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT 
+                    u.username,
+                    SUM(uip.reps_contributed) as total_reps,
+                    COUNT(uip.id) as sessions
+                FROM user_incursion_participation uip
+                JOIN users u ON u.id = uip.user_id
+                WHERE uip.incursion_id = $1
+                GROUP BY u.id, u.username
+                ORDER BY total_reps DESC
+                LIMIT $2
+                """,
+                incursion_id, limit
+            )
+            return [{
+                'username': row['username'],
+                'total_reps': row['total_reps'],
+                'sessions': row['sessions']
+            } for row in rows]

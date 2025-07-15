@@ -4,7 +4,7 @@ import discord  # Pycord (discord.py compatible)
 from typing import Union
 
 from features.incursions.logic.incursion_manager import IncursionManager
-from features.incursions.logic.rep_integration import RepIntegration
+from features.incursions.logic.rep_integration import IncursionRepIntegration
 from features.incursions.models.incursion import IncursionType
 
 class ParticipationModal(discord.ui.Modal):
@@ -52,73 +52,60 @@ class ParticipationModal(discord.ui.Modal):
                 )
                 return
             
-            # Process the rep submission
-            rep_integration = RepIntegration(self.bot.db_pool)
-            result = await rep_integration.process_incursion_reps(
+            # Process the rep submission - Fixed initialization and method call
+            rep_integration = IncursionRepIntegration(self.bot)
+            result = await rep_integration.process_rep_log(
                 user_id=interaction.user.id,
-                incursion_id=self.incursion.id,
-                exercise_type=self.incursion.exercise_type,
-                rep_count=rep_count,
-                notes=self.notes_input.value.strip() or None
+                exercise=self.incursion.target_exercise,
+                reps=rep_count,
+                sets=1
             )
             
-            if result["success"]:
-                # Create success embed
-                embed = discord.Embed(
-                    title="⚡ Reps Logged Successfully!",
-                    color=0x00ff00
-                )
-                
-                # Add progress info
-                progress = result["new_progress"]
-                target = self.incursion.target_reps
-                progress_pct = min(100, (progress / target) * 100) if target > 0 else 0
-                
-                # Progress bar
-                filled = int(progress_pct / 10)
-                bar = "█" * filled + "░" * (10 - filled)
-                
+            # Create success embed
+            embed = discord.Embed(
+                title="⚡ Reps Logged Successfully!",
+                color=0x00ff00
+            )
+            
+            # Add contribution info
+            if result["incursions_contributed"]:
+                contrib = result["incursions_contributed"][0]
                 embed.add_field(
-                    name="📊 Your Progress",
-                    value=f"[{bar}] {progress}/{target} ({progress_pct:.1f}%)",
-                    inline=False
-                )
-                
-                embed.add_field(
-                    name="💪 Reps Added",
-                    value=f"+{rep_count} {self.incursion.exercise_type}",
+                    name="💪 Reps Contributed",
+                    value=f"+{contrib['reps_contributed']} to {contrib['title']}",
                     inline=True
                 )
-                
-                # Check for completion
-                if progress >= target:
-                    embed.add_field(
-                        name="🎉 Incursion Complete!",
-                        value=f"Reward: {self.incursion.reward_description}",
-                        inline=False
-                    )
-                    embed.color = 0xffd700  # Gold color for completion
-                
-                # Add anomaly effects if applicable
-                if (self.incursion.incursion_type == IncursionType.ANOMALY and 
-                    "anomaly_effects" in result):
-                    effects = result["anomaly_effects"]
+            
+            # Add bonus XP info
+            if result["total_bonus_xp"] > 0:
+                embed.add_field(
+                    name="✨ Bonus XP",
+                    value=f"+{result['total_bonus_xp']} XP",
+                    inline=True
+                )
+            
+            # Check for completion
+            if result["incursions_completed"]:
+                completed = result["incursions_completed"][0]
+                embed.add_field(
+                    name="🎉 Incursion Complete!",
+                    value=f"Completion bonus: +{completed['completion_bonus']} XP",
+                    inline=False
+                )
+                embed.color = 0xffd700  # Gold color for completion
+            
+            # Add anomaly effects if applicable
+            if result["bonuses_applied"]:
+                effects = "\n".join([bonus["special_effect"] for bonus in result["bonuses_applied"] if bonus.get("special_effect")])
+                if effects:
                     embed.add_field(
                         name="🌀 Anomaly Effects Applied",
                         value=effects,
                         inline=False
                     )
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
                 
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-                
-            else:
-                # Handle errors
-                error_msg = result.get("error", "Unknown error occurred")
-                await interaction.response.send_message(
-                    f"❌ Failed to log reps: {error_msg}", 
-                    ephemeral=True
-                )
-        
         except ValueError:
             await interaction.response.send_message(
                 "❌ Please enter a valid number for rep count!", 
