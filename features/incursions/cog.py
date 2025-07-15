@@ -2,6 +2,8 @@
 # For maintainers: If you need to use Pycord-specific features, refer to https://docs.pycord.dev/en/master/
 import discord  # Pycord (discord.py compatible)
 from discord.ext import commands
+import asyncio
+import logging
 from typing import Optional, List  # Added List import
 
 from features.incursions.logic.incursion_manager import IncursionManager
@@ -9,13 +11,31 @@ from features.incursions.logic.scheduler import IncursionScheduler
 from features.incursions.ui.incursion_panel import IncursionPanel  # This import triggers @register
 from shared.utils.ui_helpers import run_with_animation
 
+logger = logging.getLogger(__name__)
+
 class IncursionsCog(commands.Cog):
     """Shadow Incursions - Dynamic world events for fitness challenges"""
     
     def __init__(self, bot):
         self.bot = bot
         self.manager = IncursionManager(bot)
-        self.scheduler = IncursionScheduler(bot)  # Changed from bot.db_pool to bot
+        self.scheduler = IncursionScheduler(bot)
+        
+        # Load settings when cog is ready
+        self.bot.loop.create_task(self._initialize_scheduler())
+    
+    async def _initialize_scheduler(self):
+        """Initialize scheduler settings after bot is ready"""
+        # Wait for bot to be ready and database to be available
+        await self.bot.wait_until_ready()
+        
+        # Small delay to ensure database pool is ready
+        await asyncio.sleep(1)
+        
+        try:
+            await self.scheduler.load_settings()
+        except Exception as e:
+            logger.error(f"Error initializing scheduler settings: {e}")
 
     @commands.command(name="incursions", aliases=["inc"])
     async def view_incursions(self, ctx: commands.Context):
@@ -213,6 +233,14 @@ class IncursionsCog(commands.Cog):
         
         await ctx.send(embed=embed)
 
+    @commands.command(name="start_scheduler")
+    @commands.is_owner()
+    async def start_scheduler_command(self, ctx):
+        """Start the incursion scheduler"""
+        await self.scheduler.start_scheduler()
+        await ctx.send("✅ Incursion scheduler started!")
+
+# Setup function required for Discord.py/Pycord extension loading
 async def setup(bot):
+    """Setup function to load the IncursionsCog"""
     await bot.add_cog(IncursionsCog(bot))
-    # Panel registration is handled by the IncursionPanel import above
