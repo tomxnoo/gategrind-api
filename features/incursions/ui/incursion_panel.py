@@ -9,11 +9,18 @@ from shared.utils.ui_styles import get_panel_sub_header, PRIMARY_COLOR
 from shared.utils.headers import get_system_status_header
 from shared.utils.common_views import EphemeralPanelView
 from shared.utils.ui_helpers import run_with_animation, DEFAULT_UI_DELAY
+from shared.utils.panel_registry import register
 from features.incursions.logic.incursion_manager import IncursionManager
-from features.incursions.models.incursion import IncursionType, IncursionStatus
+from features.incursions.models.incursion import IncursionType  # Remove IncursionStatus
 
+@register
 class IncursionPanel:
     """Main panel for displaying active Shadow Incursions"""
+    
+    # Required attributes for panel registration
+    key = "incursions"
+    label = "Shadow Incursions"
+    emoji = "🌑"
     
     @staticmethod
     async def render_embed(bot, user: Union[discord.User, discord.Member]) -> discord.Embed:
@@ -22,7 +29,7 @@ class IncursionPanel:
         sub_header = get_panel_sub_header("incursions")
         
         # Get active incursions
-        manager = IncursionManager(bot.db_pool)
+        manager = IncursionManager(bot)  # Pass bot, not bot.db_pool
         active_incursions = await manager.get_active_incursions()
         user_progress = await manager.get_user_progress(user.id)
         
@@ -102,7 +109,7 @@ class IncursionPanel:
     @staticmethod
     async def build_view(bot, user: Union[discord.User, discord.Member]) -> discord.ui.View:
         """Build the interactive view for the incursion panel"""
-        manager = IncursionManager(bot.db_pool)
+        manager = IncursionManager(bot)  # Changed from bot.db_pool to bot
         active_incursions = await manager.get_active_incursions()
         
         view = IncursionPanelView(bot, user, active_incursions)
@@ -185,6 +192,7 @@ class ViewDetailsButton(discord.ui.Button):
         
         async def do_work():
             current_incursion = self.parent_view.active_incursions[self.parent_view.current_page]
+            from features.incursions.ui.incursion_details import IncursionDetailsView
             view = IncursionDetailsView(self.parent_view.bot, interaction.user, current_incursion, self.parent_view)
             embed = await view.render_details_embed()
             return embed, view

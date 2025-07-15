@@ -5,8 +5,8 @@ from discord.ext import commands
 from typing import Optional
 
 from features.incursions.logic.incursion_manager import IncursionManager
-from features.incursions.logic.incursion_scheduler import IncursionScheduler
-from features.incursions.ui.incursion_panel import IncursionPanel
+from features.incursions.logic.scheduler import IncursionScheduler
+from features.incursions.ui.incursion_panel import IncursionPanel  # This import triggers @register
 from shared.utils.ui_helpers import run_with_animation
 
 class IncursionsCog(commands.Cog):
@@ -14,54 +14,141 @@ class IncursionsCog(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        self.manager = IncursionManager(bot.db_pool)
-        self.scheduler = IncursionScheduler(bot.db_pool)
-    
-    @discord.slash_command(
-        name="incursions",
-        description="View active Shadow Incursions and participate in dynamic events"
-    )
-    async def incursions_command(self, ctx: discord.ApplicationContext):
-        """Main command to access the Shadow Incursions panel"""
+        self.manager = IncursionManager(bot)
+        self.scheduler = IncursionScheduler(bot)  # Changed from bot.db_pool to bot
+
+    @commands.command(name="incursions", aliases=["inc"])
+    async def view_incursions(self, ctx: commands.Context):
+        """View active Shadow Incursions"""
+        user = ctx.author
+        try:
+            embed = await IncursionPanel.render_embed(self.bot, user)
+            view = await IncursionPanel.build_view(self.bot, user)
+            await ctx.send(embed=embed, view=view)
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            embed = discord.Embed(
+                title="❌ INCURSION ERROR",
+                description=f"```\n{tb}\n```",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+
+    @commands.command(name="incursion_admin", aliases=["inc_admin"])
+    @commands.is_owner()  # Only bot owner can use this command
+    async def incursion_admin(self, ctx: commands.Context, action: Optional[str] = None):
+        """Admin commands for managing incursions. Usage: !incursion_admin [start|stop|status]"""
+        # Delete the user's command message for cleaner chat
+        try:
+            await ctx.message.delete()
+        except (discord.NotFound, discord.Forbidden):
+            pass
         
-        async def do_work():
-            embed = await IncursionPanel.render_embed(self.bot, ctx.author)
-            view = await IncursionPanel.build_view(self.bot, ctx.author)
-            return embed, view
+        if not action:
+            embed = discord.Embed(
+                title="🔧 Incursion Admin Commands",
+                description="Available actions:\n• `!incursion_admin start` - Start a new incursion\n• `!incursion_admin stop` - Stop current incursion\n• `!incursion_admin status` - Check incursion status",
+                color=discord.Color.blue()
+            )
+            await ctx.send(embed=embed, delete_after=10)
+            return
         
-        await run_with_animation(ctx.interaction, do_work())
-    
-    @discord.slash_command(
-        name="incursion_admin",
-        description="Admin commands for managing Shadow Incursions"
-    )
-    @commands.has_permissions(administrator=True)
-    async def incursion_admin(self, ctx: discord.ApplicationContext, 
-                            action: discord.Option(str, choices=["spawn", "cleanup", "status"]),
-                            incursion_type: discord.Option(str, choices=["surge", "challenge", "anomaly"], required=False)):
-        """Admin commands for incursion management"""
+        action = action.lower()
         
-        if action == "spawn":
-            if not incursion_type:
-                await ctx.respond("❌ Please specify an incursion type for spawning.", ephemeral=True)
-                return
-            
-            success = await self.scheduler.spawn_incursion(incursion_type)
-            if success:
-                await ctx.respond(f"✅ {incursion_type.title()} incursion spawned successfully!", ephemeral=True)
-            else:
-                await ctx.respond(f"❌ Failed to spawn {incursion_type} incursion.", ephemeral=True)
+        if action == "start":
+            # Start a new incursion using the scheduler's force_spawn_incursion method
+            try:
+                incursion_id = await self.scheduler.force_spawn_incursion()
+                if incursion_id:
+                    embed = discord.Embed(
+                        title="✅ Incursion Started",
+                        description=f"A new Shadow Incursion has been initiated! (ID: {incursion_id})",
+                        color=discord.Color.green()
+                    )
+                else:
+                    embed = discord.Embed(
+                        title="⚠️ Incursion Not Started",
+                        description="Could not start a new incursion.",
+                        color=discord.Color.orange()
+                    )
+                await ctx.send(embed=embed, delete_after=10)
+            except Exception as e:
+                embed = discord.Embed(
+                    title="❌ Error Starting Incursion",
+                    description=f"Error: {str(e)}",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=embed, delete_after=10)
         
-        elif action == "cleanup":
-            cleaned = await self.scheduler.cleanup_expired_incursions()
-            await ctx.respond(f"🧹 Cleaned up {cleaned} expired incursions.", ephemeral=True)
+        elif action == "stop":
+            # Stop current incursion by getting active incursions and completing them
+            try:
+                active_incursions = await self.manager.get_active_incursions()
+                if active_incursions:
+                    # Complete the first active incursion
+                    result = await self.manager.complete_incursion(active_incursions[0].incursion_id)
+                    if result:
+                        embed = discord.Embed(
+                            title="✅ Incursion Stopped",
+                            description=f"The incursion '{active_incursions[0].title}' has been ended.",
+                            color=discord.Color.green()
+                        )
+                    else:
+                        embed = discord.Embed(
+                            title="⚠️ Error Stopping Incursion",
+                            description="Could not stop the incursion.",
+                            color=discord.Color.orange()
+                        )
+                else:
+                    embed = discord.Embed(
+                        title="⚠️ No Active Incursion",
+                        description="There is no active incursion to stop.",
+                        color=discord.Color.orange()
+                    )
+                await ctx.send(embed=embed, delete_after=10)
+            except Exception as e:
+                embed = discord.Embed(
+                    title="❌ Error Stopping Incursion",
+                    description=f"Error: {str(e)}",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=embed, delete_after=10)
         
         elif action == "status":
-            active_count = len(await self.manager.get_active_incursions())
-            await ctx.respond(f"📊 Currently {active_count} active incursions.", ephemeral=True)
+            # Check incursion status
+            try:
+                active_incursions = await self.manager.get_active_incursions()
+                if active_incursions:
+                    incursion = active_incursions[0]  # Show first active incursion
+                    embed = discord.Embed(
+                        title="📊 Incursion Status",
+                        description=f"**Active Incursion:** {incursion.title}\n**Type:** {incursion.incursion_type.value}\n**Progress:** {incursion.current_reps}/{incursion.target_reps}\n**Expires:** <t:{int(incursion.expires_at.timestamp())}:R>",
+                        color=discord.Color.blue()
+                    )
+                else:
+                    embed = discord.Embed(
+                        title="📊 Incursion Status",
+                        description="No active incursions.",
+                        color=discord.Color.blue()
+                    )
+                await ctx.send(embed=embed, delete_after=15)
+            except Exception as e:
+                embed = discord.Embed(
+                    title="❌ Error Checking Status",
+                    description=f"Error: {str(e)}",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=embed, delete_after=10)
+        
+        else:
+            embed = discord.Embed(
+                title="❌ Invalid Action",
+                description="Valid actions: start, stop, status",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, delete_after=10)
 
-def setup(bot):
-    bot.add_cog(IncursionsCog(bot))
-    
-    # Register the panel
-    from features.incursions.ui.panel_registration import *
+async def setup(bot):
+    await bot.add_cog(IncursionsCog(bot))
+    # Panel registration is handled by the IncursionPanel import above
