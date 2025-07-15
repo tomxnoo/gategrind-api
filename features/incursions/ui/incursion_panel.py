@@ -51,20 +51,63 @@ class IncursionPanel:
             empty_squares = 10 - filled_squares
             progress_bar = "🟩" * filled_squares + "⬜️" * empty_squares
             
+            # Calculate time remaining (matching details view format)
+            time_left = current_incursion.expires_at - datetime.now(timezone.utc)
+            hours_left = int(time_left.total_seconds() / 3600)
+            minutes_left = int((time_left.total_seconds() % 3600) / 60)
+            time_remaining_str = f"{hours_left}h {minutes_left}m"
+            
             # Get participant count
             participant_count = await manager.get_participant_count(current_incursion.incursion_id)
             
-            content = f"```ansi\n{header}\n{sub_header}\n\n\x1b[1;35m{current_incursion.title}\x1b[0m\nType: {current_incursion.incursion_type.value.upper()} | {current_incursion.target_exercise}\n\nProgress: [{progress_bar}] {progress_percent:.0f}%\n\nCurrent: {current_incursion.current_reps}/{current_incursion.target_reps} reps\nReward: {current_incursion.reward_description}\nParticipants: {participant_count}\n```"
+            # Type-specific ANSI colors (consistent with details view)
+            type_colors = {
+                IncursionType.SURGE: "\x1b[1;33m",      # Bright orange (changed from green)
+                IncursionType.CHALLENGE: "\x1b[1;36m",  # Bright cyan
+                IncursionType.ANOMALY: "\x1b[1;35m"     # Bright magenta
+            }
+            color = type_colors.get(current_incursion.incursion_type, "\x1b[1;37m")
+            
+            # Improved layout to match other panels
+            content = (
+                f"```ansi\n"
+                f"{header}\n"
+                f"{sub_header}\n\n"
+                f"{color}● {current_incursion.title}\x1b[0m\n"
+                f"Type: {current_incursion.incursion_type.value.upper()}\n"
+                f"Exercise: {current_incursion.target_exercise}\n\n"
+                f"\x1b[1;37mDescription:\x1b[0m\n"
+                f"{current_incursion.description}\n\n"
+                f"\x1b[1;37mProgress:\x1b[0m\n"
+                f"[{progress_bar}] {progress_percent:.0f}%\n"
+                f"{current_incursion.current_reps}/{current_incursion.target_reps} reps\n\n"
+                f"\x1b[1;37mReward:\x1b[0m {current_incursion.reward_description}\n"
+                f"\x1b[1;37mParticipants:\x1b[0m {participant_count} warriors\n"
+                f"\x1b[1;37mTime Remaining:\x1b[0m {time_remaining_str}\n\n"
+                f"──────────────────────────\n"
+                f"```"
+            )
         
         embed = discord.Embed(
             description=content,
-            color=discord.Color.dark_purple()
+            color=IncursionPanel._get_incursion_color(current_incursion.incursion_type if active_incursions else None)
         )
         # Fix footer to match panel design
-        embed.set_footer(text="Shadow Archive • Incursion Command Node")
+        embed.set_footer(text="Shadow Archive • Incursions")
         return embed
     
     @staticmethod
+    def _get_incursion_color(incursion_type) -> discord.Color:
+        """Get color based on incursion type"""
+        from features.incursions.models.incursion import IncursionType
+        
+        color_map = {
+            IncursionType.ANOMALY: discord.Color.from_rgb(255, 20, 147),    # Magenta
+            IncursionType.CHALLENGE: discord.Color.from_rgb(0, 255, 255),   # Cyan  
+            IncursionType.SURGE: discord.Color.from_rgb(255, 140, 0)        # Orange
+        }
+        return color_map.get(incursion_type, discord.Color.dark_purple())
+    
     async def build_view(bot, user: Union[discord.User, discord.Member], **kwargs) -> discord.ui.View:
         """Build the interactive view for the incursion panel"""
         # FIXED: Pass bot object instead of bot.db_pool

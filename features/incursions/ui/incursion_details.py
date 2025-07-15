@@ -4,7 +4,7 @@ import discord  # Pycord (discord.py compatible)
 from typing import Union
 from datetime import datetime, timezone
 
-from shared.utils.ui_styles import PRIMARY_COLOR
+from shared.utils.ui_styles import PRIMARY_COLOR, get_panel_sub_header
 from shared.utils.headers import get_system_status_header
 from shared.utils.ui_helpers import run_with_animation
 from features.incursions.logic.incursion_manager import IncursionManager
@@ -56,7 +56,7 @@ async def render_details_embed(bot, user: Union[discord.User, discord.Member], i
     
     embed = discord.Embed(
         description="\n".join(content_lines),
-        color=discord.Color.dark_purple()
+        color=_get_incursion_color(incursion.incursion_type)
     )
     # Fix footer to match panel design
     embed.set_footer(text="Shadow Archive • Incursion Details")
@@ -73,18 +73,22 @@ class IncursionDetailsView(discord.ui.View):
         self.incursion = incursion
         self.previous_view = previous_view
         
-        # Add back button
-        self.add_item(BackToIncursionsButton(self.previous_view))
-        
-        # Add participate button
+        # Add participate button first
         self.add_item(ParticipateDetailButton(self.bot, self.incursion))
         
         # Add leaderboard button
         self.add_item(LeaderboardButton(self.bot, self.incursion))
+        
+        # Add back button last (rightmost position)
+        self.add_item(BackToIncursionsButton(self.previous_view))
+        
+        # REMOVED: All duplicate buttons
     
     async def render_details_embed(self) -> discord.Embed:
         """Render detailed incursion information"""
-        header = get_system_status_header(self.user)
+        # Use universal header and sub-header pattern
+        header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = get_panel_sub_header("incursions")
         
         # Get user progress - FIXED: Pass bot object instead of bot.db_pool
         manager = IncursionManager(self.bot)
@@ -102,10 +106,10 @@ class IncursionDetailsView(discord.ui.View):
         hours_left = int(time_left.total_seconds() / 3600)
         minutes_left = int((time_left.total_seconds() % 3600) / 60)
         
-        # Type-specific styling
+        # Type-specific styling (consistent with panel view)
         type_colors = {
-            IncursionType.SURGE: "\x1b[1;32m",      # Bright green
-            IncursionType.CHALLENGE: "\x1b[1;33m",  # Bright yellow  
+            IncursionType.SURGE: "\x1b[1;33m",      # Bright orange (changed from green)
+            IncursionType.CHALLENGE: "\x1b[1;36m",  # Bright cyan
             IncursionType.ANOMALY: "\x1b[1;35m"     # Bright magenta
         }
         color = type_colors.get(self.incursion.incursion_type, "\x1b[1;37m")
@@ -114,22 +118,16 @@ class IncursionDetailsView(discord.ui.View):
         participant_count = await manager.get_participant_count(self.incursion.incursion_id)
         
         content = (
-            "```ansi\n"
+            f"```ansi\n"
             f"{header}\n"
-            "🌑 [ INCURSION DETAILS MODULE ]\n"
-            "System: SHADOW_PACT // Detail Access [GRANTED]\n"
-            "──────────────────────────\n\n"
+            f"{sub_header}\n\n"
             f"{color}● {self.incursion.title}\x1b[0m\n"
-            f"  Type: {self.incursion.incursion_type.value.upper()}\n"
-            f"  Exercise: {self.incursion.target_exercise}\n\n"
+            f"Type: {self.incursion.incursion_type.value.upper()}\n"
+            f"Exercise: {self.incursion.target_exercise}\n\n"
             f"\x1b[1;37mDescription:\x1b[0m\n"
             f"{self.incursion.description}\n\n"
             f"\x1b[1;37mYour Progress:\x1b[0m\n"
-        )
-        
-        content += f"[{progress_bar}] {progress}/{self.incursion.target_reps} ({progress_pct:.1f}%)\n\n"
-        
-        content += (
+            f"[{progress_bar}] {progress}/{self.incursion.target_reps} ({progress_pct:.1f}%)\n\n"
             f"\x1b[1;37mReward:\x1b[0m {self.incursion.reward_description}\n"
             f"\x1b[1;37mParticipants:\x1b[0m {participant_count} warriors\n"
             f"\x1b[1;37mTime Remaining:\x1b[0m {hours_left}h {minutes_left}m\n\n"
@@ -149,16 +147,32 @@ class IncursionDetailsView(discord.ui.View):
         
         embed = discord.Embed(
             description=content,
-            color=int(PRIMARY_COLOR.replace("#", ""), 16)
+            color=self._get_incursion_color(self.incursion.incursion_type)
         )
         
+        # Fix footer to match panel design
+        embed.set_footer(text="Shadow Archive • Incursion Details")
+        
+        return embed
+        # REMOVED: Duplicate footer and return statement
         embed.set_footer(text="💡 Use buttons below to participate or view leaderboard")
         
         return embed
+    
+    def _get_incursion_color(self, incursion_type: 'IncursionType') -> discord.Color:
+        """Get color based on incursion type"""
+        from features.incursions.models.incursion import IncursionType
+        
+        color_map = {
+            IncursionType.ANOMALY: discord.Color.from_rgb(255, 20, 147),    # Magenta
+            IncursionType.CHALLENGE: discord.Color.from_rgb(0, 255, 255),   # Cyan
+            IncursionType.SURGE: discord.Color.from_rgb(255, 140, 0)        # Orange
+        }
+        return color_map.get(incursion_type, discord.Color.dark_purple())
 
 class BackToIncursionsButton(discord.ui.Button):
     def __init__(self, previous_view):
-        super().__init__(label="⬅️ Back", style=discord.ButtonStyle.secondary)
+        super().__init__(label="⬅️ Back to menu", style=discord.ButtonStyle.secondary)
         self.previous_view = previous_view
     
     async def callback(self, interaction: discord.Interaction):
@@ -188,9 +202,34 @@ class LeaderboardButton(discord.ui.Button):
     
     async def callback(self, interaction: discord.Interaction):
         async def do_work():
-            view = LeaderboardView(self.bot, interaction.user, self.incursion)
-            embed = await view.render_leaderboard_embed()
-            return embed, view
+            try:
+                sentry_sdk.add_breadcrumb(
+                    message=f"LeaderboardButton: Starting leaderboard load for incursion {self.incursion.incursion_id}",
+                    level="info"
+                )
+                
+                view = LeaderboardView(self.bot, interaction.user, self.incursion)
+                
+                sentry_sdk.add_breadcrumb(
+                    message="LeaderboardButton: LeaderboardView created, rendering embed",
+                    level="info"
+                )
+                
+                embed = await view.render_leaderboard_embed()
+                
+                sentry_sdk.add_breadcrumb(
+                    message="LeaderboardButton: Embed rendered successfully",
+                    level="info"
+                )
+                
+                return embed, view
+            except Exception as e:
+                sentry_sdk.capture_exception(e)
+                sentry_sdk.add_breadcrumb(
+                    message=f"LeaderboardButton: Error occurred - {str(e)}",
+                    level="error"
+                )
+                raise
         
         await run_with_animation(interaction, do_work())
 
@@ -203,46 +242,126 @@ class LeaderboardView(discord.ui.View):
         self.user = user
         self.incursion = incursion
         
+        sentry_sdk.add_breadcrumb(
+            message=f"LeaderboardView: Initializing for incursion {incursion.incursion_id}",
+            level="info"
+        )
+        
         # Add back button
         self.add_item(BackToDetailsButton(bot, user, incursion))
     
     async def render_leaderboard_embed(self) -> discord.Embed:
         """Render the leaderboard for this incursion"""
-        # Fix header implementation
-        header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+        try:
+            sentry_sdk.add_breadcrumb(
+                message="LeaderboardView: Starting render_leaderboard_embed",
+                level="info"
+            )
+            
+            # Use universal header and sub-header pattern
+            header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+            sub_header = get_panel_sub_header("incursions")
+            
+            sentry_sdk.add_breadcrumb(
+                message="LeaderboardView: Headers generated",
+                level="info"
+            )
+            
+            # Get leaderboard data - FIXED: Pass bot object instead of bot.db_pool
+            manager = IncursionManager(self.bot)
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"LeaderboardView: IncursionManager created, fetching leaderboard for {self.incursion.incursion_id}",
+                level="info"
+            )
+            
+            leaderboard = await manager.get_incursion_leaderboard(self.incursion.incursion_id, limit=10)
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"LeaderboardView: Leaderboard fetched, {len(leaderboard) if leaderboard else 0} entries",
+                level="info"
+            )
+            
+            # Type-specific ANSI colors for incursion title
+            type_colors = {
+                IncursionType.SURGE: "\x1b[1;33m",      # Bright orange
+                IncursionType.CHALLENGE: "\x1b[1;36m",  # Bright cyan
+                IncursionType.ANOMALY: "\x1b[1;35m"     # Bright magenta
+            }
+            title_color = type_colors.get(self.incursion.incursion_type, "\x1b[1;37m")
+            
+            content_lines = [
+                "```ansi",
+                header,
+                sub_header,
+                "",
+                f"{title_color}● {self.incursion.title}\x1b[0m",
+                f"Type: {self.incursion.incursion_type.value.upper()}",
+                "",
+                "\x1b[1;37m🏆 LEADERBOARD:\x1b[0m"
+            ]
+            
+            if leaderboard:
+                for i, entry in enumerate(leaderboard, 1):
+                    # Enhanced rank coloring with ANSI
+                    if i == 1:
+                        rank_color = "\x1b[1;33m"  # Gold for 1st place
+                    elif i == 2:
+                        rank_color = "\x1b[1;37m"  # Silver for 2nd place
+                    elif i == 3:
+                        rank_color = "\x1b[1;31m"  # Bronze/Red for 3rd place
+                    else:
+                        rank_color = "\x1b[0m"     # Default for others
+                        
+                    content_lines.append(
+                        f"{rank_color}{i:2d}. {entry['username']:<15} {entry['total_reps']:>6} reps\x1b[0m"
+                    )
+            else:
+                content_lines.append("\x1b[1;31mNo participants yet.\x1b[0m")
+            
+            content_lines.extend([
+                "",
+                "──────────────────────────",
+                "```"
+            ])
+            
+            sentry_sdk.add_breadcrumb(
+                message="LeaderboardView: Content lines generated, creating embed",
+                level="info"
+            )
+            
+            embed = discord.Embed(
+                description="\n".join(content_lines),
+                color=self._get_incursion_color(self.incursion.incursion_type)
+            )
+            # Fix footer to match panel design
+            embed.set_footer(text="Shadow Archive • Incursion Leaderboard")
+            
+            sentry_sdk.add_breadcrumb(
+                message="LeaderboardView: Embed created successfully",
+                level="info"
+            )
+            
+            return embed
+            
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            sentry_sdk.add_breadcrumb(
+                message=f"LeaderboardView: Error in render_leaderboard_embed - {str(e)}",
+                level="error"
+            )
+            raise
+    
+    def _get_incursion_color(self, incursion_type: 'IncursionType') -> discord.Color:
+        """Get color based on incursion type"""
+        from features.incursions.models.incursion import IncursionType
         
-        # Get leaderboard data - FIXED: Pass bot object instead of bot.db_pool
-        manager = IncursionManager(self.bot)
-        leaderboard = await manager.get_incursion_leaderboard(self.incursion.incursion_id, limit=10)
-        
-        content_lines = [
-            "```ansi",
-            header,
-            "🏆 [ INCURSION LEADERBOARD ]",
-            "System: SHADOW_PACT // Leaderboard Access [GRANTED]",
-            "──────────────────────────",
-            f"\x1b[1;37m{self.incursion.title}\x1b[0m",
-            ""
-        ]
-        
-        if leaderboard:
-            for i, entry in enumerate(leaderboard, 1):
-                rank_color = "\x1b[1;33m" if i <= 3 else "\x1b[0m"
-                content_lines.append(
-                    f"{rank_color}{i:2d}. {entry['username']:<15} {entry['total_reps']:>6} reps\x1b[0m"
-                )
-        else:
-            content_lines.append("\x1b[1;31mNo participants yet.\x1b[0m")
-        
-        content_lines.append("```")
-        
-        embed = discord.Embed(
-            description="\n".join(content_lines),
-            color=discord.Color.gold()
-        )
-        # Fix footer to match panel design
-        embed.set_footer(text="Shadow Archive • Incursion Leaderboard")
-        return embed
+        color_map = {
+            IncursionType.ANOMALY: discord.Color.from_rgb(255, 20, 147),    # Magenta
+            IncursionType.CHALLENGE: discord.Color.from_rgb(0, 255, 255),   # Cyan
+            IncursionType.SURGE: discord.Color.from_rgb(255, 140, 0)        # Orange
+        }
+        return color_map.get(incursion_type, discord.Color.dark_purple())
 
 class BackToDetailsButton(discord.ui.Button):
     def __init__(self, bot, user, incursion):

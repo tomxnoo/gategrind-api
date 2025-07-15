@@ -46,7 +46,7 @@ class IncursionManager:
                              reward_type: RewardType,
                              reward_value: int,
                              reward_description: str,
-                             duration_hours: int = 24,
+                             duration_hours: float = 24.0,  # Changed to float for fractional hours
                              metadata: Dict[str, Any] = None) -> Incursion:
         """Create a new incursion"""
         if metadata is None:
@@ -69,10 +69,10 @@ class IncursionManager:
                 """,
                 incursion_id, incursion_type.value, title, description, 
                 target_exercise, target_reps, reward_type.value, reward_value,
-                reward_description, expires_at, metadata_json  # Use JSON string instead of dict
+                reward_description, expires_at, metadata_json
             )
             
-        logger.info(f"Created new incursion: {incursion_id}")
+        logger.info(f"Created new incursion: {incursion_id} (expires: {expires_at})")
         return self._row_to_incursion(row)
     
     async def contribute_reps(self, incursion_id: str, reps: int) -> bool:
@@ -174,23 +174,53 @@ class IncursionManager:
     async def get_incursion_leaderboard(self, incursion_id: str, limit: int = 10) -> List[Dict]:
         """Get leaderboard for an incursion"""
         async with self.db_pool.acquire() as conn:
-            rows = await conn.fetch(
+            try:
+                rows = await conn.fetch(
+                    """
+                    SELECT 
+                        user_id,
+                        SUM(reps_contributed) as total_reps,
+                        COUNT(id) as sessions
+                    FROM user_incursion_participation
+                    WHERE incursion_id = $1
+                    GROUP BY user_id
+                    ORDER BY total_reps DESC
+                    LIMIT $2
+                    """,
+                    incursion_id, limit
+                )
+                return [{
+                    'username': f'User {row["user_id"]}',  # Fallback username format
+                    'total_reps': row['total_reps'],
+                    'sessions': row['sessions']
+                } for row in rows]
+            except Exception as e:
+                logger.warning(f"Error fetching leaderboard for {incursion_id}: {e}")
+                return []  # Return empty list if query fails
+    
+    async def get_hours_since_last_incursion(self) -> float:
+        """Get hours since the last incursion ended (expired or completed)"""
+        async with self.db_pool.acquire() as conn:
+            # Get the most recent incursion that ended (either expired or manually completed)
+            row = await conn.fetchrow(
                 """
-                SELECT 
-                    u.username,
-                    SUM(uip.reps_contributed) as total_reps,
-                    COUNT(uip.id) as sessions
-                FROM user_incursion_participation uip
-                JOIN users u ON u.id = uip.user_id
-                WHERE uip.incursion_id = $1
-                GROUP BY u.id, u.username
-                ORDER BY total_reps DESC
-                LIMIT $2
-                """,
-                incursion_id, limit
+                SELECT expires_at, created_at
+                FROM active_incursions 
+                WHERE is_active = FALSE
+                ORDER BY 
+                    CASE 
+                        WHEN expires_at <= NOW() THEN expires_at  -- Use expiry time for expired incursions
+                        ELSE created_at  -- Use creation time for manually completed ones
+                    END DESC
+                LIMIT 1
+                """
             )
-            return [{
-                'username': row['username'],
-                'total_reps': row['total_reps'],
-                'sessions': row['sessions']
-            } for row in rows]
+            
+            if not row:
+                # No previous incursions found, return a large number to trigger escalation
+                return 24.0  # 24 hours to ensure escalation kicks in
+            
+            # Calculate time since the incursion ended
+            end_time = row['expires_at'] if row['expires_at'] <= datetime.now() else row['created_at']
+            time_diff = datetime.now() - end_time
+            return time_diff.total_seconds() / 3600  # Convert to hours

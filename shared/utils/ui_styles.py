@@ -24,6 +24,7 @@ PANEL_SUB_HEADERS = {
     "quest_abandon": "[ QUEST ABANDON MODULE ]\nSystem: SHADOW_PACT // Quest Abandon Access [GRANTED]\n──────────────────────────",
     "quest_abandon_confirm": "[ QUEST ABANDON CONFIRMATION ]\nSystem: SHADOW_PACT // Quest Abandon Confirm [GRANTED]\n──────────────────────────",
     "level_up": "[ LEVEL UP MODULE ]\nSystem: SHADOW_PACT // Level Up Access [GRANTED]\n──────────────────────────",
+    "incursions": "[ INCURSION DETAILS MODULE ]\nSystem: SHADOW_PACT // Incursion Details Access [GRANTED]\n──────────────────────────",
     # Add more panels as needed
 }
 
