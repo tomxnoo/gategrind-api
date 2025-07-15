@@ -185,3 +185,38 @@ async def reroll_weekly_contract(conn: asyncpg.Connection, user_id: int) -> bool
     from features.quests.logic.weekly_quests.reroll_weekly_contracts import reroll_weekly_contracts
     # This will update the user's weekly contracts in the DB
     return await reroll_weekly_contracts(user_id)
+
+# Add these functions to the existing db.py file
+
+async def get_system_setting(conn: asyncpg.Connection, setting_key: str, default_value=None):
+    """Get a system setting value"""
+    try:
+        row = await conn.fetchrow(
+            'SELECT setting_value FROM system_settings WHERE setting_key = $1',
+            setting_key
+        )
+        if row:
+            return row['setting_value']
+        return default_value
+    except Exception as e:
+        logger.error(f"Error getting system setting {setting_key}: {e}")
+        return default_value
+
+async def set_system_setting(conn: asyncpg.Connection, setting_key: str, setting_value):
+    """Set a system setting value"""
+    try:
+        await conn.execute(
+            '''
+            INSERT INTO system_settings (setting_key, setting_value, updated_at)
+            VALUES ($1, $2, CURRENT_TIMESTAMP)
+            ON CONFLICT (setting_key) 
+            DO UPDATE SET 
+                setting_value = EXCLUDED.setting_value,
+                updated_at = CURRENT_TIMESTAMP
+            ''',
+            setting_key, json.dumps(setting_value)
+        )
+        logger.info(f"Updated system setting {setting_key} = {setting_value}")
+    except Exception as e:
+        logger.error(f"Error setting system setting {setting_key}: {e}")
+        raise

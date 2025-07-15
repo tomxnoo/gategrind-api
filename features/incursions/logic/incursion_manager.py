@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import json  # Add this import
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 import asyncpg
 from features.incursions.models.incursion import Incursion, IncursionType, RewardType
@@ -46,13 +46,13 @@ class IncursionManager:
                              reward_type: RewardType,
                              reward_value: int,
                              reward_description: str,
-                             duration_hours: float = 24.0,  # Changed to float for fractional hours
+                             duration_hours: float = 24.0,
                              metadata: Dict[str, Any] = None) -> Incursion:
         """Create a new incursion"""
         if metadata is None:
             metadata = {}
         
-        expires_at = datetime.now() + timedelta(hours=duration_hours)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
         
         # Convert metadata dict to JSON string for database storage
         metadata_json = json.dumps(metadata)
@@ -221,6 +221,6 @@ class IncursionManager:
                 return 24.0  # 24 hours to ensure escalation kicks in
             
             # Calculate time since the incursion ended
-            end_time = row['expires_at'] if row['expires_at'] <= datetime.now() else row['created_at']
-            time_diff = datetime.now() - end_time
+            end_time = row['expires_at'] if row['expires_at'] <= datetime.now(timezone.utc) else row['created_at']
+            time_diff = datetime.now(timezone.utc) - end_time
             return time_diff.total_seconds() / 3600  # Convert to hours
