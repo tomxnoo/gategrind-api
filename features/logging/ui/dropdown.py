@@ -9,6 +9,7 @@ from features.user.logic.xp_engine import MOVEMENT_DATA
 from shared.utils.common_views import EphemeralPanelSelect
 from shared.utils.headers import render_loading_embed
 import asyncio
+from shared.utils.ui_helpers import run_with_animation
 
 # Modal for logging reps
 class LogModal(discord.ui.Modal):
@@ -33,10 +34,20 @@ class LogModal(discord.ui.Modal):
             return await interaction.response.send_message(
                 "Please enter a valid number.", ephemeral=True
             )
-        # Defer and let the MovementLogger cog handle the loading UI and response
-        await interaction.response.defer(ephemeral=True)
-        bot = interaction.client
-        bot.dispatch("log_reps", interaction, self.movement, reps)
+        
+        async def do_work():
+            # Dispatch the log_reps event for the MovementLogger cog to handle
+            bot = interaction.client
+            bot.dispatch("log_reps", interaction, self.movement, reps)
+            # Return a simple confirmation embed
+            embed = discord.Embed(
+                title="📝 Processing...",
+                description=f"Logging {reps} {self.movement} reps...",
+                color=discord.Color.blue()
+            )
+            return embed, None
+        
+        await run_with_animation(interaction, do_work, ephemeral=True)
         # Do not send another response or run a loading animation here; the cog will handle it.
 
 # Dropdown for selecting movement to log

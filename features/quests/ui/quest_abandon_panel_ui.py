@@ -20,32 +20,34 @@ class ConfirmAbandonButton(discord.ui.Button):
         self.bot = bot
 
     async def callback(self, interaction: discord.Interaction):
-        if not interaction.user: return
+        from shared.utils.ui_helpers import run_with_animation
         
-        from features.quests.ui.weekly.weekly_contract_panel import abandon_active_weekly_contract, WeeklyQuestSelectorView
+        async def do_work():
+            if not interaction.user:
+                raise ValueError("No user found")
+            
+            from features.quests.ui.weekly.weekly_contract_panel import abandon_active_weekly_contract, WeeklyQuestSelectorView
+            
+            # Abandon the contract
+            await abandon_active_weekly_contract(interaction.user.id, self.bot)
+            
+            # Create new view and manually build the embed and update
+            view = WeeklyQuestSelectorView(self.bot, interaction.user.id)
+            
+            # Get the contracts and build embed manually
+            from features.quests.ui.weekly.weekly_contract_panel import get_weekly_contracts, build_weekly_contract_panel_embed
+            contracts = await get_weekly_contracts(interaction.user.id, self.bot)
+            
+            if contracts:
+                # Reset page to 0 after abandon
+                view.page_dict[interaction.user.id] = 0
+                embed = build_weekly_contract_panel_embed(interaction.user, contracts[0], 1, len(contracts))
+            else:
+                embed = discord.Embed(description="❌ No weekly contracts found.", color=discord.Color.red())
+            
+            return embed, view
         
-        # Respond to the interaction first
-        await interaction.response.defer()
-        
-        # Abandon the contract
-        await abandon_active_weekly_contract(interaction.user.id, self.bot)
-        
-        # Create new view and manually build the embed and update
-        view = WeeklyQuestSelectorView(self.bot, interaction.user.id)
-        
-        # Get the contracts and build embed manually
-        from features.quests.ui.weekly.weekly_contract_panel import get_weekly_contracts, build_weekly_contract_panel_embed
-        contracts = await get_weekly_contracts(interaction.user.id, self.bot)
-        
-        if contracts:
-            # Reset page to 0 after abandon
-            view.page_dict[interaction.user.id] = 0
-            embed = build_weekly_contract_panel_embed(interaction.user, contracts[0], 1, len(contracts))
-        else:
-            embed = discord.Embed(description="❌ No weekly contracts found.", color=discord.Color.red())
-        
-        # Update the message
-        await interaction.edit_original_response(embed=embed, view=view)
+        await run_with_animation(interaction, do_work())
 
 class CancelAbandonButton(discord.ui.Button):
     def __init__(self, bot, user_id):
@@ -54,30 +56,32 @@ class CancelAbandonButton(discord.ui.Button):
         self.user_id = user_id
 
     async def callback(self, interaction: discord.Interaction):
-        if not interaction.user: return
+        from shared.utils.ui_helpers import run_with_animation
         
-        from features.quests.ui.weekly.weekly_contract_panel import WeeklyQuestSelectorView, get_weekly_contracts, build_weekly_contract_panel_embed
+        async def do_work():
+            if not interaction.user:
+                raise ValueError("No user found")
+            
+            from features.quests.ui.weekly.weekly_contract_panel import WeeklyQuestSelectorView, get_weekly_contracts, build_weekly_contract_panel_embed
+            
+            # Create new view and manually build the embed
+            view = WeeklyQuestSelectorView(self.bot, self.user_id)
+            
+            # Get current contracts and build embed
+            contracts = await get_weekly_contracts(self.user_id, self.bot)
+            
+            if contracts:
+                current_page = view.page_dict.get(self.user_id, 0)
+                if current_page >= len(contracts):
+                    current_page = 0
+                    view.page_dict[self.user_id] = current_page
+                embed = build_weekly_contract_panel_embed(interaction.user, contracts[current_page], current_page + 1, len(contracts))
+            else:
+                embed = discord.Embed(description="❌ No weekly contracts found.", color=discord.Color.red())
+            
+            return embed, view
         
-        # Respond to the interaction first
-        await interaction.response.defer()
-        
-        # Create new view and manually build the embed
-        view = WeeklyQuestSelectorView(self.bot, self.user_id)
-        
-        # Get current contracts and build embed
-        contracts = await get_weekly_contracts(self.user_id, self.bot)
-        
-        if contracts:
-            current_page = view.page_dict.get(self.user_id, 0)
-            if current_page >= len(contracts):
-                current_page = 0
-                view.page_dict[self.user_id] = current_page
-            embed = build_weekly_contract_panel_embed(interaction.user, contracts[current_page], current_page + 1, len(contracts))
-        else:
-            embed = discord.Embed(description="❌ No weekly contracts found.", color=discord.Color.red())
-        
-        # Update the message
-        await interaction.edit_original_response(embed=embed, view=view)
+        await run_with_animation(interaction, do_work())
 
 
 class AbandonQuestConfirmationView(discord.ui.View):

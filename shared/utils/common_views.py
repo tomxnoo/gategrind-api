@@ -36,6 +36,8 @@ class EphemeralPanelSelect(Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        from shared.utils.ui_helpers import run_with_animation
+        
         try:
             if not interaction.user or interaction.user.id != self.user_id:
                 await interaction.response.send_message("This menu isn't for you.", ephemeral=True)
@@ -50,44 +52,32 @@ class EphemeralPanelSelect(Select):
                 await interaction.response.send_message("❌ Panel not found.", ephemeral=True)
                 return
 
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-
-            loading = True
-            loading_task = asyncio.create_task(self.animate_loading(interaction))
-            embed = None
-            view = None
-            try:
-                embed = await asyncio.wait_for(panel_cls.render_embed(self.bot, interaction.user), timeout=15)
-                view = await asyncio.wait_for(panel_cls.build_view(self.bot, interaction.user), timeout=15)
-            except asyncio.TimeoutError:
-                print(f"[ERROR] Panel render timed out for {key}")
-                embed = discord.Embed(
-                    title="⚠️ Panel Loading Timeout",
-                    description=f"Panel `{key}` took too long to load. Please try again.",
-                    color=0xff6b35
-                )
-                if interaction.user:
-                    view = EphemeralPanelView(self.bot, interaction.user)  # Accepts both User and Member
-            except Exception as render_error:
-                print(f"[ERROR] Panel render failed for {key}: {render_error}")
-                traceback.print_exc()
-                embed = discord.Embed(
-                    title="⚠️ Panel Loading Error",
-                    description=f"Could not load `{key}` panel. Please try again.",
-                    color=0xff6b35
-                )
-                if interaction.user:
-                    view = EphemeralPanelView(self.bot, interaction.user)  # Accepts both User and Member
-            finally:
-                loading = False
-                loading_task.cancel()
+            async def do_work():
                 try:
-                    await loading_task
-                except asyncio.CancelledError:
-                    pass
-                if embed and view:
-                    await interaction.edit_original_response(embed=embed, view=view)
+                    embed = await asyncio.wait_for(panel_cls.render_embed(self.bot, interaction.user), timeout=15)
+                    view = await asyncio.wait_for(panel_cls.build_view(self.bot, interaction.user), timeout=15)
+                    return embed, view
+                except asyncio.TimeoutError:
+                    print(f"[ERROR] Panel render timed out for {key}")
+                    embed = discord.Embed(
+                        title="⚠️ Panel Loading Timeout",
+                        description=f"Panel `{key}` took too long to load. Please try again.",
+                        color=0xff6b35
+                    )
+                    view = EphemeralPanelView(self.bot, interaction.user) if interaction.user else None
+                    return embed, view
+                except Exception as render_error:
+                    print(f"[ERROR] Panel render failed for {key}: {render_error}")
+                    traceback.print_exc()
+                    embed = discord.Embed(
+                        title="⚠️ Panel Loading Error",
+                        description=f"Could not load `{key}` panel. Please try again.",
+                        color=0xff6b35
+                    )
+                    view = EphemeralPanelView(self.bot, interaction.user) if interaction.user else None
+                    return embed, view
+            
+            await run_with_animation(interaction, do_work())
 
         except Exception as e:
             print(f"[ERROR] Unexpected error in EphemeralPanelSelect: {e}")

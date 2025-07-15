@@ -182,15 +182,16 @@ class ConfirmRerollView(discord.ui.View):
                 pass
 
     async def cancel_reroll(self, interaction: discord.Interaction):
-        try:
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
             from ui.quest_panel import QuestPanel
             view = await QuestPanel.build_view(self.bot, self.user)
             embed = await build_quest_panel_embed(self.bot, self.user)
             self.clear_items()
-            await interaction.response.edit_message(embed=embed, view=view)
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            raise
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())
 
 class BackToMenuView(discord.ui.View):
     def __init__(self, bot, user: Union[discord.User, discord.Member]):
@@ -202,47 +203,35 @@ class BackToMenuView(discord.ui.View):
         self.add_item(self.back_button)
 
     async def back_to_menu(self, interaction: discord.Interaction):
-        # Use manual defer() instead of trying to edit without deferring
-        await interaction.response.defer(ephemeral=False)
+        from shared.utils.ui_helpers import run_with_animation
         
-        loading = True
-        async def animate_loading():
-            dots = 1
-            while loading:
-                loading_embed = render_loading_embed(self.user, dot_count=dots)
-                try:
-                    await interaction.edit_original_response(embed=loading_embed, view=None)
-                except Exception:
-                    pass
-                dots = dots % 3 + 1
-                await asyncio.sleep(0.35)
-        loading_task = asyncio.create_task(animate_loading())
-        try:
-            await asyncio.sleep(1.2)
+        async def do_work():
             from features.quests.ui.quest_panel import QuestPanel
             view = await QuestPanel.build_view(self.bot, self.user)
             embed = await QuestPanel.render_embed(self.bot, self.user)
-            loading = False
-            await interaction.edit_original_response(embed=embed, view=view)
-        except Exception as e:
-            import sentry_sdk
-            from discord.errors import NotFound
-            sentry_sdk.capture_exception(e)
-            if isinstance(e, NotFound):
-                sentry_sdk.capture_message("404 NotFound: Webhook or interaction expired in back_to_menu")
-                return
-            try:
-                await interaction.edit_original_response(content="An error occurred while returning to the quest panel.", embed=None, view=None)
-            except Exception:
-                pass
-            raise
-        finally:
-            try:
-                loading_task.cancel()
-                await loading_task
-            except Exception:
-                pass
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())
 
+class RerollLimitView(discord.ui.View):
+    def __init__(self, bot, user):
+        super().__init__(timeout=60)
+        self.bot = bot
+        self.user = user
+        self.back_button = discord.ui.Button(label="Back to Menu", style=discord.ButtonStyle.primary)
+        self.back_button.callback = self.back_to_menu
+        self.add_item(self.back_button)
+
+    async def back_to_menu(self, interaction: discord.Interaction):
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            from features.quests.ui.quest_panel import QuestPanel
+            view = await QuestPanel.build_view(self.bot, self.user)
+            embed = await QuestPanel.render_embed(self.bot, self.user)
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())
 
 # --- RPG-style reroll confirmation embed builder ---
 def build_reroll_confirm_embed(user, already_rerolled=False, add_back_button=False, bot=None):
@@ -258,64 +247,6 @@ def build_reroll_confirm_embed(user, already_rerolled=False, add_back_button=Fal
         embed = discord.Embed(description=f"```ansi\n{desc}\n```", color=discord.Color.orange())
     embed.set_footer(text="Shadow Archive • Quest Database")
     return embed
-
-# Add a Back to Menu view for reroll limit reached
-class RerollLimitView(discord.ui.View):
-    def __init__(self, bot, user):
-        super().__init__(timeout=60)
-        self.bot = bot
-        self.user = user
-        self.back_button = discord.ui.Button(label="Back to Menu", style=discord.ButtonStyle.primary)
-        self.back_button.callback = self.back_to_menu
-        self.add_item(self.back_button)
-
-    async def back_to_menu(self, interaction: discord.Interaction):
-        loading = True
-        async def animate_loading():
-            dots = 1
-            while loading:
-                loading_embed = render_loading_embed(self.user, dot_count=dots)
-                try:
-                    if not interaction.response.is_done():
-                        await interaction.response.edit_message(embed=loading_embed, view=None)
-                    else:
-                        await interaction.edit_original_response(embed=loading_embed, view=None)
-                except Exception:
-                    pass
-                dots = dots % 3 + 1
-                await asyncio.sleep(0.35)
-        loading_task = asyncio.create_task(animate_loading())
-        try:
-            await asyncio.sleep(1.2)
-            from ui.quest_panel import QuestPanel
-            view = await QuestPanel.build_view(self.bot, self.user)
-            embed = await build_quest_panel_embed(self.bot, self.user)
-            nonlocal_loading = False
-            if not interaction.response.is_done():
-                await interaction.response.edit_message(embed=embed, view=view)
-            else:
-                await interaction.edit_original_response(embed=embed, view=view)
-        except Exception as e:
-            import sentry_sdk
-            from discord.errors import NotFound
-            sentry_sdk.capture_exception(e)
-            if isinstance(e, NotFound):
-                sentry_sdk.capture_message("404 NotFound: Webhook or interaction expired in back_to_menu")
-                return
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.edit_message(content="An error occurred while returning to the quest panel.", embed=None, view=None)
-                else:
-                    await interaction.edit_original_response(content="An error occurred while returning to the quest panel.", embed=None, view=None)
-            except Exception:
-                pass
-            raise
-        finally:
-            try:
-                loading_task.cancel()
-                await loading_task
-            except Exception:
-                pass
 
 def get_reroll_limit_view(bot, user):
     return RerollLimitView(bot, user)

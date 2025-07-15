@@ -10,6 +10,7 @@ from features.quests.logic.quest_templates import generate_weekly_contract, get_
 from features.quests.ui.weekly.weekly_contract_ansi import render_weekly_contract_ansi_block
 from shared.utils.headers import get_system_status_header
 from shared.utils.ui_styles import get_panel_sub_header
+from shared.utils.ui_helpers import run_with_animation
 from discord.ext import commands
 from features.quests.ui.quest_panel_common import QuestSelectorView, QuestAcceptDeclineView
 
@@ -131,42 +132,40 @@ class WeeklyQuestAcceptDeclineView(QuestAcceptDeclineView):
         super().__init__(bot, user, quest, disable_accept, quest_type)
     
     async def accept_callback(self, interaction: discord.Interaction):
-        try:
-            await interaction.response.defer(ephemeral=False)
-        except Exception:
-            pass
+        async def do_work():
+            user_id = self.user.id
+            tier = self.quest.get("Tier") or self.quest.get("tier")
+            if tier is None:
+                tier = 1
+            await activate_weekly_contract(user_id, tier, bot=self.bot)
+            
+            # Invalidate cache to ensure fresh data
+            from core.redis_cache import invalidate_user_json_cache
+            await invalidate_user_json_cache(self.bot, user_id)
+            
+            # Reset page index to 0 since active quest will be first
+            _weekly_pages[user_id] = 0
+            
+            contracts = await get_weekly_contracts(user_id, self.bot)
+            active_contract = next((c for c in contracts if c.get("active")), None)
+            if active_contract is None:
+                active_contract = self.quest
+            embed = render_quest_accepted_embed(self.user, active_contract)
+            view = BackToMenuFromWeeklyAcceptView(self.bot, self.user)
+            return embed, view
         
-        user_id = self.user.id
-        tier = self.quest.get("Tier") or self.quest.get("tier")
-        if tier is None:
-            tier = 1
-        await activate_weekly_contract(user_id, tier, bot=self.bot)
-        
-        # Invalidate cache to ensure fresh data
-        from core.redis_cache import invalidate_user_json_cache
-        await invalidate_user_json_cache(self.bot, user_id)
-        
-        # Reset page index to 0 since active quest will be first
-        _weekly_pages[user_id] = 0
-        
-        contracts = await get_weekly_contracts(user_id, self.bot)
-        active_contract = next((c for c in contracts if c.get("active")), None)
-        if active_contract is None:
-            active_contract = self.quest
-        embed = render_quest_accepted_embed(self.user, active_contract)
-        view = BackToMenuFromWeeklyAcceptView(self.bot, self.user)
-        await interaction.edit_original_response(embed=embed, view=view)
+        await run_with_animation(interaction, do_work)
+    
     async def decline_callback(self, interaction: discord.Interaction):
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-        user_id = self.user.id
-        view = WeeklyQuestSelectorView(self.bot, user_id)
-        contracts = await get_weekly_contracts(user_id, self.bot)
-        index = _weekly_pages.get(user_id, 0)
-        embed = build_weekly_contract_panel_embed(self.user, contracts[index], index + 1, len(contracts))
-        await interaction.edit_original_response(embed=embed, view=view)
+        async def do_work():
+            user_id = self.user.id
+            view = WeeklyQuestSelectorView(self.bot, user_id)
+            contracts = await get_weekly_contracts(user_id, self.bot)
+            index = _weekly_pages.get(user_id, 0)
+            embed = build_weekly_contract_panel_embed(self.user, contracts[index], index + 1, len(contracts))
+            return embed, view
+        
+        await run_with_animation(interaction, do_work)
 
 class BackToMenuFromWeeklyAcceptView(discord.ui.View):
     def __init__(self, bot, user):
@@ -181,18 +180,20 @@ class BackToWeeklyMenuButton(discord.ui.Button):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
-        from core.redis_cache import invalidate_user_json_cache
-        
-        await interaction.response.defer(ephemeral=False)
-        
-        # Invalidate cache to ensure fresh data
-        await invalidate_user_json_cache(self.parent_view.bot, self.parent_view.user.id)
-        
-        # Reset page index to show active quest first
-        _weekly_pages[self.parent_view.user.id] = 0
+        async def do_work():
+            from core.redis_cache import invalidate_user_json_cache
+            
+            # Invalidate cache to ensure fresh data
+            await invalidate_user_json_cache(self.parent_view.bot, self.parent_view.user.id)
+            
+            # Reset page index to show active quest first
+            _weekly_pages[self.parent_view.user.id] = 0
 
-        view = WeeklyQuestSelectorView(self.parent_view.bot, self.parent_view.user.id)
-        await view.refresh_panel(interaction)
+            view = WeeklyQuestSelectorView(self.parent_view.bot, self.parent_view.user.id)
+            await view.refresh_panel(interaction)
+            return None, None  # refresh_panel handles the response
+        
+        await run_with_animation(interaction, do_work)
 
 
 # endregion
