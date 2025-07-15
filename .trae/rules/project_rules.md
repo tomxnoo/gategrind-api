@@ -89,7 +89,7 @@ Objective: This document provides the essential context about the user and the p
 
 User Profile:
 
-Lifestyle: A highly dedicated and motivated individual working a demanding 3-shift weekly rotation, which makes traditional gym schedules impossible. Is also an avid gamer and highly active at work (10k-25k steps/day).
+Lifestyle: A highly dedicated and motivated individual working a demanding 3-shift weekly rotation(06-14, 14-22, 22-06), which makes traditional gym schedules impossible. Is also an avid gamer and highly active at work (10k-25k steps/day).
 
 Training Philosophy (Crucial): The user has found immense success with a self-developed, high-frequency training style inspired by Pavel Tsatsouline's "Grease the Groove" (GtG). This involves performing many short, distributed sets of bodyweight exercises throughout the day. This method is not a temporary choice; it is the only sustainable and effective system that fits their lifestyle.
 
@@ -113,9 +113,59 @@ Drive Specific Progression: The quest and Incursion systems must guide the user 
 Be Immersive and Engaging: All features, from quest text to UI panels, must be steeped in the "shadow assassin" theme. The introduction of dynamic "Shadow Incursions" is designed to make the world feel alive, unpredictable, and exciting, breaking the monotony of a predictable routine.
 
 **User Profile:**
-*   **Lifestyle:** Works a demanding 3-shift weekly rotation, making traditional 1-2 hour gym sessions impossible. Is highly active at work, walking 10,000-25,000 steps per day. Is also an avid gamer.
+*   **Lifestyle:** Works a demanding 3-shift weekly rotation(06-14, 14-22, 22-06), making traditional 1-2 hour gym sessions impossible. Is highly active at work, walking 10,000-25,000 steps per day. Is also an avid gamer.
 *   **Training Philosophy (Crucial):** The user has developed a successful, high-frequency training style inspired by "Grease the Groove" (GtG). This involves performing many short, distributed sets of bodyweight exercises throughout the day (e.g., during breaks at work or between games). This method has proven more sustainable and motivating than traditional workouts.
 *   **Autoregulation:** A key to the user's success is autoregulation. On days with high energy, they push sets closer to failure to stimulate muscle growth. On days with low energy or fatigue, they reduce intensity and focus on perfect, sub-maximal reps to practice the skill of the movement and aid recovery. The bot **must support and encourage this, not fight it.**
 *   **Primary Goal:** To achieve a lean, "anime-like" physique with a prominent V-taper. This means the training focus is on building wide shoulders (especially lateral deltoids) and a wide back (lats), while keeping the waist tight through a low body fat percentage.
 *   **Nutrition:** The user has experience with different diets and understands the trade-off between being extremely lean (and feeling fatigued) and being well-fueled for performance. They are currently using a carb-cycling approach to balance these needs.
 *   **Psychology & Motivation:** The user is highly self-motivated and consistent. They thrive on the gamification aspect of fitness, which is why they are building this RPG-themed bot. The bot's purpose is to enhance this motivation, provide structure, and introduce smart variability—not to enforce a rigid, generic program.
+
+## Panel Registration Pattern Summary (For Your Memory)
+Standard Panel Registration Pattern:
+
+1. Panel Class Structure:
+   
+   ```
+   from shared.utils.panel_registry import 
+   register
+   
+   @register
+   class MyPanel:
+       key = "unique_key"        # Used in 
+       panel switcher
+       label = "Display Name"    # Shown 
+       in dropdown
+       emoji = "🎯"              # Icon in 
+       dropdown
+       
+       @staticmethod
+       async def render_embed(bot, user, 
+       **kwargs):
+           # Return discord.Embed
+           
+       @staticmethod
+       async def build_view(bot, user, 
+       **kwargs):
+           # Return discord.ui.View
+   ```
+2. Cog Integration:
+   
+   ```
+   from features.myfeature.ui.my_panel 
+   import MyPanel  # Import triggers 
+   @register
+   
+   def setup(bot):
+       bot.add_cog(MyCog(bot))
+   ```
+3. Panel Registry Order:
+   
+   - Edit desired_order list in shared/utils/panel_registry.py
+   - Panels appear in dropdown in this order
+   - Current order: ["profile", "log_reps", "quest_log", "buffs"]
+4. Existing Registered Panels:
+   
+   - ProfilePanel ( features/user/ui/profile_view.py )
+   - LogRepsPanel ( features/logging/ui/view.py )
+   - QuestPanel ( features/quests/ui/quest_panel.py )
+   - BuffsPanel ( features/buffs/ui/view.py )

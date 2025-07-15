@@ -149,6 +149,65 @@ class IncursionsCog(commands.Cog):
             )
             await ctx.send(embed=embed, delete_after=10)
 
+    @incursion_admin.command(name="testing")
+    async def toggle_testing_mode(self, ctx, mode: str = None):
+        """Toggle testing mode on/off"""
+        if mode is None:
+            # Show current status
+            status = "enabled" if self.scheduler.testing_mode else "disabled"
+            await ctx.send(f"Testing mode is currently **{status}**")
+            return
+        
+        mode = mode.lower()
+        if mode in ["on", "enable", "true", "1"]:
+            self.scheduler.set_testing_mode(True)
+            await ctx.send("✅ Testing mode **enabled**\n- 1 minute spawn intervals\n- 100% spawn chance\n- 45 second incursion duration")
+        elif mode in ["off", "disable", "false", "0"]:
+            self.scheduler.set_testing_mode(False)
+            await ctx.send("✅ Testing mode **disabled**\n- 2-3 minute spawn intervals\n- 2-3% spawn chance\n- 30 minutes to 3 hours duration")
+        else:
+            await ctx.send("❌ Invalid mode. Use: `on`, `off`, `enable`, `disable`, `true`, or `false`")
+    
+    @incursion_admin.command(name="status")
+    async def scheduler_status(self, ctx):
+        """Show detailed scheduler status"""
+        status = "Running" if self.scheduler.is_running else "Stopped"
+        testing = "Enabled" if self.scheduler.testing_mode else "Disabled"
+        
+        active_incursions = await self.manager.get_active_incursions()
+        
+        embed = discord.Embed(
+            title="🌑 Incursion Scheduler Status",
+            color=0x4B0082
+        )
+        
+        embed.add_field(
+            name="Scheduler",
+            value=f"**Status:** {status}\n**Testing Mode:** {testing}",
+            inline=True
+        )
+        
+        if self.scheduler.testing_mode:
+            embed.add_field(
+                name="Testing Settings",
+                value="**Interval:** 1 minute\n**Spawn Chance:** 100%\n**Duration:** 45 seconds",
+                inline=True
+            )
+        else:
+            embed.add_field(
+                name="Production Settings",
+                value="**Interval:** 2-3 minutes\n**Spawn Chance:** 2-3%\n**Duration:** 30min-3hrs",
+                inline=True
+            )
+        
+        embed.add_field(
+            name="Active Incursions",
+            value=f"{len(active_incursions)} currently active",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+
 async def setup(bot):
     await bot.add_cog(IncursionsCog(bot))
     # Panel registration is handled by the IncursionPanel import above
