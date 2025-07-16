@@ -13,7 +13,7 @@ def get_system_status_header(user: Union[discord.User, discord.Member]) -> str:
         "```ansi\n"
         "● Status: \x1b[1;32m● Online\x1b[0m\n"
         f"● User: {user.name} [LINKED]\n"
-        "● System: SHADOW_NEXUS // v0.277\n"
+        "● System: SHADOW_NEXUS // v0.412\n"
         "──────────────────────────\n"
     )
     return header
@@ -44,5 +44,1618 @@ def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: i
     )
     embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
     return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
+    desc = (
+        f"```ansi\n{header}\n[ SYSTEM LOADING{dots} ]\n"
+        "───────────────────────────\n"  # matches your style
+        "```"
+    )
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
+
+def create_header_embed(title: str, description: str) -> discord.Embed:
+    """
+    Creates a Discord embed with the standard header format.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=0x2f3136
+    )
+    return embed
+
+# --- NEW: RPG/Terminal-style animated loading embed ---
+def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOADING... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    """
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    dots = '.' * dot_count
 
 
