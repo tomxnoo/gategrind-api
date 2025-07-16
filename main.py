@@ -3,7 +3,7 @@ sentry_sdk.init(
     dsn="https://a79a94e31ba80fa8835018abc3e28dfb@o4509645249118208.ingest.de.sentry.io/4509645253312592",
     send_default_pii=True,
     traces_sample_rate=1.0,
-    profile_session_sample_rate=1.0,
+    # Removed deprecated profile_session_sample_rate parameter
 )
 
 import os
@@ -17,8 +17,10 @@ from discord.ext import commands
 from dotenv import load_dotenv
 import asyncpg  # <-- Import asyncpg
 
-# ---- FLASK IMPORT ----
-from api.flask_api import create_app
+# ---- FASTAPI IMPORT ----
+from api.main import app as fastapi_app
+import uvicorn
+
 from core.redis_cache import RedisCache
 
 # Add the project root directory to the Python path
@@ -31,12 +33,10 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")  # <-- Get DB URL from .env
 
-# ---- FLASK SETUP ----
-flask_app = create_app()
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    flask_app.run(host="0.0.0.0", port=port)
+def run_fastapi():
+    """Run FastAPI server in a separate thread"""
+    port = int(os.environ.get("API_PORT", 8000))
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=port, log_level="info")
 
 # ---- DISCORD BOT SETUP ----
 intents = discord.Intents.default()
@@ -174,7 +174,14 @@ def start_bot_thread():
     asyncio.run(discord_bot_main())
 
 if __name__ == "__main__":
-    # Start Flask API in a thread, then Discord bot main loop
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
+    print("🌒 Starting Realm of Shadows - Dual Mode (FastAPI + Discord Bot)")
+    print("=" * 60)
+    
+    # Start FastAPI in a thread
+    print("[INFO] Starting FastAPI server...")
+    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
+    fastapi_thread.start()
+    
+    # Start Discord bot in main thread
+    print("[INFO] Starting Discord bot...")
     start_bot_thread()

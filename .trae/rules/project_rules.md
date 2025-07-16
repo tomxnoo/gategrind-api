@@ -1,3 +1,8 @@
+Rule 1. Always read PRD.md, planning.md and project_rules.md before starting any work or task.
+Rule 2. Always read the code before starting any work or task. 
+Rule 3. always ask if unsure.
+Rule 4. Always read fastAPI.md while working on it.
+
 Part 1: The Project Blueprint (The "What")
 Objective: This document outlines the complete feature set and design philosophy for the "Realm of Shadows" fitness RPG bot. It should be used as the source of truth for all development.
 
