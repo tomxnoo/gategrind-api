@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 import logging
 import discord
-from features.incursions.logic.incursion_manager import IncursionManager
+from core.api_client import api_client
 from features.incursions.logic.content_generator import IncursionContentGenerator
 from features.incursions.models.incursion import IncursionType, Incursion
 
@@ -23,7 +23,7 @@ class IncursionScheduler:
     
     def __init__(self, bot):
         self.bot = bot
-        self.manager = IncursionManager(bot)
+        self.api_client = api_client
         self.generator = IncursionContentGenerator()
         self.is_running = False
         self._scheduler_task = None
@@ -40,6 +40,10 @@ class IncursionScheduler:
             'last_incursion_time': 'incursions:last_time',
             'message_cache': 'incursions:messages:{}',  # Format with incursion_id
         }
+    
+    def _get_system_user(self):
+        """Get a system user for API calls"""
+        return self.bot.user
     
     async def load_settings(self):
         """Load scheduler settings from database"""
@@ -121,21 +125,48 @@ class IncursionScheduler:
         except Exception as e:
             logger.warning(f"Redis cache read failed: {e}")
         
-        # Fallback to database
-        incursions = await self.manager.get_active_incursions()
-        
-        # Cache the result for 10 seconds
+        # Fallback to API
         try:
-            incursions_data = [self._incursion_to_dict(inc) for inc in incursions]
-            await self.bot.redis.set(
-                self.CACHE_KEYS['active_incursions'], 
-                json.dumps(incursions_data), 
-                expire=10
-            )
+            system_user = self._get_system_user()
+            response = await self.api_client.get_active_incursions(system_user)
+            incursions = []
+            
+            for inc_data in response.get('incursions', []):
+                incursion = Incursion(
+                    id=inc_data.get('id'),
+                    incursion_id=inc_data['incursion_id'],
+                    incursion_type=IncursionType(inc_data['incursion_type']),
+                    title=inc_data['title'],
+                    description=inc_data['description'],
+                    target_exercise=inc_data['target_exercise'],
+                    target_reps=inc_data['target_reps'],
+                    current_reps=inc_data['current_reps'],
+                    reward_type=inc_data['reward_type'],
+                    reward_value=inc_data['reward_value'],
+                    reward_description=inc_data['reward_description'],
+                    created_at=datetime.fromisoformat(inc_data['created_at'].replace('Z', '+00:00')),
+                    expires_at=datetime.fromisoformat(inc_data['expires_at'].replace('Z', '+00:00')),
+                    is_active=inc_data.get('status') == 'active',
+                    metadata=inc_data.get('metadata', {})
+                )
+                incursions.append(incursion)
+            
+            # Cache the result for 10 seconds
+            try:
+                incursions_data = [self._incursion_to_dict(inc) for inc in incursions]
+                await self.bot.redis.set(
+                    self.CACHE_KEYS['active_incursions'], 
+                    json.dumps(incursions_data), 
+                    expire=10
+                )
+            except Exception as e:
+                logger.warning(f"Redis cache write failed: {e}")
+            
+            return incursions
+            
         except Exception as e:
-            logger.warning(f"Redis cache write failed: {e}")
-        
-        return incursions
+            logger.error(f"Failed to get active incursions from API: {e}")
+            return []
     
     def _incursion_to_dict(self, incursion: Incursion) -> dict:
         """Convert Incursion object to dictionary for caching"""
@@ -212,11 +243,14 @@ class IncursionScheduler:
     async def _cleanup_expired_incursions(self):
         """Clean up expired incursions and delete their announcement messages"""
         try:
-            # First, mark expired incursions as inactive in database
-            count = await self.manager.cleanup_expired_incursions()
+            # Use API to cleanup expired incursions
+            system_user = self._get_system_user()
+            response = await self.api_client.cleanup_expired_incursions(system_user)
+            count = response.get('cleaned_count', 0)
+            
             if count > 0:
                 logger.info(f"Marked {count} expired incursions as inactive")
-                # Invalidate cache immediately after database update
+                # Invalidate cache immediately after cleanup
                 await self._invalidate_incursion_cache()
             
             # Then get the expired incursions that still have messages to delete
@@ -356,8 +390,40 @@ class IncursionScheduler:
             duration = self._get_incursion_duration(incursion_type, difficulty_modifier)
             incursion_data['duration_hours'] = duration
             
-            # Create the incursion
-            incursion = await self.manager.create_incursion(**incursion_data)
+            # Create the incursion via API
+            system_user = self._get_system_user()
+            api_data = {
+                "title": incursion_data['title'],
+                "description": incursion_data['description'],
+                "incursion_type": incursion_data['incursion_type'].value,
+                "target_exercise": incursion_data['target_exercise'],
+                "target_reps": incursion_data['target_reps'],
+                "reward_type": incursion_data['reward_type'].value,
+                "reward_value": incursion_data['reward_value'],
+                "reward_description": incursion_data['reward_description'],
+                "duration_hours": duration
+            }
+            
+            response = await self.api_client.create_incursion(system_user, api_data)
+            
+            # Convert response back to Incursion object
+            incursion = Incursion(
+                id=response.get('id'),
+                incursion_id=response['incursion_id'],
+                incursion_type=IncursionType(response['incursion_type']),
+                title=response['title'],
+                description=response['description'],
+                target_exercise=response['target_exercise'],
+                target_reps=response['target_reps'],
+                current_reps=response['current_reps'],
+                reward_type=response['reward_type'],
+                reward_value=response['reward_value'],
+                reward_description=response['reward_description'],
+                created_at=datetime.fromisoformat(response['created_at'].replace('Z', '+00:00')),
+                expires_at=datetime.fromisoformat(response['expires_at'].replace('Z', '+00:00')),
+                is_active=response.get('status') == 'active',
+                metadata=response.get('metadata', {})
+            )
             
             # Invalidate cache since we added a new incursion
             await self._invalidate_incursion_cache()
@@ -642,7 +708,40 @@ class IncursionScheduler:
             duration = self._get_incursion_duration(incursion_type_enum)
             incursion_data['duration_hours'] = duration
             
-            incursion = await self.manager.create_incursion(**incursion_data)
+            # Create via API
+            system_user = self._get_system_user()
+            api_data = {
+                "title": incursion_data['title'],
+                "description": incursion_data['description'],
+                "incursion_type": incursion_data['incursion_type'].value,
+                "target_exercise": incursion_data['target_exercise'],
+                "target_reps": incursion_data['target_reps'],
+                "reward_type": incursion_data['reward_type'].value,
+                "reward_value": incursion_data['reward_value'],
+                "reward_description": incursion_data['reward_description'],
+                "duration_hours": duration
+            }
+            
+            response = await self.api_client.create_incursion(system_user, api_data)
+            
+            # Convert response back to Incursion object
+            incursion = Incursion(
+                id=response.get('id'),
+                incursion_id=response['incursion_id'],
+                incursion_type=IncursionType(response['incursion_type']),
+                title=response['title'],
+                description=response['description'],
+                target_exercise=response['target_exercise'],
+                target_reps=response['target_reps'],
+                current_reps=response['current_reps'],
+                reward_type=response['reward_type'],
+                reward_value=response['reward_value'],
+                reward_description=response['reward_description'],
+                created_at=datetime.fromisoformat(response['created_at'].replace('Z', '+00:00')),
+                expires_at=datetime.fromisoformat(response['expires_at'].replace('Z', '+00:00')),
+                is_active=response.get('status') == 'active',
+                metadata=response.get('metadata', {})
+            )
             
             # Invalidate cache
             await self._invalidate_incursion_cache()
