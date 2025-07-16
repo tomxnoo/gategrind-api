@@ -122,6 +122,38 @@ class APIClient:
         """Get logging statistics from API"""
         return await self._make_request("GET", "/logging/stats/summary", discord_user)
     
+    # Buff endpoints
+    async def get_buff_inventory(self, discord_user) -> Dict[str, Any]:
+        """Get user's buff inventory (active and consumable buffs) from API"""
+        return await self._make_request("GET", "/buffs/inventory", discord_user)
+    
+    async def get_consumable_buffs(self, discord_user) -> Dict[str, Any]:
+        """Get user's consumable buff inventory from API"""
+        return await self._make_request("GET", "/buffs/consumables", discord_user)
+    
+    async def use_consumable_buff(self, discord_user, buff_id: int) -> Dict[str, Any]:
+        """Use a consumable buff from inventory via API"""
+        return await self._make_request("POST", f"/buffs/consumables/{buff_id}/use", discord_user)
+    
+    async def apply_buff(self, discord_user, buff_id: int, duration_minutes: int = None) -> Dict[str, Any]:
+        """Apply a buff to user (admin/testing) via API"""
+        data = {}
+        if duration_minutes is not None:
+            data["duration_minutes"] = duration_minutes
+        return await self._make_request("POST", f"/buffs/apply/{buff_id}", discord_user, json=data)
+    
+    async def add_consumable_buff(self, discord_user, buff_id: int, quantity: int = 1) -> Dict[str, Any]:
+        """Add consumable buff to user's inventory (admin/testing) via API"""
+        data = {"quantity": quantity}
+        return await self._make_request("POST", f"/buffs/consumables/{buff_id}/add", discord_user, json=data)
+    
+    async def grant_random_buff(self, discord_user, rarity: str = None) -> Dict[str, Any]:
+        """Grant a random buff to user (admin/testing) via API"""
+        data = {}
+        if rarity:
+            data["rarity"] = rarity
+        return await self._make_request("POST", "/buffs/random", discord_user, json=data)
+    
     # Health endpoint
     async def get_health_status(self) -> Dict[str, Any]:
         """Get API health status (no auth required)"""
@@ -130,6 +162,36 @@ class APIClient:
             response = await client.get(url)
             response.raise_for_status()
             return response.json()
+    
+    # Incursion endpoints
+    async def get_active_incursions(self, discord_user) -> Dict[str, Any]:
+        """Get active incursions from API"""
+        return await self._make_request("GET", "/incursions/active", discord_user)
+    
+    async def get_incursion(self, discord_user, incursion_id: str) -> Dict[str, Any]:
+        """Get specific incursion by ID from API"""
+        return await self._make_request("GET", f"/incursions/{incursion_id}", discord_user)
+    
+    async def contribute_to_incursion(self, discord_user, incursion_id: str, reps: int) -> Dict[str, Any]:
+        """Contribute reps to an incursion via API"""
+        data = {"reps": reps}
+        return await self._make_request("POST", f"/incursions/{incursion_id}/contribute", discord_user, json=data)
+    
+    async def get_incursion_leaderboard(self, discord_user, incursion_id: str) -> Dict[str, Any]:
+        """Get incursion leaderboard from API"""
+        return await self._make_request("GET", f"/incursions/{incursion_id}/leaderboard", discord_user)
+    
+    async def create_incursion(self, discord_user, incursion_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new incursion via API"""
+        return await self._make_request("POST", "/incursions/", discord_user, json=incursion_data)
+    
+    async def complete_incursion(self, discord_user, incursion_id: str) -> Dict[str, Any]:
+        """Complete an incursion via API"""
+        return await self._make_request("POST", f"/incursions/{incursion_id}/complete", discord_user)
+    
+    async def cleanup_expired_incursions(self, discord_user) -> Dict[str, Any]:
+        """Clean up expired incursions via API"""
+        return await self._make_request("POST", "/incursions/cleanup", discord_user)
 
 # Global API client instance
 api_client = APIClient()

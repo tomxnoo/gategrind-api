@@ -3,21 +3,19 @@
 import discord  # Pycord (discord.py compatible)
 from typing import Union
 
-from features.incursions.logic.incursion_manager import IncursionManager
-from features.incursions.logic.rep_integration import IncursionRepIntegration
-from features.incursions.models.incursion import IncursionType
+from core.api_client import api_client
 
 class ParticipationModal(discord.ui.Modal):
     """Modal for logging reps towards an incursion"""
     
     def __init__(self, bot, incursion):
-        super().__init__(title=f"Log Reps: {incursion.title}")
+        super().__init__(title=f"Log Reps: {incursion.get('title', 'Unknown Incursion')}")
         self.bot = bot
         self.incursion = incursion
         
         # Rep count input
         self.rep_input = discord.ui.TextInput(
-            label=f"How many {incursion.target_exercise} did you complete?",  # Changed from exercise_type
+            label=f"How many {incursion.get('target_exercise', 'reps')} did you complete?",
             placeholder="Enter number of reps (e.g., 25)",
             required=True,
             max_length=10
@@ -52,14 +50,38 @@ class ParticipationModal(discord.ui.Modal):
                 )
                 return
             
-            # Process the rep submission - Fixed initialization and method call
-            rep_integration = IncursionRepIntegration(self.bot)
-            result = await rep_integration.process_rep_log(
-                user_id=interaction.user.id,
-                exercise=self.incursion.target_exercise,
-                reps=rep_count,
-                sets=1
-            )
+            # First log the reps via the logging API
+            log_data = {
+                "exercise": self.incursion.get("target_exercise", "unknown"),
+                "reps": rep_count,
+                "sets": 1,
+                "notes": self.notes_input.value.strip() if self.notes_input.value else None
+            }
+            
+            try:
+                log_result = await api_client.log_reps(interaction.user, log_data)
+            except Exception as e:
+                print(f"Error logging reps: {e}")
+                await interaction.response.send_message(
+                    "❌ Failed to log reps. Please try again.", 
+                    ephemeral=True
+                )
+                return
+            
+            # Then contribute to the incursion
+            try:
+                contrib_result = await api_client.contribute_to_incursion(
+                    interaction.user, 
+                    self.incursion["incursion_id"], 
+                    rep_count
+                )
+            except Exception as e:
+                print(f"Error contributing to incursion: {e}")
+                await interaction.response.send_message(
+                    "❌ Reps logged but failed to contribute to incursion. Please try again.", 
+                    ephemeral=True
+                )
+                return
             
             # Create success embed
             embed = discord.Embed(
@@ -68,41 +90,36 @@ class ParticipationModal(discord.ui.Modal):
             )
             
             # Add contribution info
-            if result["incursions_contributed"]:
-                contrib = result["incursions_contributed"][0]
-                embed.add_field(
-                    name="💪 Reps Contributed",
-                    value=f"+{contrib['reps_contributed']} to {contrib['title']}",
-                    inline=True
-                )
+            embed.add_field(
+                name="💪 Reps Contributed",
+                value=f"+{rep_count} to {self.incursion.get('title', 'Unknown Incursion')}",
+                inline=True
+            )
             
-            # Add bonus XP info
-            if result["total_bonus_xp"] > 0:
+            # Add bonus XP info if available
+            if contrib_result.get("bonus_xp", 0) > 0:
                 embed.add_field(
                     name="✨ Bonus XP",
-                    value=f"+{result['total_bonus_xp']} XP",
+                    value=f"+{contrib_result['bonus_xp']} XP",
                     inline=True
                 )
             
             # Check for completion
-            if result["incursions_completed"]:
-                completed = result["incursions_completed"][0]
+            if contrib_result.get("incursion_completed", False):
                 embed.add_field(
                     name="🎉 Incursion Complete!",
-                    value=f"Completion bonus: +{completed['completion_bonus']} XP",
+                    value=f"Completion bonus: +{contrib_result.get('completion_bonus', 0)} XP",
                     inline=False
                 )
                 embed.color = 0xffd700  # Gold color for completion
             
-            # Add anomaly effects if applicable
-            if result["bonuses_applied"]:
-                effects = "\n".join([bonus["special_effect"] for bonus in result["bonuses_applied"] if bonus.get("special_effect")])
-                if effects:
-                    embed.add_field(
-                        name="🌀 Anomaly Effects Applied",
-                        value=effects,
-                        inline=False
-                    )
+            # Add any special effects if available
+            if contrib_result.get("special_effects"):
+                embed.add_field(
+                    name="🌀 Special Effects Applied",
+                    value=contrib_result["special_effects"],
+                    inline=False
+                )
             
             await interaction.response.send_message(embed=embed, ephemeral=True)
                 

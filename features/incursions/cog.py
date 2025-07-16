@@ -4,8 +4,9 @@ import discord  # Pycord (discord.py compatible)
 from discord.ext import commands
 import asyncio
 import logging
-from typing import Optional, List  # Added List import
+from typing import Optional, List
 
+from core.api_client import api_client
 from features.incursions.logic.incursion_manager import IncursionManager
 from features.incursions.logic.scheduler import IncursionScheduler
 from features.incursions.ui.incursion_panel import IncursionPanel  # This import triggers @register
@@ -104,14 +105,18 @@ class IncursionsCog(commands.Cog):
         elif action == "stop":
             # Stop current incursion by getting active incursions and completing them
             try:
-                active_incursions = await self.manager.get_active_incursions()
+                response = await api_client.get_active_incursions(ctx.author)
+                active_incursions = response.get("incursions", [])
+                
                 if active_incursions:
                     # Complete the first active incursion
-                    result = await self.manager.complete_incursion(active_incursions[0].incursion_id)
-                    if result:
+                    incursion_id = active_incursions[0]["incursion_id"]
+                    result = await api_client.complete_incursion(ctx.author, incursion_id)
+                    
+                    if result.get("success"):
                         embed = discord.Embed(
                             title="✅ Incursion Stopped",
-                            description=f"The incursion '{active_incursions[0].title}' has been ended.",
+                            description=f"The incursion '{active_incursions[0]['title']}' has been ended.",
                             color=discord.Color.green()
                         )
                     else:
@@ -138,12 +143,14 @@ class IncursionsCog(commands.Cog):
         elif action == "status":
             # Check incursion status
             try:
-                active_incursions = await self.manager.get_active_incursions()
+                response = await api_client.get_active_incursions(ctx.author)
+                active_incursions = response.get("incursions", [])
+                
                 if active_incursions:
                     incursion = active_incursions[0]  # Show first active incursion
                     embed = discord.Embed(
                         title="📊 Incursion Status",
-                        description=f"**Active Incursion:** {incursion.title}\n**Type:** {incursion.incursion_type.value}\n**Progress:** {incursion.current_reps}/{incursion.target_reps}\n**Expires:** <t:{int(incursion.expires_at.timestamp())}:R>",
+                        description=f"**Active Incursion:** {incursion['title']}\n**Type:** {incursion['incursion_type']}\n**Progress:** {incursion['current_reps']}/{incursion['target_reps']}\n**Expires:** <t:{int(incursion['expires_at'])}:R>",
                         color=discord.Color.blue()
                     )
                 else:
@@ -169,9 +176,7 @@ class IncursionsCog(commands.Cog):
             )
             await ctx.send(embed=embed, delete_after=10)
 
-    # Remove these problematic subcommand decorators:
-    # @incursion_admin.command(name="testing")  # DELETE THIS LINE
-    @commands.command(name="incursion_testing")  # Change to regular command
+    @commands.command(name="incursion_testing")
     @commands.is_owner()
     async def toggle_testing_mode(self, ctx, mode: str = None):
         """Toggle testing mode on/off"""
@@ -191,15 +196,19 @@ class IncursionsCog(commands.Cog):
         else:
             await ctx.send("❌ Invalid mode. Use: `on`, `off`, `enable`, `disable`, `true`, or `false`")
     
-    # @incursion_admin.command(name="status")  # DELETE THIS LINE  
-    @commands.command(name="incursion_status")  # Change to regular command
+    @commands.command(name="incursion_status")
     @commands.is_owner()
     async def scheduler_status(self, ctx):
         """Show detailed scheduler status"""
         status = "Running" if self.scheduler.is_running else "Stopped"
         testing = "Enabled" if self.scheduler.testing_mode else "Disabled"
         
-        active_incursions = await self.manager.get_active_incursions()
+        try:
+            response = await api_client.get_active_incursions(ctx.author)
+            active_incursions = response.get("incursions", [])
+        except Exception as e:
+            logger.error(f"Error getting active incursions: {e}")
+            active_incursions = []
         
         embed = discord.Embed(
             title="🌑 Incursion Scheduler Status",

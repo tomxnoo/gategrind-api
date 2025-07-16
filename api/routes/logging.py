@@ -60,7 +60,9 @@ async def log_reps(
     db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
 ):
     """Log reps for a movement"""
-    # Development mode: return mock success
+    from datetime import datetime, timedelta
+    
+    # Development mode: return mock success with comprehensive data
     if is_development_mode() or db_pool is None:
         total_reps = rep_log.reps * rep_log.sets
         xp_gained = total_reps * 2  # Mock XP calculation
@@ -87,34 +89,121 @@ async def log_reps(
                 "xp_gained": xp_gained,
                 "stat_gains": stat_gains,
                 "user_id": current_user["user_id"],
+                "completed_quests": [],  # Mock empty quest completions
+                "weekly_completed": [],  # Mock empty weekly completions
+                "leveled_up": False,     # Mock no level up
                 "mode": "development"
             }
         )
     
-    # Production mode: use database and existing logging logic
+    # Production mode: implement full logging logic
     try:
-        # Import existing logging logic
-        from features.logging.cog import process_rep_log
+        user_id = current_user["user_id"]
+        now = datetime.utcnow()
         
+        # Import required modules
+        from features.user.logic.user_data import load_user_data, save_user_data
+        from features.user.logic.xp_engine import calculate_xp_for_movement, add_xp
+        from features.quests.logic.daily_quests.daily_quest_logic import update_quest_progress
+        from features.quests.ui.weekly.weekly_contract_panel import update_weekly_progress
+        from core.redis_cache import invalidate_user_json_cache, get_or_cache_user_json_data
+        
+        # Load user data
+        data = await load_user_data(user_id)
+        
+        # Check cooldown (2 minutes)
+        COOLDOWN_MINUTES = 2
+        last_log_str = data.get("cooldowns", {}).get(rep_log.movement)
+        if last_log_str:
+            last_time = datetime.fromisoformat(last_log_str)
+            if now - last_time < timedelta(minutes=COOLDOWN_MINUTES):
+                remaining = timedelta(minutes=COOLDOWN_MINUTES) - (now - last_time)
+                minutes, seconds = divmod(int(remaining.total_seconds()), 60)
+                raise HTTPException(
+                    status_code=429, 
+                    detail=f"Cooldown active! Try again in {minutes}m {seconds}s."
+                )
+        
+        # Rep caps
+        REP_CAPS = {
+            "push_ups": 500,
+            "pull_ups": 300,
+            "squats": 400,
+            "crunches": 500,
+            "planks": 300,
+            "knee_raises": 400,
+            "shoulder_raises": 300,
+            "bicep_curls": 300
+        }
+        
+        # Update user stats
+        stats = data.setdefault("log_stats", {})
+        stats.setdefault(rep_log.movement, 0)
+        rep_log_data = data.setdefault("rep_log", {})
+        today_str = now.strftime("%Y-%m-%d")
+        movement_key = rep_log.movement.lower().replace(" ", "").replace("-", "")
+        rep_log_key = f"{movement_key}_{today_str}"
+        
+        # Calculate XP with caps
+        cap = REP_CAPS.get(rep_log.movement, 500)
+        total_today = stats[rep_log.movement]
+        total_reps = rep_log.reps * rep_log.sets
+        xp_earned = calculate_xp_for_movement(rep_log.movement, rep_log.reps)
+        
+        if total_today >= cap:
+            xp_earned = int(xp_earned * 0.2)
+        elif total_today + total_reps > cap:
+            capped = total_today + total_reps - cap
+            uncapped = total_reps - capped
+            xp_uncapped = calculate_xp_for_movement(rep_log.movement, uncapped)
+            xp_capped = int(calculate_xp_for_movement(rep_log.movement, capped) * 0.2)
+            xp_earned = xp_uncapped + xp_capped
+        
+        # Update data
+        stats[rep_log.movement] += total_reps
+        rep_log_data[rep_log_key] = rep_log_data.get(rep_log_key, 0) + total_reps
+        data.setdefault("cooldowns", {})[rep_log.movement] = now.isoformat()
+        
+        # Add XP
+        xp_result = await add_xp(user_id, xp_earned)
+        
+        # Update quest progress
+        completed_quests = await update_quest_progress(user_id, rep_log.movement, total_reps)
+        
+        # Update weekly progress (need to create a mock bot object)
         class MockBot:
             def __init__(self, db_pool):
                 self.db_pool = db_pool
         
         bot = MockBot(db_pool)
-        result = await process_rep_log(
-            bot, 
-            current_user["user_id"], 
-            rep_log.movement, 
-            rep_log.reps,
-            rep_log.sets,
-            rep_log.notes
-        )
+        weekly_completed = await update_weekly_progress(user_id, bot, rep_log.movement, total_reps)
+        
+        # Save user data
+        await save_user_data(user_id, data)
+        
+        # Invalidate cache
+        await invalidate_user_json_cache(bot, user_id)
+        await get_or_cache_user_json_data(bot, user_id)
         
         return SuccessResponse(
-            message=f"Logged {rep_log.reps * rep_log.sets} {rep_log.movement} reps!",
-            data=result
+            message=f"Logged {total_reps} {rep_log.movement} reps!",
+            data={
+                "movement": rep_log.movement,
+                "reps": rep_log.reps,
+                "sets": rep_log.sets,
+                "total_reps": total_reps,
+                "xp_gained": xp_earned,
+                "user_id": user_id,
+                "completed_quests": completed_quests or [],
+                "weekly_completed": weekly_completed or [],
+                "leveled_up": xp_result.get("leveled_up", False),
+                "new_level": xp_result.get("new_level"),
+                "mode": "production"
+            }
         )
         
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions (like cooldown)
     except Exception as e:
         print(f"[ERROR] Failed to log reps: {e}")
         raise HTTPException(status_code=500, detail="Failed to log reps")
