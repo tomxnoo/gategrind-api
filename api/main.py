@@ -11,7 +11,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from core.redis_cache import RedisCache
-from api.routes import health, users, quests
+from api.routes import health, users, quests, logging, auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -85,9 +85,11 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(health.router, prefix="/api/health", tags=["Health"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(quests.router, prefix="/api/quests", tags=["Quests"])
+app.include_router(logging.router, prefix="/api/logging", tags=["Logging"])
 
 # Root endpoint
 @app.get("/")
@@ -101,8 +103,10 @@ async def root():
         "redoc": "/redoc",
         "health": "/api/health",
         "endpoints": {
+            "auth": "/api/auth",
             "users": "/api/users",
             "quests": "/api/quests",
+            "logging": "/api/logging",
             "health": "/api/health"
         }
     }

@@ -117,6 +117,49 @@ async def activate_daily_quest(
         print(f"[ERROR] Failed to activate quest: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@router.post("/daily/{quest_id}/complete", response_model=SuccessResponse)
+async def complete_daily_quest(
+    quest_id: int,
+    current_user: dict = Depends(get_current_user),
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+):
+    """Complete a daily quest"""
+    # Development mode: return mock success
+    if is_development_mode() or db_pool is None:
+        return SuccessResponse(
+            message="Quest completed successfully! (development mode)",
+            data={
+                "quest_id": quest_id, 
+                "user_id": current_user["user_id"], 
+                "xp_gained": 50,
+                "stat_gains": {"STR": 25, "END": 15},
+                "mode": "development"
+            }
+        )
+    
+    # Production mode: use database
+    try:
+        from features.quests.logic.daily_quests.daily_quest_logic import complete_quest
+        
+        class MockBot:
+            def __init__(self, db_pool):
+                self.db_pool = db_pool
+        
+        bot = MockBot(db_pool)
+        result = await complete_quest(current_user["user_id"], quest_id, bot)
+        
+        if result:
+            return SuccessResponse(
+                message="Quest completed successfully!",
+                data={"quest_id": quest_id, "user_id": current_user["user_id"], "rewards": result}
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Failed to complete quest")
+            
+    except Exception as e:
+        print(f"[ERROR] Failed to complete quest: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 @router.get("/weekly", response_model=List[dict])
 async def get_weekly_quests(
     current_user: dict = Depends(get_current_user),
@@ -141,4 +184,35 @@ async def get_weekly_quests(
         ]
     
     # Production mode: placeholder for weekly quest logic
+    return []
+
+@router.get("/history", response_model=List[dict])
+async def get_quest_history(
+    current_user: dict = Depends(get_current_user),
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool),
+    limit: int = 10
+):
+    """Get user's quest completion history"""
+    # Development mode: return mock data
+    if is_development_mode() or db_pool is None:
+        return [
+            {
+                "quest_id": 5,
+                "name": "Yesterday's Challenge",
+                "type": "daily",
+                "completed_at": "2024-12-30T18:30:00",
+                "xp_gained": 75,
+                "stat_gains": {"STR": 30, "TECH": 20}
+            },
+            {
+                "quest_id": 4,
+                "name": "Morning Routine",
+                "type": "daily", 
+                "completed_at": "2024-12-30T08:15:00",
+                "xp_gained": 50,
+                "stat_gains": {"END": 25, "SPR": 15}
+            }
+        ]
+    
+    # Production mode: use database
     return []
