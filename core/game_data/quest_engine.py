@@ -15,7 +15,7 @@ from .exercise_library import (
     get_exercise_by_difficulty, get_user_appropriate_exercise,
     calculate_quest_reps, calculate_quest_duration, get_stat_rewards,
     get_vtaper_movement_weights, get_quest_layout_template,
-    get_tier_probabilities, ExerciseProgression
+    get_tier_probabilities, ExerciseProgression, MovementPath
 )
 
 
@@ -228,53 +228,66 @@ class QuestGenerationEngine:
         # Get appropriate exercise
         exercise = get_user_appropriate_exercise(
             category, 
-            params.user_level, 
-            params.readiness_level.value
+            params.user_level
         )
         
         if not exercise:
             return None
         
-        # Calculate quest parameters
-        base_reps = calculate_quest_reps(
-            exercise.movement_name,
-            params.user_level,
-            params.readiness_level.value
+        # Get the movement path for additional data
+        movement_path = EXERCISE_LIBRARY[category]
+        
+        # Determine quest tier based on readiness level
+        tier_probabilities = get_tier_probabilities(
+            3 if params.readiness_level == ReadinessLevel.STANDARD 
+            else 2 if params.readiness_level == ReadinessLevel.LOW 
+            else 4
         )
+        tier = self.random.choices(
+            list(tier_probabilities.keys()), 
+            weights=list(tier_probabilities.values())
+        )[0]
+        
+        # Calculate quest parameters
+        base_reps = calculate_quest_reps(exercise, params.user_level, tier)
         
         # Apply intensity modifier
         target_reps = max(1, int(base_reps * params.intensity_modifier))
         
         # Determine sets based on quest type and tier
-        target_sets = self._calculate_sets(params.quest_type, exercise.tier, target_reps)
+        target_sets = self._calculate_sets(params.quest_type, tier, target_reps)
         
         # Calculate duration and XP
-        duration = calculate_quest_duration(target_reps, target_sets, exercise.tier)
+        duration = calculate_quest_duration(exercise, params.user_level, tier)
         if params.time_constraint_minutes:
             duration = min(duration, params.time_constraint_minutes // len(params.preferred_stats) if params.preferred_stats else params.time_constraint_minutes)
         
-        xp_reward = get_stat_rewards(exercise.tier, target_reps, target_sets)["xp"]
-        stat_rewards = get_stat_rewards(exercise.tier, target_reps, target_sets)
+        stat_rewards = get_stat_rewards(category, tier)
+        xp_reward = stat_rewards.get_total_reward() * 10  # Convert to XP scale
         
         # Apply readiness modifiers
         xp_reward = int(xp_reward * self._get_readiness_xp_modifier(params.readiness_level))
         
         # Generate quest flavor
-        quest_flavor = self._select_quest_flavor(exercise, params.readiness_level)
+        quest_flavor = self._select_quest_flavor(movement_path, params.readiness_level, tier)
         
         # Create quest
         quest = GeneratedQuest(
-            title=self._generate_quest_title(exercise, params.readiness_level),
+            title=self._generate_quest_title(movement_path, params.readiness_level),
             description=self._generate_quest_description(exercise, target_reps, target_sets, quest_flavor),
-            movement_name=exercise.movement_name,
+            movement_name=exercise.name,
             movement_category=category,
             exercise_progression=exercise,
             target_reps=target_reps,
             target_sets=target_sets,
-            rest_seconds=self._calculate_rest_time(exercise.tier, params.readiness_level),
+            rest_seconds=self._calculate_rest_time(tier, params.readiness_level),
             xp_reward=xp_reward,
-            stat_rewards=stat_rewards,
-            tier=exercise.tier,
+            stat_rewards={
+                "strength": stat_rewards.str_reward,
+                "endurance": stat_rewards.end_reward,
+                "technique": stat_rewards.tech_reward
+            },
+            tier=tier,
             difficulty_level=exercise.difficulty_level,
             estimated_duration_minutes=duration,
             quest_flavor=quest_flavor,
@@ -376,19 +389,17 @@ class QuestGenerationEngine:
         rest = base_rest.get(tier, 60)
         return int(rest * readiness_modifiers[readiness])
     
-    def _select_quest_flavor(self, exercise: ExerciseProgression, readiness: ReadinessLevel) -> str:
+    def _select_quest_flavor(self, movement_path: MovementPath, readiness: ReadinessLevel, tier: QuestTier) -> str:
         """Select appropriate quest flavor text"""
         
-        flavors = exercise.quest_flavors
+        flavors = movement_path.quest_flavors.get(tier, [])
         
-        if readiness == ReadinessLevel.LOW and "shadow" in flavors:
-            return flavors["shadow"]
-        elif readiness == ReadinessLevel.HIGH and "ascendant" in flavors:
-            return flavors["ascendant"]
-        else:
-            return flavors.get("warrior", flavors.get("shadow", "Execute with precision."))
+        if not flavors:
+            return "Execute with precision and purpose."
+        
+        return self.random.choice(flavors)
     
-    def _generate_quest_title(self, exercise: ExerciseProgression, readiness: ReadinessLevel) -> str:
+    def _generate_quest_title(self, movement_path: MovementPath, readiness: ReadinessLevel) -> str:
         """Generate a thematic quest title"""
         
         readiness_prefixes = {
@@ -398,7 +409,7 @@ class QuestGenerationEngine:
         }
         
         prefix = self.random.choice(readiness_prefixes[readiness])
-        return f"{prefix} {exercise.thematic_title}"
+        return f"{prefix} {movement_path.thematic_title}"
     
     def _generate_quest_description(
         self, 
