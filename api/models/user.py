@@ -6,7 +6,6 @@ class UserStats(BaseModel):
     """User statistics model"""
     STR: Dict[str, Any] = Field(default_factory=lambda: {"level": 1, "xp": 0, "xp_max": 100})
     END: Dict[str, Any] = Field(default_factory=lambda: {"level": 1, "xp": 0, "xp_max": 100})
-    SPR: Dict[str, Any] = Field(default_factory=lambda: {"level": 1, "xp": 0, "xp_max": 100})
     TECH: Dict[str, Any] = Field(default_factory=lambda: {"level": 1, "xp": 0, "xp_max": 100})
 
 class UserBase(BaseModel):

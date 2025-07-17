@@ -5,7 +5,7 @@ import asyncpg
 from datetime import datetime
 
 from api.models.common import SuccessResponse
-from api.dependencies import get_db_pool, get_current_user, is_development_mode
+from api.dependencies import get_db_pool_optional, get_current_user, is_development_mode
 
 router = APIRouter()
 
@@ -57,7 +57,7 @@ def get_mock_rep_history() -> List[RepLogEntry]:
 async def log_reps(
     rep_log: RepLogRequest,
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Log reps for a movement"""
     from datetime import datetime, timedelta
@@ -174,6 +174,7 @@ async def log_reps(
         class MockBot:
             def __init__(self, db_pool):
                 self.db_pool = db_pool
+                self.redis = None  # Add redis attribute for compatibility
         
         bot = MockBot(db_pool)
         weekly_completed = await update_weekly_progress(user_id, bot, rep_log.movement, total_reps)
@@ -211,7 +212,7 @@ async def log_reps(
 @router.get("/reps/history", response_model=List[RepLogEntry])
 async def get_rep_history(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool),
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional),
     limit: int = 20,
     movement: Optional[str] = None
 ):
@@ -264,7 +265,7 @@ async def get_rep_history(
 @router.get("/movements", response_model=List[str])
 async def get_available_movements(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Get list of available movements for logging"""
     # Development mode: return mock movements
@@ -301,7 +302,7 @@ async def get_available_movements(
 @router.get("/stats/summary", response_model=dict)
 async def get_logging_stats(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool),
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional),
     days: int = 7
 ):
     """Get user's logging statistics summary"""

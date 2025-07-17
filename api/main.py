@@ -4,6 +4,10 @@ from contextlib import asynccontextmanager
 import asyncpg
 import os
 import sys
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add project root to path for imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))

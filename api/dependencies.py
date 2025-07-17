@@ -10,12 +10,17 @@ from core.redis_cache import RedisCache
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
 
-async def get_db_pool(request: Request) -> Optional[asyncpg.Pool]:
-    """Get database connection pool"""
-    db_pool = getattr(request.app.state, 'db_pool', None)
-    if db_pool is None:
-        # In development mode, return None instead of raising an error
-        return None
+async def get_db_pool_optional(request: Request) -> Optional[asyncpg.Pool]:
+    """Get database connection pool, returns None if not available"""
+    return getattr(request.app.state, 'db_pool', None)
+
+async def require_db_pool_dev_aware(db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)) -> Optional[asyncpg.Pool]:
+    """Require database pool in production, allow None in development mode"""
+    if db_pool is None and not is_development_mode():
+        raise HTTPException(
+            status_code=503, 
+            detail="Database not available. This endpoint requires a database connection."
+        )
     return db_pool
 
 async def get_redis(request: Request) -> Optional[RedisCache]:
@@ -70,7 +75,7 @@ def is_development_mode() -> bool:
     """Check if we're running in development mode"""
     return os.getenv("DEV_MODE", "false").lower() == "true"
 
-async def require_db_pool(db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)) -> asyncpg.Pool:
+async def require_db_pool(db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)) -> asyncpg.Pool:
     """Require database pool, raise error if not available"""
     if db_pool is None:
         raise HTTPException(

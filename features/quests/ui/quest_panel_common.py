@@ -1,5 +1,6 @@
 import discord
 import asyncio
+import sentry_sdk
 from typing import Callable, List, Dict, Any, Union
 from shared.utils.ui_helpers import interaction_handler
 
@@ -70,6 +71,7 @@ class PrevQuestButton(discord.ui.Button):
         from shared.utils.ui_helpers import run_with_animation
         
         async def do_work():
+            sentry_sdk.add_breadcrumb(message="PrevQuestButton do_work started", level="info")
             user_id = interaction.user.id
             quests = await self.parent_view.get_quests_func(user_id, self.parent_view.bot)
             
@@ -102,9 +104,16 @@ class PrevQuestButton(discord.ui.Button):
                 self.parent_view.details_btn.style = discord.ButtonStyle.primary
             
             final_embed = await self.parent_view.build_embed(self.parent_view.bot, quest, interaction.user)
+            sentry_sdk.add_breadcrumb(message="PrevQuestButton do_work completed", level="info")
             return final_embed, self.parent_view
         
-        await run_with_animation(interaction, do_work())
+        sentry_sdk.add_breadcrumb(
+            message="PrevQuestButton callback - calling run_with_animation", 
+            level="info",
+            data={"work_type": "function"}
+        )
+        # CRITICAL FIX: Remove parentheses to pass the function, not execute it
+        await run_with_animation(interaction, do_work)
 
 class NextQuestButton(discord.ui.Button):
     def __init__(self, parent_view):
@@ -115,6 +124,7 @@ class NextQuestButton(discord.ui.Button):
         from shared.utils.ui_helpers import run_with_animation
         
         async def do_work():
+            sentry_sdk.add_breadcrumb(message="NextQuestButton do_work started", level="info")
             user_id = interaction.user.id
             quests = await self.parent_view.get_quests_func(user_id, self.parent_view.bot)
             
@@ -147,9 +157,16 @@ class NextQuestButton(discord.ui.Button):
                 self.parent_view.details_btn.style = discord.ButtonStyle.primary
             
             final_embed = await self.parent_view.build_embed(self.parent_view.bot, quest, interaction.user)
+            sentry_sdk.add_breadcrumb(message="NextQuestButton do_work completed", level="info")
             return final_embed, self.parent_view
         
-        await run_with_animation(interaction, do_work())
+        sentry_sdk.add_breadcrumb(
+            message="NextQuestButton callback - calling run_with_animation", 
+            level="info",
+            data={"work_type": "function"}
+        )
+        # CRITICAL FIX: Remove parentheses to pass the function, not execute it
+        await run_with_animation(interaction, do_work)
 
 class ViewDetailsButton(discord.ui.Button):
     def __init__(self, parent_view):
@@ -160,6 +177,7 @@ class ViewDetailsButton(discord.ui.Button):
         from shared.utils.ui_helpers import run_with_animation
         
         async def do_work():
+            sentry_sdk.add_breadcrumb(message="ViewDetailsButton do_work started", level="info")
             user_id = interaction.user.id
             quests = await self.parent_view.get_quests_func(user_id, self.parent_view.bot)
             
@@ -185,10 +203,17 @@ class ViewDetailsButton(discord.ui.Button):
                 quest_type=self.parent_view.quest_type
             )
             embed = await self.parent_view.build_embed(self.parent_view.bot, quest, interaction.user)
+            sentry_sdk.add_breadcrumb(message="ViewDetailsButton do_work completed", level="info")
             
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        sentry_sdk.add_breadcrumb(
+            message="ViewDetailsButton callback - calling run_with_animation", 
+            level="info",
+            data={"work_type": "function"}
+        )
+        # CRITICAL FIX: Remove parentheses to pass the function, not execute it
+        await run_with_animation(interaction, do_work)
 
 class BackToMenuButton(discord.ui.Button):
     def __init__(self, parent_view):
@@ -199,13 +224,21 @@ class BackToMenuButton(discord.ui.Button):
         from shared.utils.ui_helpers import run_with_animation
         
         async def do_work():
+            sentry_sdk.add_breadcrumb(message="BackToMenuButton do_work started", level="info")
             from features.quests.ui.quest_panel import QuestPanel
             view = await QuestPanel.build_view(self.parent_view.bot, interaction.user)
             embed = await QuestPanel.render_embed(self.parent_view.bot, interaction.user)
+            sentry_sdk.add_breadcrumb(message="BackToMenuButton do_work completed", level="info")
             
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        sentry_sdk.add_breadcrumb(
+            message="BackToMenuButton callback - calling run_with_animation", 
+            level="info",
+            data={"work_type": "function"}
+        )
+        # CRITICAL FIX: Remove parentheses to pass the function, not execute it
+        await run_with_animation(interaction, do_work)
 
 class QuestAcceptDeclineView(discord.ui.View):
     def __init__(self, bot, user: Union[discord.User, discord.Member], quest: dict, disable_accept=False, quest_type="daily"):

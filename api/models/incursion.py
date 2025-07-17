@@ -34,8 +34,17 @@ class IncursionBase(BaseModel):
     reward_description: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-class IncursionCreate(IncursionBase):
+class IncursionCreate(BaseModel):
     """Incursion creation model"""
+    title: str
+    description: str
+    incursion_type: IncursionType
+    target_exercise: str
+    target_reps: int
+    reward_type: RewardType
+    reward_value: int
+    reward_description: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     duration_hours: float = 24.0
 
 class Incursion(IncursionBase):
@@ -84,6 +93,11 @@ class IncursionSummary(BaseModel):
     reward_description: str
 
 class IncursionListResponse(BaseModel):
-    """Response model for incursion lists"""
-    active_incursions: List[IncursionSummary]
+    """Response model for listing incursion summaries"""
+    incursions: List[IncursionSummary]
+    total_count: int
+
+class IncursionFullListResponse(BaseModel):
+    """Response model for listing full incursion objects"""
+    active_incursions: List[Incursion]
     total_count: int

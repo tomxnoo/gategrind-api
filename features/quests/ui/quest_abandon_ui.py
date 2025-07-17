@@ -271,7 +271,7 @@ class AbandonQuestConfirmationView(discord.ui.View):
             
             return embed, None
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)
 
     async def cancel_abandon(self, interaction: discord.Interaction):
         from shared.utils.ui_helpers import run_with_animation
@@ -283,4 +283,4 @@ class AbandonQuestConfirmationView(discord.ui.View):
             view = await QuestPanel.build_view(self.bot, self.user)
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)

@@ -34,15 +34,16 @@ class IncursionPanel:
         # Get active incursions from API
         try:
             response = await api_client.get_active_incursions(user)
-            active_incursions_data = response.get("incursions", [])
+            # Fix: Use 'active_incursions' instead of 'incursions' to match API response
+            active_incursions = response.get("active_incursions", [])
         except Exception as e:
             print(f"Error fetching active incursions: {e}")
-            active_incursions_data = []
+            active_incursions = []
         
-        if not active_incursions_data:
+        if not active_incursions:
             content = f"```ansi\n{header}\n{sub_header}\n\n\x1b[1;31mNo active incursions found.\x1b[0m\n\nShadow Incursions are temporary challenges that appear\nperiodically. Check back later for new opportunities.\n```"
         else:
-            current_incursion = active_incursions_data[0]
+            current_incursion = active_incursions[0]
             # Fix ZeroDivisionError: Add safety check for target_reps
             if current_incursion.get("target_reps", 0) > 0:
                 progress_percent = min(100, (current_incursion.get("current_reps", 0) / current_incursion["target_reps"]) * 100)
@@ -99,7 +100,7 @@ class IncursionPanel:
         
         embed = discord.Embed(
             description=content,
-            color=IncursionPanel._get_incursion_color(active_incursions_data[0].get("incursion_type") if active_incursions else None)
+            color=IncursionPanel._get_incursion_color(active_incursions[0].get("incursion_type") if active_incursions else None)
         )
         # Fix footer to match panel design
         embed.set_footer(text="Shadow Archive • Incursions")
@@ -121,7 +122,7 @@ class IncursionPanel:
         # Get active incursions from API
         try:
             response = await api_client.get_active_incursions(user)
-            active_incursions = response.get("incursions", [])
+            active_incursions = response.get("active_incursions", [])
         except Exception as e:
             print(f"Error fetching active incursions: {e}")
             active_incursions = []
@@ -271,7 +272,8 @@ class RefreshButton(discord.ui.Button):
             # Refresh the incursions data from API
             try:
                 response = await api_client.get_active_incursions(interaction.user)
-                self.parent_view.active_incursions = response.get("incursions", [])
+                # Fix: Use 'active_incursions' instead of 'incursions' to match API response
+                self.parent_view.active_incursions = response.get("active_incursions", [])
             except Exception as e:
                 print(f"Error refreshing incursions: {e}")
                 self.parent_view.active_incursions = []

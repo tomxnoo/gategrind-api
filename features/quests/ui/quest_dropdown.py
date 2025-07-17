@@ -117,7 +117,7 @@ class QuestDropdown(discord.ui.Select):
             view.message = interaction.message
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)
 
     async def _handle_view_weekly(self, interaction: discord.Interaction, loading_task, stop_loading):
         """Handle viewing weekly quests with run_with_animation."""
@@ -162,7 +162,7 @@ class QuestDropdown(discord.ui.Select):
             
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)
 
     # Remove the duplicate _stop_loading_animation method (lines 119-126)
     # Keep only the one at lines 155-162

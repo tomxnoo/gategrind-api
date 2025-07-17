@@ -4,7 +4,7 @@ import asyncpg
 
 from api.models.user import UserProfile, UserUpdate, UserSummary
 from api.models.common import SuccessResponse
-from api.dependencies import get_db_pool, get_current_user, is_development_mode
+from api.dependencies import get_db_pool_optional, get_current_user, is_development_mode
 from core.database.db import get_unified_user_data
 
 router = APIRouter()
@@ -21,8 +21,7 @@ def get_mock_user_profile(user_id: int = 1) -> UserProfile:
         stats={
             "STR": {"level": 3, "xp": 150, "xp_max": 200},
             "END": {"level": 2, "xp": 75, "xp_max": 150},
-            "SPR": {"level": 4, "xp": 300, "xp_max": 400},
-            "TECH": {"level": 1, "xp": 25, "xp_max": 100}
+            "TECH": {"level": 4, "xp": 300, "xp_max": 400}
         },
         active_buffs={
             "strength_boost": {
@@ -38,7 +37,7 @@ def get_mock_user_profile(user_id: int = 1) -> UserProfile:
 @router.get("/me", response_model=UserProfile)
 async def get_current_user_profile(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Get current user's profile"""
     # Development mode: return mock data
@@ -62,7 +61,6 @@ async def get_current_user_profile(
             "stats": user_data.get("stats", {
                 "STR": {"level": 1, "xp": 0, "xp_max": 100},
                 "END": {"level": 1, "xp": 0, "xp_max": 100},
-                "SPR": {"level": 1, "xp": 0, "xp_max": 100},
                 "TECH": {"level": 1, "xp": 0, "xp_max": 100}
             }),
             "active_buffs": user_data.get("active_buffs", {}),
@@ -76,7 +74,7 @@ async def get_current_user_profile(
 async def update_current_user_profile(
     user_update: UserUpdate,
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Update current user's profile"""
     # Development mode: return mock success
@@ -98,7 +96,7 @@ async def update_current_user_profile(
 @router.get("/{user_id}", response_model=UserProfile)
 async def get_user_profile(
     user_id: int,
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Get user profile by ID (public endpoint)"""
     # Development mode: return mock data
@@ -122,7 +120,6 @@ async def get_user_profile(
             "stats": user_data.get("stats", {
                 "STR": {"level": 1, "xp": 0, "xp_max": 100},
                 "END": {"level": 1, "xp": 0, "xp_max": 100},
-                "SPR": {"level": 1, "xp": 0, "xp_max": 100},
                 "TECH": {"level": 1, "xp": 0, "xp_max": 100}
             }),
             "active_buffs": user_data.get("active_buffs", {}),
