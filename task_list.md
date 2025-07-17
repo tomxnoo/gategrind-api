@@ -146,6 +146,12 @@ Read PRD_updated.md
   - [✅] Add comprehensive error handling for all API endpoints
   - [✅] Implement graceful degradation for Redis failures
   - [✅] Add retry logic for database operations
+  - [✅] Create universal error recovery UI system
+  - [🔄] **Universal Error Decorators**
+    - [✅] Apply @handle_panel_errors decorator to awakening panel methods
+    - [ ] Apply @handle_panel_errors decorator to other panel methods (incursion, quest, logging, profile, history)
+    - [ ] Integrate error recovery UI across all Discord panels
+    - [ ] Update existing error handling to use new universal system
 
 ## 📱 FUTURE FEATURES (Lower Priority)
 
