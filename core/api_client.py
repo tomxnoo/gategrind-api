@@ -248,6 +248,32 @@ class APIClient:
     async def update_incursion_metadata(self, discord_user, incursion_id: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Update incursion metadata via API"""
         return await self._make_request("POST", f"/incursions/{incursion_id}/update_metadata", discord_user, json=metadata)
+    
+    # Awakening endpoints
+    async def get_awakening_status(self, discord_user) -> Dict[str, Any]:
+        """Get today's awakening status from API"""
+        return await self._make_request("GET", "/awakening/status", discord_user)
+    
+    async def perform_awakening(self, discord_user, readiness_level: str) -> Dict[str, Any]:
+        """Perform the daily awakening ritual via API"""
+        data = {"readiness_level": readiness_level}
+        return await self._make_request("POST", "/awakening/awaken", discord_user, json=data)
+    
+    async def get_awakening_quests(self, discord_user) -> Dict[str, Any]:
+        """Get today's awakening quests from API"""
+        return await self._make_request("GET", "/awakening/quests", discord_user)
+    
+    async def complete_awakening_quest(self, discord_user, quest_id: int) -> Dict[str, Any]:
+        """Complete an awakening quest via API"""
+        return await self._make_request("POST", f"/awakening/quests/{quest_id}/complete", discord_user)
+    
+    async def get_awakening_briefing(self, discord_user) -> Dict[str, Any]:
+        """Get daily briefing after awakening from API"""
+        return await self._make_request("GET", "/awakening/briefing", discord_user)
+    
+    async def get_awakening_history(self, discord_user) -> Dict[str, Any]:
+        """Get user's awakening history from API"""
+        return await self._make_request("GET", "/awakening/history", discord_user)
 
 # Global API client instance
 api_client = APIClient()
