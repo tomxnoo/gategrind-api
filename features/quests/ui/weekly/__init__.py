@@ -1,0 +1,3 @@
+"""
+Weekly Quest UI Module
+"""

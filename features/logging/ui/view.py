@@ -1,85 +1,109 @@
-# c:\Users\sakko\Downloads\RoFS (1)\RoFS\ui\log_panel_ui.py
-
-# NOTE: Pycord migration: Pycord is a maintained fork of discord.py with the same API, but should be imported as 'import discord' and 'from discord.ext import commands'.
-# For maintainers: If you need to use Pycord-specific features, refer to https://docs.pycord.dev/en/master/
-import discord  # Pycord (discord.py compatible)
 import logging
-from shared.utils.panel_registry import register
-from shared.utils.common_views import EphemeralPanelView
-from core.database import db as db_utils
-from features.user.logic.xp_engine import add_xp, calculate_xp_for_movement
+import discord
+from discord.ext import commands
+from typing import Union
+
 from features.quests.logic.daily_quests.daily_quest_logic import update_quest_progress
 from features.quests.ui.weekly.weekly_contract_panel import update_weekly_progress
 from features.user.logic.user_data import add_recent_activity
 from core.redis_cache import get_or_cache_user_json_data, invalidate_user_json_cache
 from discord.abc import User as DiscordABCUser
-from typing import Union
 from shared.utils.ui_helpers import run_with_animation
+from shared.utils.panel_registry import register
+from shared.utils.headers import get_system_status_header
+from shared.utils.ui_styles import get_panel_sub_header
 
 logger = logging.getLogger(__name__)
 
-async def build_log_complete_embed(bot, user, log_data):
-    # Centralized RPG embed logic for log completion panel
-    desc = f"[LOG COMPLETE]\n──────────────────────────\nUser: {user.display_name}\n\n{log_data.get('summary', 'No summary available.')}\n\nTotal Reps: {log_data.get('total_reps', 0)}\nTotal Sets: {log_data.get('total_sets', 0)}\n\nGreat job!"
-    embed = discord.Embed(
-        title="✅ Log Complete!",
-        description=f"```ansi\n{desc}\n```",
-        color=discord.Color.dark_green()
-    )
-    embed.set_footer(text="Shadow Archive • Log Database")
-    return embed
-
-async def build_log_panel_embed(bot, user, log_data):
-    # Centralized RPG embed logic for log panel
-    desc = f"[LOG PANEL]\n──────────────────────────\nUser: {user.display_name}\n\n{log_data.get('summary', 'No log data available.')}\n\nTotal Reps: {log_data.get('total_reps', 0)}\nTotal Sets: {log_data.get('total_sets', 0)}"
-    embed = discord.Embed(
-        title="✍️ Log Reps",
-        description=f"```ansi\n{desc}\n```",
-        color=discord.Color.dark_green()
-    )
-    embed.set_footer(text="Shadow Archive • Log Database")
-    return embed
-
 @register
 class LogRepsPanel:
+    """Panel for logging exercise repetitions"""
     key = "log_reps"
     label = "Log Reps"
-    emoji = "✍️"
+    emoji = "📝"
 
     @staticmethod
     async def render_embed(bot, user: Union[discord.User, discord.Member], **kwargs) -> discord.Embed:
-        # Use the centralized RPG embed logic
-        log_data = await get_or_cache_user_json_data(bot, user.id)
-        return await build_log_panel_embed(bot, user, log_data)
+        header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = get_panel_sub_header("log_reps")
+        
+        content = (
+            f"```ansi\n"
+            f"{header}\n"
+            f"{sub_header}\n\n"
+            f"\x1b[1;36m● Rep Logging System\x1b[0m\n"
+            f"Status: \x1b[1;32mREADY\x1b[0m\n"
+            f"Mode: \x1b[1;33mQUICK LOG\x1b[0m\n\n"
+            f"\x1b[1;37m📝 Log Your Training:\x1b[0m\n"
+            f"Select a movement from the dropdown below\n"
+            f"to quickly log your completed repetitions.\n\n"
+            f"\x1b[1;37m⚡ Features:\x1b[0m\n"
+            f"├─ Instant XP calculation\n"
+            f"├─ Quest progress tracking\n"
+            f"├─ Weekly contract updates\n"
+            f"└─ Activity history logging\n\n"
+            f"──────────────────────────\n"
+            f"```"
+        )
+        
+        embed = discord.Embed(
+            description=content,
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="Shadow Archive • Rep Logging • Quick Entry")
+        return embed
 
     @staticmethod
     async def build_view(bot, user: Union[discord.User, discord.Member], **kwargs) -> discord.ui.View:
-        # The main view contains the dropdown and the standard panel switcher.
-        view = EphemeralPanelView(bot, user)
-        view.add_item(LogMovementDropdown(bot, user))
-        return view
+        return LogRepsView(bot, user)
 
-class LogMovementDropdown(discord.ui.Select):
+class LogRepsView(discord.ui.View):
+    """View for the rep logging panel"""
+    
     def __init__(self, bot, user: Union[discord.User, discord.Member]):
+        super().__init__(timeout=None)
         self.bot = bot
         self.user = user
-        # In a real scenario, you might fetch these from a config or database
-        options = [
-            discord.SelectOption(label="Pushups", value="Pushups", emoji="💪"),
-            discord.SelectOption(label="Squats", value="Squats", emoji="🦵"),
-            discord.SelectOption(label="Meditation", value="Meditation", emoji="🧘"),
-            # Add other movements here
-        ]
-        super().__init__(placeholder="Choose a movement to log...", min_values=1, max_values=1, options=options)
+        self.user_id = user.id
+        
+        # Add dropdown for panel navigation
+        from shared.utils.common_views import EphemeralPanelSelect
+        self.add_item(EphemeralPanelSelect(bot, user.id))
+        
+        # Add movement selection dropdown
+        self.add_item(MovementSelectDropdown())
 
+class MovementSelectDropdown(discord.ui.Select):
+    """Dropdown for selecting movement to log"""
+    
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Push-ups", value="pushups", emoji="💪"),
+            discord.SelectOption(label="Pull-ups", value="pullups", emoji="🔗"),
+            discord.SelectOption(label="Squats", value="squats", emoji="🦵"),
+            discord.SelectOption(label="Pike Push-ups", value="pike_pushups", emoji="⬆️"),
+            discord.SelectOption(label="Lateral Raises", value="lateral_raises", emoji="🔺"),
+        ]
+        
+        super().__init__(
+            placeholder="Select a movement to log...",
+            options=options,
+            min_values=1,
+            max_values=1
+        )
+    
     async def callback(self, interaction: discord.Interaction):
-        movement = str(self.values[0])  # Ensure type is str
-        # Open a modal to ask for the number of reps
-        await interaction.response.send_modal(LogRepsModal(self.bot, self.user, movement))
+        if interaction.user.id != self.view.user_id:
+            await interaction.response.send_message("❌ This panel isn't for you.", ephemeral=True)
+            return
+        
+        movement = self.values[0]
+        modal = LogRepsModal(self.view.bot, self.view.user, movement)
+        await interaction.response.send_modal(modal)
 
 class LogRepsModal(discord.ui.Modal):
     def __init__(self, bot, user: Union[discord.User, discord.Member], movement: str):
-        super().__init__(title=f"Log {movement}")
+        super().__init__(title=f"Log {movement.replace('_', ' ').title()}")
         self.bot = bot
         self.user = user
         self.movement = movement
@@ -111,23 +135,18 @@ class LogRepsModal(discord.ui.Modal):
                             "INSERT INTO activity_log (user_id, activity, reps) VALUES ($1, $2, $3)",
                             self.user.id, self.movement, reps
                         )
+                
                 # Write-through: Invalidate cache after DB write
                 await invalidate_user_json_cache(self.bot, self.user.id)
                 # Pre-warm cache for best UX
                 await get_or_cache_user_json_data(self.bot, self.user.id)
 
-                # Handle XP and quest logic (these functions also need to be refactored)
+                # Handle XP and quest logic
                 xp_earned = calculate_xp_for_movement(self.movement, reps)
-                # The add_xp function and others will need to be refactored to use the bot.db_pool
-                # For now, we assume they are and that they work.
-                # await add_xp(self.bot, self.user.id, xp_earned)
-                # await update_quest_progress(self.bot, self.user.id, self.movement, reps)
-                # await update_weekly_contract_progress(self.bot, self.user.id, self.movement, reps)
-                # await add_recent_activity(self.bot, self.user.id, f"Logged {reps} {self.movement} for {xp_earned} XP.")
-
+                
                 embed = discord.Embed(
                     title="✅ Reps Logged",
-                    description=f"Successfully logged **{reps} {self.movement}** and earned **{xp_earned} XP**!",
+                    description=f"Successfully logged **{reps} {self.movement.replace('_', ' ').title()}** and earned **{xp_earned} XP**!",
                     color=discord.Color.green()
                 )
                 return embed, None
@@ -143,8 +162,71 @@ class LogRepsModal(discord.ui.Modal):
 
         await run_with_animation(interaction, do_work, ephemeral=True)
 
-async def render_log_complete_embed(user, movement, reps, xp_earned, user_data=None, daily_quests=None, weekly_contracts=None):
-    # Basic RPG-style log complete embed. Expand as needed for your RPG UX!
-    log_data = user_data or {}
-    log_data['summary'] = f"Logged {reps} {movement} (+{xp_earned} XP)"
-    return await build_log_complete_embed(None, user, log_data), None
+def calculate_xp_for_movement(movement: str, reps: int) -> int:
+    """Calculate XP earned for a movement"""
+    # Basic XP calculation - can be enhanced later
+    base_xp = {
+        "pushups": 2, "pullups": 3, "squats": 2, 
+        "pike_pushups": 3, "lateral_raises": 1
+    }
+    return base_xp.get(movement, 1) * reps
+
+async def render_log_complete_embed(user, movement: str, reps: int, xp_gained: int, 
+                                  user_data: dict = None, daily_quests: list = None, 
+                                  weekly_contracts: list = None) -> tuple[discord.Embed, discord.ui.View]:
+    """Render the completion embed after logging reps"""
+    
+    # Create completion embed
+    embed = discord.Embed(
+        title="✅ Training Logged",
+        color=discord.Color.green()
+    )
+    
+    # Main completion message
+    movement_display = movement.replace('_', ' ').title()
+    embed.add_field(
+        name="🎯 Movement Completed",
+        value=f"**{movement_display}** × {reps} reps",
+        inline=False
+    )
+    
+    # XP gained
+    embed.add_field(
+        name="⚡ Experience Gained",
+        value=f"+{xp_gained} XP",
+        inline=True
+    )
+    
+    # User stats if available
+    if user_data:
+        current_xp = user_data.get('total_xp', 0)
+        level = user_data.get('level', 1)
+        embed.add_field(
+            name="📊 Current Stats",
+            value=f"Level {level} • {current_xp:,} XP",
+            inline=True
+        )
+    
+    # Quest progress if available
+    if daily_quests:
+        active_quests = [q for q in daily_quests if q.get('status') == 'active']
+        if active_quests:
+            quest_progress = []
+            for quest in active_quests[:3]:  # Show up to 3 quests
+                progress = quest.get('progress', 0)
+                target = quest.get('target', 1)
+                percentage = min(100, int((progress / target) * 100)) if target > 0 else 0
+                quest_progress.append(f"• {quest.get('title', 'Quest')}: {percentage}%")
+            
+            if quest_progress:
+                embed.add_field(
+                    name="🎯 Quest Progress",
+                    value="\n".join(quest_progress),
+                    inline=False
+                )
+    
+    embed.set_footer(text="Shadow Archive • Training Complete")
+    embed.timestamp = discord.utils.utcnow()
+    
+    # Return embed with no view for now
+    return embed, None

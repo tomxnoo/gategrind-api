@@ -22,11 +22,18 @@ class EphemeralPanelSelect(Select):
         
         excluded_panels = {"fitness_integration"}
 
+        # Debug: Print registered panels
+        from shared.utils.panel_registry import debug_registry
+        debug_registry()
+
         options = [
             discord.SelectOption(label=p.label, value=p.key, emoji=p.emoji)
             for p in get_registered_panels()
             if p.key not in excluded_panels
         ]
+        
+        print(f"[DEBUG] Panel options: {[(opt.label, opt.value) for opt in options]}")
+        
         super().__init__(
             placeholder="Switch Panel…",
             min_values=1,

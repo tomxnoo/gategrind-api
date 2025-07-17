@@ -1,0 +1,3 @@
+"""
+Daily Quest Logic Module
+"""

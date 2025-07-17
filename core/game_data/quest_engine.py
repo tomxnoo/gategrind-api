@@ -62,7 +62,7 @@ class GeneratedQuest:
     rest_seconds: int = 60
     xp_reward: int = 0
     stat_rewards: Dict[str, int] = field(default_factory=dict)
-    tier: QuestTier = QuestTier.SHADOW
+    tier: QuestTier = QuestTier.PRACTICE
     difficulty_level: int = 1
     estimated_duration_minutes: int = 5
     quest_flavor: str = ""
@@ -344,9 +344,9 @@ class QuestGenerationEngine:
         }
         
         tier_modifiers = {
-            QuestTier.SHADOW: 1.0,
-            QuestTier.WARRIOR: 1.2,
-            QuestTier.ASCENDANT: 1.5
+            QuestTier.PRACTICE: 1.0,
+            QuestTier.TRIAL: 1.2,
+            QuestTier.CHALLENGE: 1.5
         }
         
         sets = base_sets.get(quest_type, 2)
@@ -362,9 +362,9 @@ class QuestGenerationEngine:
         """Calculate rest time between sets"""
         
         base_rest = {
-            QuestTier.SHADOW: 45,
-            QuestTier.WARRIOR: 60,
-            QuestTier.ASCENDANT: 90
+            QuestTier.PRACTICE: 45,
+            QuestTier.TRIAL: 60,
+            QuestTier.CHALLENGE: 90
         }
         
         readiness_modifiers = {

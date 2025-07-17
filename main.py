@@ -86,19 +86,20 @@ class RealmBot(commands.AutoShardedBot):  # <-- Use AutoShardedBot
 
 bot = RealmBot(command_prefix="!", intents=intents)
 
+# Updated extension list with proper order and all necessary cogs
 EXTS = [
-    'features.system.system_hub_cog',
-    'features.awakening.cog',  # Add awakening cog
-    'features.buffs.cog',
-    'features.logging.cog',
-    'features.quests.cog',
-    'features.user.cog',  # Add this line
-    'features.moderation.message_management_cog',
+    'features.system.system_hub_cog',        # Core system hub - load first
+    'features.awakening.cog',                # Awakening system
+    'features.buffs.cog',                    # Buffs system
+    'features.logging.cog',                  # Logging system
+    'features.quests.cog',                   # New quest system
+    'features.user.cog',                     # User management
+    'features.moderation.message_management_cog',  # Moderation
     'features.moderation.reroll_reset_cog',
-    'features.moderation.quest_completion_cog',  # Add this line
-    'features.fitness.fitness_sync_cog',
+    'features.moderation.quest_completion_cog',
+    'features.fitness.fitness_sync_cog',     # Fitness integration
     'features.fitness.fitness_api_cog',
-    'features.incursions.cog',  # <-- ADD THIS LINE
+    'features.incursions.cog',               # Incursions system
 ]
 
 @bot.event
@@ -110,8 +111,16 @@ async def on_ready():
     print(f"🌒 {bot.user} online • ID {bot.user.id}")
     print(f"Guilds: {len(bot.guilds)}  •  Cogs: {len(bot.cogs)}")
     print("═" * 60)
-    from features.system.ui.dropdown import SystemHubPublicView
-    bot.add_view(SystemHubPublicView(bot))
+    
+    # Add persistent views
+    try:
+        from features.system.ui.dropdown import SystemHubPublicView
+        bot.add_view(SystemHubPublicView(bot))
+        print("[OK] System Hub persistent view added")
+    except Exception as e:
+        print(f"[WARN] Could not add System Hub persistent view: {e}")
+    
+    # Set bot presence
     await bot.change_presence(
         activity=discord.Activity(type=discord.ActivityType.watching,
                                   name="the shadows move")
@@ -121,10 +130,13 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot:
         return
+    
     WEBHOOK_CHANNEL_ID = 1390426998526181377  # <-- Change to your Discord channel ID
     if message.channel.id != WEBHOOK_CHANNEL_ID:
         await bot.process_commands(message)
         return
+        
+    # Handle health data sync webhook
     if "Health data synced for <@" in message.content:
         if not bot.db_pool:
             print("[ERROR] Database pool not available in on_message.", file=sys.stderr)
@@ -144,6 +156,7 @@ async def on_message(message):
                     # For now, this demonstrates the pattern.
         except Exception as e:
             print(f"[ERROR] Failed to process webhook: {e}", file=sys.stderr)
+    
     await bot.process_commands(message)
 
 @bot.event
@@ -157,22 +170,41 @@ async def on_application_command_error(ctx, err):
     traceback.print_exc()
 
 async def load_extension(bot_instance, ext):
+    """Load a single extension with proper error handling"""
     try:
         await bot_instance.load_extension(ext)
         print(f"[OK] {ext}")
     except Exception as e:
-        print(f"[FAIL] {ext}: {e}", file=sys.stderr)
+        print(f"[FAIL] {ext}: Extension '{ext}' raised an error: {type(e).__name__}: {e}", file=sys.stderr)
+        # Don't re-raise the exception to allow other extensions to load
 
 async def discord_bot_main():
+    """Main Discord bot coroutine"""
     if not TOKEN:
         print("[FAIL] DISCORD_TOKEN not found in environment variables.", file=sys.stderr)
         return
+    
+    if not DATABASE_URL:
+        print("[FAIL] DATABASE_URL not found in environment variables.", file=sys.stderr)
+        return
+    
     # The setup_hook now handles loading extensions
     print("[INFO] Starting Discord bot...")
-    await bot.start(TOKEN)
+    try:
+        await bot.start(TOKEN)
+    except Exception as e:
+        print(f"[FAIL] Discord bot failed to start: {e}", file=sys.stderr)
+        traceback.print_exc()
 
 def start_bot_thread():
-    asyncio.run(discord_bot_main())
+    """Start the Discord bot in an asyncio event loop"""
+    try:
+        asyncio.run(discord_bot_main())
+    except KeyboardInterrupt:
+        print("[INFO] Discord bot shutdown requested")
+    except Exception as e:
+        print(f"[FAIL] Discord bot thread error: {e}", file=sys.stderr)
+        traceback.print_exc()
 
 if __name__ == "__main__":
     print("🌒 Starting Realm of Shadows - Dual Mode (FastAPI + Discord Bot)")
@@ -180,8 +212,12 @@ if __name__ == "__main__":
     
     # Start FastAPI in a thread
     print("[INFO] Starting FastAPI server...")
-    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
-    fastapi_thread.start()
+    try:
+        fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
+        fastapi_thread.start()
+        print("[OK] FastAPI server thread started")
+    except Exception as e:
+        print(f"[FAIL] Could not start FastAPI server: {e}", file=sys.stderr)
     
     # Start Discord bot in main thread
     print("[INFO] Starting Discord bot...")

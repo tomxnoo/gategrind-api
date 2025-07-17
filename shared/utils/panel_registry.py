@@ -41,3 +41,11 @@ def get_panel_by_key(key: str) -> Type | None:
     Lookup a panel class by its .key
     """
     return _PANEL_REGISTRY.get(key)
+
+
+def debug_registry():
+    """Debug function to see what panels are registered"""
+    print(f"[DEBUG] Registered panels: {list(_PANEL_REGISTRY.keys())}")
+    for key, panel_cls in _PANEL_REGISTRY.items():
+        print(f"[DEBUG] Panel '{key}': {panel_cls.__name__}")
+    return _PANEL_REGISTRY
