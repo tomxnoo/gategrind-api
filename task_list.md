@@ -25,7 +25,7 @@
   - [ ] Add awakening panel to system hub navigation
 
 ## 🎯 HIGH PRIORITY - Shadow Labyrinths & Keys
-
+Read PRD_updated.md
 ### Database & Models
 - [ ] **Shadow Labyrinths Schema**
   - [ ] Create labyrinths table (id, name, description, difficulty, rewards)
@@ -106,6 +106,7 @@
 - [ ] **Rep Logging Panel**
   - [ ] Improve movement selection dropdown intelligence
   - [ ] Add quest-aware exercise prioritization
+  - [ ] Add visually appealing UI that matches the main theme
   - [ ] Enhance visual feedback for logged reps
 
 - [ ] **History Panel ("Shadow Archive")**
@@ -117,16 +118,19 @@
 - [ ] **Profile Panel Enhancement**
   - [ ] Add dynamic XP progress bars
   - [ ] Implement temporary stat gain flairs (e.g., STR: 2 (+1) ✨)
-  - [ ] Add "Spirit" stat with readiness-based buffs/debuffs
+  - [ ] Add "Technique" stat with readiness-based buffs/debuffs
   - [ ] Create visual stat comparison over time
 
 ## 🔧 TECHNICAL IMPROVEMENTS
 
 ### Database Optimizations
-- [ ] **Performance**
-  - [ ] Add database indexes for frequently queried fields
-  - [ ] Implement connection pooling optimization
-  - [ ] Add query performance monitoring
+- [✅] **Performance**
+  - [✅] Add database indexes for frequently queried fields
+  - [✅] Implement connection pooling optimization
+  - [✅] Add query performance monitoring
+  - [✅] Expand Redis caching coverage (user profiles, stats, system settings, quests, buffs, incursions, leaderboards)
+  - [✅] Implement intelligent cache invalidation patterns
+  - [✅] Add batch operations for database queries
 
 ### API Enhancements
 - [ ] **Authentication & Security**
@@ -137,7 +141,7 @@
 ### Error Handling
 - [ ] **Robustness**
   - [ ] Add comprehensive error handling for all API endpoints
-  - [ ] Implement graceful degradation for Redis failures
+  - [✅] Implement graceful degradation for Redis failures
   - [ ] Add retry logic for database operations
 
 ## 📱 FUTURE FEATURES (Lower Priority)
@@ -171,7 +175,7 @@
 - [ ] **Integration Tests**
   - [ ] Test Discord bot <-> API integration
   - [ ] Validate database transaction integrity
-  - [ ] Test Redis caching behavior
+  - [✅] Test Redis caching behavior
 
 ### Documentation
 - [ ] **Code Documentation**

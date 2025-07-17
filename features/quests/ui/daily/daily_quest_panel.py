@@ -73,11 +73,12 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
     async def accept_callback(self, interaction: discord.Interaction):
         async def do_work():
             user_id = self.user.id
-            quest_id = self.quest.get("id")
-            if quest_id is None:
-                quest_id = self.quest.get("QuestID", "unknown")
+            # Fix: Use the correct field name for quest tier
+            quest_tier = self.quest.get("tier")
+            if quest_tier is None:
+                quest_tier = self.quest.get("Tier")
             
-            await activate_daily_quest(user_id, quest_id, bot=self.bot)
+            await activate_daily_quest(user_id, quest_tier, bot=self.bot)
             
             # Invalidate cache to ensure fresh data
             from core.redis_cache import invalidate_user_json_cache
@@ -94,7 +95,7 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
             view = BackToMenuFromDailyAcceptView(self.bot, self.user)
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)
     
     async def decline_callback(self, interaction: discord.Interaction):
         async def do_work():
@@ -105,7 +106,7 @@ class DailyQuestAcceptDeclineView(QuestAcceptDeclineView):
             embed = build_daily_quest_panel_embed(self.user, quests[index], index + 1, len(quests))
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)
 
 class BackToMenuFromDailyAcceptView(discord.ui.View):
     def __init__(self, bot, user):
@@ -133,7 +134,7 @@ class BackToMenuButton(discord.ui.Button):
             await view.refresh_panel(interaction)
             return None, None  # refresh_panel handles the response
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)
 
 class DailyQuestView(View):
     def __init__(self, bot, user: Union[discord.User, discord.Member], quest: dict, disable_accept=False, quest_type="daily"):

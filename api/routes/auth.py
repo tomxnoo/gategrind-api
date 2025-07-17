@@ -8,7 +8,7 @@ import asyncpg
 
 from api.models.auth import TokenResponse, DiscordOAuthRequest, LoginRequest, UserClaims
 from api.models.common import SuccessResponse
-from api.dependencies import get_db_pool, is_development_mode
+from api.dependencies import get_db_pool_optional, is_development_mode
 
 router = APIRouter()
 
@@ -77,7 +77,7 @@ async def get_or_create_user(db_pool: Optional[asyncpg.Pool], discord_id: str, u
 @router.post("/discord/callback", response_model=TokenResponse)
 async def discord_oauth_callback(
     request: DiscordOAuthRequest,
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Handle Discord OAuth2 callback"""
     if is_development_mode():
@@ -154,7 +154,7 @@ async def discord_oauth_callback(
 @router.post("/dev/login", response_model=TokenResponse)
 async def dev_login(
     request: LoginRequest,
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Development login endpoint (only available in dev mode)"""
     if not is_development_mode():

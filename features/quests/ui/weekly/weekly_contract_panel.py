@@ -193,7 +193,7 @@ class BackToWeeklyMenuButton(discord.ui.Button):
             await view.refresh_panel(interaction)
             return None, None  # refresh_panel handles the response
         
-        await run_with_animation(interaction, do_work)
+        await run_with_animation(interaction, do_work())
 
 
 # endregion

@@ -17,6 +17,12 @@ class APIClient:
         self.jwt_secret = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
         self.jwt_algorithm = "HS256"
         self._user_tokens: Dict[int, str] = {}  # Cache tokens by discord user_id
+        self._system_token: Optional[str] = None  # Cache system token
+        
+        # Check if we're in development mode
+        self.dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+        if self.dev_mode:
+            print(f"[API_CLIENT] Running in development mode - authentication disabled")
         
     def _create_user_token(self, discord_user_id: int, username: str, user_id: int = None) -> str:
         """Create JWT token for Discord user"""
@@ -33,8 +39,47 @@ class APIClient:
         
         return jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
     
+    def _create_system_token(self) -> str:
+        """Create JWT token for system operations"""
+        now = datetime.utcnow()
+        exp = now + timedelta(hours=24)  # 24 hours for system token
+        
+        payload = {
+            "user_id": 0,  # System user ID
+            "discord_id": "system",
+            "username": "System",
+            "iat": int(now.timestamp()),
+            "exp": int(exp.timestamp())
+        }
+        
+        return jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
+    
+    async def _get_system_token(self) -> str:
+        """Get or create JWT token for system operations"""
+        # Check if we have a cached token
+        if self._system_token:
+            try:
+                # Verify token is still valid
+                payload = jwt.decode(self._system_token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+                if payload["exp"] > datetime.utcnow().timestamp():
+                    return self._system_token
+            except jwt.InvalidTokenError:
+                pass
+        
+        # Create new system token
+        self._system_token = self._create_system_token()
+        return self._system_token
+
     async def _get_user_token(self, discord_user) -> str:
         """Get or create JWT token for Discord user"""
+        # Handle system operations - check if it's a bot user
+        if hasattr(discord_user, 'bot') and discord_user.bot:
+            return await self._get_system_token()
+        
+        # Handle None or system user
+        if discord_user is None or (hasattr(discord_user, 'id') and discord_user.id == 0):
+            return await self._get_system_token()
+        
         discord_user_id = discord_user.id
         username = discord_user.display_name or discord_user.name
         
@@ -53,14 +98,17 @@ class APIClient:
         token = self._create_user_token(discord_user_id, username)
         self._user_tokens[discord_user_id] = token
         return token
-    
+
     async def _make_request(self, method: str, endpoint: str, discord_user, **kwargs) -> Dict[Any, Any]:
         """Make authenticated API request"""
-        token = await self._get_user_token(discord_user)
         headers = kwargs.get("headers", {})
-        headers["Authorization"] = f"Bearer {token}"
-        kwargs["headers"] = headers
         
+        # Only add Authorization header if not in development mode
+        if not self.dev_mode:
+            token = await self._get_user_token(discord_user)
+            headers["Authorization"] = f"Bearer {token}"
+        
+        kwargs["headers"] = headers
         url = f"{self.base_url}{endpoint}"
         
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -192,6 +240,14 @@ class APIClient:
     async def cleanup_expired_incursions(self, discord_user) -> Dict[str, Any]:
         """Clean up expired incursions via API"""
         return await self._make_request("POST", "/incursions/cleanup", discord_user)
+    
+    async def mark_incursion_inactive(self, discord_user, incursion_id: str) -> Dict[str, Any]:
+        """Mark an incursion as inactive via API"""
+        return await self._make_request("POST", f"/incursions/{incursion_id}/mark_inactive", discord_user)
+    
+    async def update_incursion_metadata(self, discord_user, incursion_id: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Update incursion metadata via API"""
+        return await self._make_request("POST", f"/incursions/{incursion_id}/update_metadata", discord_user, json=metadata)
 
 # Global API client instance
 api_client = APIClient()

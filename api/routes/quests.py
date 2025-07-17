@@ -4,7 +4,7 @@ import asyncpg
 
 from api.models.quest import Quest
 from api.models.common import SuccessResponse
-from api.dependencies import get_db_pool, get_current_user, is_development_mode
+from api.dependencies import get_db_pool_optional, get_current_user, is_development_mode
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ def get_mock_daily_quests() -> List[dict]:
         {
             "quest_id": 1,
             "name": "Morning Workout",
-            "description": "Complete a 30-minute workout session",
+            "description": "Complete 30 push-ups and 20 squats",
             "type": "daily",
             "xp_reward": 50,
             "stat_rewards": {"STR": 25, "END": 15},
@@ -29,7 +29,7 @@ def get_mock_daily_quests() -> List[dict]:
             "description": "Study for 2 hours",
             "type": "daily",
             "xp_reward": 75,
-            "stat_rewards": {"TECH": 40, "SPR": 10},
+            "stat_rewards": {"TECH": 50},
             "status": "in_progress",
             "progress": 1,
             "max_progress": 2,
@@ -41,7 +41,7 @@ def get_mock_daily_quests() -> List[dict]:
             "description": "Meditate for 15 minutes",
             "type": "daily",
             "xp_reward": 30,
-            "stat_rewards": {"SPR": 35},
+            "stat_rewards": {"TECH": 35},
             "status": "completed",
             "progress": 1,
             "max_progress": 1,
@@ -52,7 +52,7 @@ def get_mock_daily_quests() -> List[dict]:
 @router.get("/daily", response_model=List[dict])
 async def get_daily_quests(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Get user's daily quests"""
     # Development mode: return mock data
@@ -68,6 +68,7 @@ async def get_daily_quests(
         class MockBot:
             def __init__(self, db_pool):
                 self.db_pool = db_pool
+                self.redis = None  # Add redis attribute for compatibility
         
         bot = MockBot(db_pool)
         quests = await get_today_quests(current_user["user_id"], bot)
@@ -84,7 +85,7 @@ async def get_daily_quests(
 async def activate_daily_quest(
     quest_id: int,
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Activate a daily quest"""
     # Development mode: return mock success
@@ -121,7 +122,7 @@ async def activate_daily_quest(
 async def complete_daily_quest(
     quest_id: int,
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Complete a daily quest"""
     # Development mode: return mock success
@@ -163,7 +164,7 @@ async def complete_daily_quest(
 @router.get("/weekly", response_model=List[dict])
 async def get_weekly_quests(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Get user's weekly quests"""
     # Development mode: return mock data
@@ -189,7 +190,7 @@ async def get_weekly_quests(
 @router.get("/history", response_model=List[dict])
 async def get_quest_history(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool),
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional),
     limit: int = 10
 ):
     """Get user's quest completion history"""
@@ -210,7 +211,7 @@ async def get_quest_history(
                 "type": "daily", 
                 "completed_at": "2024-12-30T08:15:00",
                 "xp_gained": 50,
-                "stat_gains": {"END": 25, "SPR": 15}
+                "stat_gains": {"END": 25, "TECH": 15}
             }
         ]
     

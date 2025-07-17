@@ -77,7 +77,8 @@ class EphemeralPanelSelect(Select):
                     view = EphemeralPanelView(self.bot, interaction.user) if interaction.user else None
                     return embed, view
             
-            await run_with_animation(interaction, do_work())
+            # CRITICAL FIX: Pass the function, not the coroutine result
+            await run_with_animation(interaction, do_work)
 
         except Exception as e:
             print(f"[ERROR] Unexpected error in EphemeralPanelSelect: {e}")

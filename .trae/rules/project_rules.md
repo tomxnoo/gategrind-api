@@ -1,7 +1,9 @@
-Rule 1. Always read PRD.md, planning.md and project_rules.md before starting any work or task.
+Rule 1. Always read PRD.md, PRD_updated.md, planning.md and project_rules.md before starting any work or task.
 Rule 2. Always read the code before starting any work or task. 
 Rule 3. always ask if unsure.
 Rule 4. Always read fastAPI.md while working on it.
+Rule 5. Follow tasks and rules before starting any work or task.
+Rule 6. Tick down tasks from the task_list.md when updated or completed.
 
 Part 1: The Project Blueprint (The "What")
 Objective: This document outlines the complete feature set and design philosophy for the "Realm of Shadows" fitness RPG bot. It should be used as the source of truth for all development.
@@ -87,7 +89,7 @@ Rep Logging: The rep logging panel is the heart of the system. It must be robust
 
 History Panel ("The Shadow Archive"): Must be more than a text log. It should be a visual chronicle highlighting Personal Bests (PRs), consistency streaks (🔥), and summarizing sets/reps in a clean, readable format.
 
-Profile Panel ("Operative Profile"): Stats should be dynamic. Use visual progress bars for XP. Display temporary flairs for stat gains (Strength: 2 (+1) ✨). The "Spirit" stat could be directly buffed/debuffed by the daily "Readiness Assessment."
+Profile Panel ("Operative Profile"): Stats should be dynamic. Use visual progress bars for XP. Display temporary flairs for stat gains (Strength: 2 (+1) ✨). The "Technique" stat could be directly buffed/debuffed by the daily "Readiness Assessment."
 
 Part 2: The User Persona & Project Philosophy (The "Why")
 Objective: This document provides the essential context about the user and the project's philosophy. It is the "soul" of the bot, ensuring all generated content and logic is perfectly aligned with the user's journey.

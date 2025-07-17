@@ -23,7 +23,9 @@ def generate_daily_quest(tier: int, user_level: int, bot=None):
     Generates a single, unified daily quest with a theme and a chance for a modifier.
     Optionally accepts a bot instance for future extensibility (DB/cache access).
     """
-    # 1. Select a random stat theme (STR, END, SPR)
+    # 1. Select a random stat theme (STR, END, TECH)
+    stat_themes = ["STR", "END", "TECH"]
+    chosen_stat = random.choice(stat_themes)
     theme_stat = random.choice(list(QUEST_THEMES.keys()))
     theme_info = QUEST_THEMES[theme_stat]
 
@@ -93,7 +95,7 @@ def generate_weekly_contract(tier: int, bot=None) -> dict:
         if obj["type"] in ("training_days", "complete_dailies", "unique_movements"):
             target = obj.get("target", 3)
         if obj["type"] == "stat_reps":
-            chosen_stat = random.choice(["STR", "END", "SPR"])
+            chosen_stat = random.choice(["STR", "END", "TECH"])
             obj["stat_focus"] = chosen_stat
             obj["desc"] = f"Perform {target} reps of {chosen_stat}-based exercises"
         elif obj["type"] == "tier_reps":

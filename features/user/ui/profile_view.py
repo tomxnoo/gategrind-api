@@ -64,9 +64,9 @@ async def build_profile_embed(bot, user: Union[discord.User, discord.Member]) ->
 📊 CORE ATTRIBUTES"""
         
         # Add stats with visual bars
-        stat_keys = ["STR", "END", "SPR", "TECH"]
-        stat_emojis = {"STR": "💪", "END": "🛡️", "SPR": "✨", "TECH": "🎯"}
-        stat_labels = {"STR": "Strength", "END": "Endurance", "SPR": "Spirit", "TECH": "Technique"}
+        stat_keys = ["STR", "END", "TECH"]
+        stat_emojis = {"STR": "💪", "END": "🛡️", "TECH": "🎯"}
+        stat_labels = {"STR": "Strength", "END": "Endurance", "TECH": "Technique"}
         
         for i, key in enumerate(stat_keys):
             stat_data = stats.get(key, {})

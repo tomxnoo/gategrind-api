@@ -30,10 +30,16 @@ class SystemHubPublicDropdown(discord.ui.Select):
             await interaction.response.send_message("This is not your menu.", ephemeral=True)
             return
 
-        # When the user opens the hub, we pass the bot instance to the next view
-        embed = await render_hub_embed(self.bot, interaction.user)
-        view = EphemeralPanelView(self.bot, interaction.user)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        # Send ephemeral response directly instead of using run_with_animation
+        try:
+            embed = await render_hub_embed(self.bot, interaction.user)
+            view = EphemeralPanelView(self.bot, interaction.user)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(
+                "❌ Failed to open System Hub. Please try again.", 
+                ephemeral=True
+            )
 
 class SystemHubPublicView(discord.ui.View):
     def __init__(self, bot, user=None):

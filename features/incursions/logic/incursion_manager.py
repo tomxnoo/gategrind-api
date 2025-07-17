@@ -224,3 +224,39 @@ class IncursionManager:
             end_time = row['expires_at'] if row['expires_at'] <= datetime.now(timezone.utc) else row['created_at']
             time_diff = datetime.now(timezone.utc) - end_time
             return time_diff.total_seconds() / 3600  # Convert to hours
+    
+    async def mark_incursion_inactive(self, incursion_id: str) -> bool:
+        """Mark an incursion as inactive"""
+        async with self.db_pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE active_incursions 
+                SET is_active = FALSE
+                WHERE incursion_id = $1
+                """,
+                incursion_id
+            )
+        
+        success = result.split()[-1] == '1'
+        if success:
+            logger.info(f"Marked incursion {incursion_id} as inactive")
+        return success
+    
+    async def update_incursion_metadata(self, incursion_id: str, metadata: Dict[str, Any]) -> bool:
+        """Update incursion metadata"""
+        metadata_json = json.dumps(metadata)
+        
+        async with self.db_pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE active_incursions 
+                SET metadata = $1
+                WHERE incursion_id = $2
+                """,
+                metadata_json, incursion_id
+            )
+        
+        success = result.split()[-1] == '1'
+        if success:
+            logger.info(f"Updated metadata for incursion {incursion_id}")
+        return success

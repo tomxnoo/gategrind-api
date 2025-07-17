@@ -15,10 +15,10 @@ CLASS_EVOLUTIONS = {
 MOVEMENT_DATA = {
     "Push-ups": {"stat": "STR", "tier": 1, "xp": 5},
     "Squats": {"stat": "END", "tier": 1, "xp": 5},
-    "Plank": {"stat": "SPR", "tier": 1, "xp": 5},
+    "Plank": {"stat": "TECH", "tier": 1, "xp": 5},
     "Pull-ups": {"stat": "STR", "tier": 2, "xp": 8},
     "Lunges": {"stat": "END", "tier": 2, "xp": 8},
-    "Hollow Hold": {"stat": "SPR", "tier": 2, "xp": 8},
+    "Hollow Hold": {"stat": "TECH", "tier": 2, "xp": 8},
     # ...add more movements as needed...
 }
 
@@ -312,7 +312,7 @@ QUEST_THEMES = {
             "Breathe the quiet rhythm of persistence.", "The long road is your proving ground."
         ]
     },
-    "SPR": {
+    "TECH": {
         "name": "The Argent Core",
         "flavor": [
             "Hone the center of your will.", "From stability, true power is born.",

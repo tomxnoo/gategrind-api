@@ -4,7 +4,7 @@ import asyncpg
 
 from api.models.buff import BuffInventory, ActiveBuff
 from api.models.common import SuccessResponse
-from api.dependencies import get_db_pool, get_current_user, is_development_mode
+from api.dependencies import get_db_pool_optional, get_current_user, is_development_mode
 
 router = APIRouter()
 
@@ -53,7 +53,7 @@ def get_mock_consumable_inventory() -> Dict[str, int]:
 @router.get("/inventory", response_model=BuffInventory)
 async def get_buff_inventory(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Get user's buff inventory (active buffs and consumables)"""
     # Development mode: return mock data
@@ -111,7 +111,7 @@ async def get_buff_inventory(
 @router.get("/consumables", response_model=Dict[str, int])
 async def get_consumable_inventory(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Get user's consumable buff inventory"""
     # Development mode: return mock data
@@ -136,7 +136,7 @@ async def get_consumable_inventory(
 async def use_consumable_buff(
     buff_id: str,
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Use a consumable buff from inventory"""
     # Development mode: return mock success
@@ -162,6 +162,7 @@ async def use_consumable_buff(
         class MockBot:
             def __init__(self, db_pool):
                 self.db_pool = db_pool
+                self.redis = None  # Add redis attribute for compatibility
         
         bot = MockBot(db_pool)
         result = await use_consumable_buff(bot, user_id, buff_id)
@@ -190,7 +191,7 @@ async def use_consumable_buff(
 async def apply_buff(
     buff_id: str,
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Apply a buff to the user (admin/testing endpoint)"""
     # Development mode: return mock success
@@ -246,7 +247,7 @@ async def add_consumable_buff(
     buff_id: str,
     quantity: int = 1,
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Add consumable buffs to user's inventory (admin/testing endpoint)"""
     # Development mode: return mock success
@@ -298,7 +299,7 @@ async def add_consumable_buff(
 @router.post("/random", response_model=SuccessResponse)
 async def grant_random_buff(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Grant a random buff to the user (admin/testing endpoint)"""
     # Development mode: return mock success

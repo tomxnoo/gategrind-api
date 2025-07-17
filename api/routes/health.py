@@ -3,7 +3,7 @@ import asyncpg
 from datetime import datetime
 from typing import Optional
 
-from api.dependencies import get_db_pool, get_redis, is_development_mode
+from api.dependencies import get_db_pool_optional, get_redis, is_development_mode
 from api.models.common import SuccessResponse
 from core.redis_cache import RedisCache
 
@@ -24,7 +24,7 @@ async def health_check():
 
 @router.get("/detailed", response_model=SuccessResponse)
 async def detailed_health_check(
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool),
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional),
     redis: Optional[RedisCache] = Depends(get_redis)
 ):
     """Detailed health check including database and Redis"""

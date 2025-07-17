@@ -83,7 +83,7 @@ class MovementLogger(commands.Cog):
                 return None, None
         
         # Use run_with_animation for the main work
-        result = await run_with_animation(interaction, do_work())
+        result = await run_with_animation(interaction, do_work)
         
         # Handle follow-up notifications if we have results
         if hasattr(self, '_last_log_result') and self._last_log_result:

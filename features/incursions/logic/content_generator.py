@@ -31,7 +31,7 @@ class IncursionContentGenerator:
         {
             "title": "🔥 Infernal Focus Surge",
             "description": "The fires of determination burn bright. Channel this intensity into your training!",
-            "effect": "Next 3 completed quests grant double STR/END/SPR XP",
+            "effect": "Next 3 completed quests grant double STR/END/TECH XP",
             "target_exercise": "any",
             "target_reps": 0,
             "reward_type": RewardType.BUFF,

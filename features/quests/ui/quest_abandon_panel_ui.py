@@ -47,7 +47,7 @@ class ConfirmAbandonButton(discord.ui.Button):
             
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)
 
 class CancelAbandonButton(discord.ui.Button):
     def __init__(self, bot, user_id):
@@ -81,7 +81,7 @@ class CancelAbandonButton(discord.ui.Button):
             
             return embed, view
         
-        await run_with_animation(interaction, do_work())
+        await run_with_animation(interaction, do_work)
 
 
 class AbandonQuestConfirmationView(discord.ui.View):

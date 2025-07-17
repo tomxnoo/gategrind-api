@@ -11,7 +11,12 @@ async def build_hub_embed(bot, user, show_header: bool = True):
         
         # Get daily quests from API
         quests_data = await api_client.get_daily_quests(user)
-        daily_quests = quests_data.get("quests", [])
+        
+        # CRITICAL FIX: Handle both list and dict responses
+        if isinstance(quests_data, list):
+            daily_quests = quests_data
+        else:
+            daily_quests = quests_data.get("quests", [])
         
         # Build enhanced description with real data
         level = user_data.get("level", 1)
