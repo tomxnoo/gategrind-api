@@ -15,7 +15,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from core.redis_cache import RedisCache
-from api.routes import health, users, quests, logging, auth, buffs, incursions
+from api.routes import health, users, quests, logging, auth, buffs, incursions, awakening
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -96,6 +96,7 @@ app.include_router(quests.router, prefix="/api/quests", tags=["Quests"])
 app.include_router(logging.router, prefix="/api/logging", tags=["Logging"])
 app.include_router(buffs.router, prefix="/api/buffs", tags=["Buffs"])
 app.include_router(incursions.router, prefix="/api/incursions", tags=["Incursions"])
+app.include_router(awakening.router, prefix="/api/awakening", tags=["Awakening"])
 
 # Root endpoint
 @app.get("/")
@@ -115,6 +116,7 @@ async def root():
             "logging": "/api/logging",
             "buffs": "/api/buffs",
             "incursions": "/api/incursions",
+            "awakening": "/api/awakening",
             "health": "/api/health"
         }
     }

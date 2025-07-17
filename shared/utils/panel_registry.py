@@ -12,7 +12,7 @@ _PANEL_REGISTRY: dict[str, Type] = {}
 
 def register(panel_cls: Type):
     """
-    Call this at module‐load time in each panel’s UI file
+    Call this at module‐load time in each panel's UI file
     so the panel shows up in the main dropdown.
     """
     _PANEL_REGISTRY[panel_cls.key] = panel_cls
@@ -24,7 +24,7 @@ def get_registered_panels() -> list[Type]:
     Returns the list of panel classes in a specific order.
     """
     # Define the desired order for your panels
-    desired_order = ["profile", "log_reps", "quest_log", "buffs", "incursions"]
+    desired_order = ["profile", "awakening", "log_reps", "quest_log", "buffs", "incursions"]
     
     ordered_panels = []
     

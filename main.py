@@ -88,6 +88,7 @@ bot = RealmBot(command_prefix="!", intents=intents)
 
 EXTS = [
     'features.system.system_hub_cog',
+    'features.awakening.cog',  # Add awakening cog
     'features.buffs.cog',
     'features.logging.cog',
     'features.quests.cog',

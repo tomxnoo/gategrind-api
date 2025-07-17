@@ -2,6 +2,7 @@ PRIMARY_COLOR = "#9146FF"  # <--- Add this line
 
 PANEL_ICONS = {
     "profile": "📋",
+    "awakening": "🌅",
     "quests": "🏆",
     "buffs": "🧬",
     "log": "📈",
@@ -13,6 +14,7 @@ PANEL_ICONS = {
 
 PANEL_SUB_HEADERS = {
     "profile": "[ PROFILE MODULE ]\nSystem: SHADOW_PACT // Profile Access [GRANTED]\n──────────────────────────",
+    "awakening": "[ AWAKENING MODULE ]\nSystem: SHADOW_PACT // Awakening Access [GRANTED]\n──────────────────────────",
     "quests": "[ QUEST LOG MODULE ]\nSystem: SHADOW_PACT // Quest Log Access [GRANTED]\n──────────────────────────",
     "buffs": "[ BUFFS MODULE ]\nSystem: SHADOW_PACT // Buffs Access [GRANTED]\n──────────────────────────",
     "log": "[ LOG MODULE ]\nSystem: SHADOW_PACT // Log Access [GRANTED]\n──────────────────────────",
