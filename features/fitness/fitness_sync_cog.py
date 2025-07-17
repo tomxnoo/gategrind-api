@@ -157,7 +157,6 @@ Required Permissions:
             if total_steps > 0 and walking_reps > 0:
                 # Add XP and update stats (only if not already synced)
                 from features.user.logic.xp_engine import add_xp, calculate_xp_for_movement
-                from features.quests.logic.daily_quests.daily_quest_logic import update_quest_progress
                 from features.quests.ui.weekly.weekly_contract_panel import update_weekly_progress
 
                 # Update quests and contracts

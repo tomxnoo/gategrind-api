@@ -85,3 +85,4 @@ class FitnessIntegrations:
 
         await save_user_data(user_id, data)
         return True
+        from features.quests.logic.daily_quests.daily_quest_logic import update_quest_progress

@@ -286,12 +286,12 @@ async def get_available_movements(
     # Production mode: get from exercise library
     try:
         # Import exercise library
-        from features.quests.logic.daily_quests.exercise_library import EXERCISE_LIBRARY
+        from core.game_data.exercise_library import EXERCISE_LIBRARY
         
         movements = []
         for category in EXERCISE_LIBRARY.values():
-            for exercise in category:
-                movements.append(exercise["name"])
+            for progression in category.progressions:
+                movements.append(progression.display_name)
         
         return sorted(movements)
         

@@ -264,7 +264,7 @@ class EnhancedReadinessButton(discord.ui.Button):
         try:
             # Get user data for quest generation
             api_client = APIClient()
-            user_data = await api_client.get_user_data(self.view.user)
+            user_data = await api_client.get_user_profile(self.view.user)
             user_level = user_data.get("level", 1) if user_data else 1
             
             # Generate awakening session using new quest engine
@@ -857,8 +857,8 @@ class EnhancedQuestDetailsView(discord.ui.View):
 @register
 class EnhancedAwakeningPanel:
     """Enhanced Awakening Panel V2 for the system hub"""
-    key = "awakening_v2"
-    label = "Awakening V2"
+    key = "awakening"
+    label = "Awakening"
     emoji = "🌅"
 
     @staticmethod
@@ -868,3 +868,6 @@ class EnhancedAwakeningPanel:
     @staticmethod
     async def build_view(bot, user: Union[discord.User, discord.Member], **kwargs) -> discord.ui.View:
         return EnhancedAwakeningMainView(bot, user)
+
+# Alias for backward compatibility
+AwakeningPanel = EnhancedAwakeningPanel
