@@ -797,7 +797,7 @@ class ViewQuestsButton(discord.ui.Button):
             awakening_status = await api_client.get_awakening_status(self.view.user)
             
             # If no awakening exists, show the "not initiated" message
-            if not awakening_status.get("awakening_exists", False):
+            if not awakening_status.get("awakened", False):
                 return await self._show_no_quests_available()
             
             # If awakening exists, try to get quests
