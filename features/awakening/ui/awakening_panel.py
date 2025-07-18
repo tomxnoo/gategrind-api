@@ -590,7 +590,7 @@ class EnhancedAwakeningMainView(discord.ui.View):
     def _add_conditional_buttons(self, awakening_status=None):
         """Add buttons based on awakening status"""
         try:
-            if awakening_status and awakening_status.get("awakening_exists", False):
+            if awakening_status and awakening_status.get("awakened", False):
                 # Awakening exists - show quest management buttons
                 self.add_item(ViewQuestsButton())
                 self.add_item(ViewBriefingButton())
