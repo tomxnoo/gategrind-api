@@ -4,6 +4,7 @@ Handles the core logic for daily awakening ritual and quest generation
 """
 
 import asyncio
+import json
 import random
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
@@ -134,7 +135,7 @@ class AwakeningService:
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING id
                 """,
-                awakening_id, quest_data, tier, xp_reward, "available"
+                awakening_id, json.dumps(quest_data), tier, xp_reward, "available"
             )
             
             quest_data["id"] = quest_id
