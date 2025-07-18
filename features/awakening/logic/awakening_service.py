@@ -9,9 +9,10 @@ import random
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 import asyncpg
+import sentry_sdk
 from core.database.db import get_unified_user_data, update_user_json_data
 from core.redis_cache import get_or_cache_user_json_data, invalidate_user_json_cache
-from features.quests.logic.quest_templates import QUEST_THEMES, MOVEMENT_DATA
+from core.config import QUEST_THEMES, MOVEMENT_DATA
 from api.models.awakening import ReadinessLevel, AwakeningStatus, ReadinessEffects
 
 class AwakeningService:
@@ -22,19 +23,45 @@ class AwakeningService:
         
     async def get_today_awakening(self, user_id: int, conn: asyncpg.Connection) -> Optional[Dict]:
         """Get today's awakening session for a user"""
-        today = date.today()
-        
-        result = await conn.fetchrow(
-            """
-            SELECT * FROM awakening_sessions 
-            WHERE user_id = $1 AND awakening_date = $2
-            """,
-            user_id, today
-        )
-        
-        if result:
-            return dict(result)
-        return None
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_tag("operation", "get_today_awakening")
+            scope.set_context("user", {"user_id": user_id})
+            
+        try:
+            today = date.today()
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Fetching awakening session for user {user_id} on {today}",
+                level="info",
+                category="database"
+            )
+            
+            result = await conn.fetchrow(
+                """
+                SELECT * FROM awakening_sessions 
+                WHERE user_id = $1 AND awakening_date = $2
+                """,
+                user_id, today
+            )
+            
+            if result:
+                sentry_sdk.add_breadcrumb(
+                    message=f"Found awakening session: {dict(result)}",
+                    level="info",
+                    category="database"
+                )
+                return dict(result)
+            else:
+                sentry_sdk.add_breadcrumb(
+                    message=f"No awakening session found for user {user_id} on {today}",
+                    level="info",
+                    category="database"
+                )
+                return None
+                
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
     
     async def create_awakening_session(
         self, 
@@ -43,60 +70,116 @@ class AwakeningService:
         conn: asyncpg.Connection
     ) -> Dict:
         """Create a new awakening session and generate quests"""
-        today = date.today()
-        
-        # Check if awakening already exists for today
-        existing = await self.get_today_awakening(user_id, conn)
-        if existing:
-            raise ValueError("Awakening already completed for today")
-        
-        # Get user data for quest generation
-        user_data = await get_unified_user_data(conn, user_id, self.bot)
-        user_level = user_data.get("level", 1)
-        
-        # Determine quest count based on readiness and user level
-        quest_count = self._calculate_quest_count(readiness_level, user_level)
-        
-        # Create awakening session
-        awakening_id = await conn.fetchval(
-            """
-            INSERT INTO awakening_sessions 
-            (user_id, awakening_date, readiness_level, quest_count, awakened_at, status)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING id
-            """,
-            user_id, today, readiness_level.value, quest_count, datetime.utcnow(), AwakeningStatus.AWAKENED.value
-        )
-        
-        # Generate quests based on readiness level
-        quests = await self._generate_awakening_quests(
-            awakening_id, user_id, readiness_level, quest_count, user_data, conn
-        )
-        
-        # Update awakening session with quest IDs
-        quest_ids = [quest["id"] for quest in quests]
-        await conn.execute(
-            """
-            UPDATE awakening_sessions 
-            SET generated_quests = $1, updated_at = $2
-            WHERE id = $3
-            """,
-            quest_ids, datetime.utcnow(), awakening_id
-        )
-        
-        # Update user's awakening stats
-        await self._update_awakening_stats(user_id, readiness_level, conn)
-        
-        # Record readiness history
-        await self._record_readiness_history(user_id, readiness_level, conn)
-        
-        return {
-            "awakening_id": awakening_id,
-            "readiness_level": readiness_level.value,
-            "quest_count": quest_count,
-            "quests": quests,
-            "awakened_at": datetime.utcnow().isoformat()
-        }
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_tag("operation", "create_awakening_session")
+            scope.set_context("user", {"user_id": user_id})
+            scope.set_context("awakening", {
+                "readiness_level": readiness_level.value,
+                "date": date.today().isoformat()
+            })
+            
+        try:
+            today = date.today()
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Creating awakening session for user {user_id} with readiness {readiness_level.value}",
+                level="info",
+                category="awakening"
+            )
+            
+            # Check if awakening already exists for today
+            existing = await self.get_today_awakening(user_id, conn)
+            if existing:
+                sentry_sdk.add_breadcrumb(
+                    message=f"Awakening already exists: {existing}",
+                    level="warning",
+                    category="awakening"
+                )
+                raise ValueError("Awakening already completed for today")
+            
+            # Get user data for quest generation
+            user_data = await get_unified_user_data(conn, user_id, self.bot)
+            user_level = user_data.get("level", 1)
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"User data retrieved: level={user_level}, data_keys={list(user_data.keys())}",
+                level="info",
+                category="user_data"
+            )
+            
+            # Determine quest count based on readiness and user level
+            quest_count = self._calculate_quest_count(readiness_level, user_level)
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Calculated quest count: {quest_count}",
+                level="info",
+                category="quest_generation"
+            )
+            
+            # Create awakening session
+            awakening_id = await conn.fetchval(
+                """
+                INSERT INTO awakening_sessions 
+                (user_id, awakening_date, readiness_level, quest_count, awakened_at, status)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id
+                """,
+                user_id, today, readiness_level.value, quest_count, datetime.utcnow(), AwakeningStatus.AWAKENED.value
+            )
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Created awakening session with ID: {awakening_id}",
+                level="info",
+                category="database"
+            )
+            
+            # Generate quests based on readiness level
+            quests = await self._generate_awakening_quests(
+                awakening_id, user_id, readiness_level, quest_count, user_data, conn
+            )
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Generated {len(quests)} quests: {[q.get('id') for q in quests]}",
+                level="info",
+                category="quest_generation"
+            )
+            
+            # Update awakening session with quest IDs
+            quest_ids = [quest["id"] for quest in quests]
+            await conn.execute(
+                """
+                UPDATE awakening_sessions 
+                SET generated_quests = $1, updated_at = $2
+                WHERE id = $3
+                """,
+                quest_ids, datetime.utcnow(), awakening_id
+            )
+            
+            # Update user's awakening stats
+            await self._update_awakening_stats(user_id, readiness_level, conn)
+            
+            # Record readiness history
+            await self._record_readiness_history(user_id, readiness_level, conn)
+            
+            result = {
+                "awakening_id": awakening_id,
+                "readiness_level": readiness_level.value,
+                "quest_count": quest_count,
+                "quests": quests,
+                "awakened_at": datetime.utcnow().isoformat()
+            }
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Awakening session created successfully: {awakening_id}",
+                level="info",
+                category="awakening"
+            )
+            
+            return result
+            
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
     
     async def _generate_awakening_quests(
         self,
@@ -108,43 +191,101 @@ class AwakeningService:
         conn: asyncpg.Connection
     ) -> List[Dict]:
         """Generate quests based on readiness level and autoregulation"""
-        
-        readiness_effects = self._get_readiness_effects(readiness_level)
-        user_level = user_data.get("level", 1)
-        
-        quests = []
-        
-        for i in range(quest_count):
-            # Determine quest tier based on readiness and position
-            tier = self._determine_quest_tier(readiness_level, i, quest_count)
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_tag("operation", "generate_awakening_quests")
+            scope.set_context("quest_generation", {
+                "awakening_id": awakening_id,
+                "user_id": user_id,
+                "readiness_level": readiness_level.value,
+                "quest_count": quest_count
+            })
             
-            # Generate quest with readiness modifications
-            quest_data = await self._generate_single_quest(
-                tier, user_level, readiness_effects, user_data
+        try:
+            sentry_sdk.add_breadcrumb(
+                message=f"Starting quest generation: {quest_count} quests for awakening {awakening_id}",
+                level="info",
+                category="quest_generation"
             )
             
-            # Calculate XP reward with readiness modifier
-            base_xp = self._calculate_base_xp(tier, user_level)
-            xp_reward = int(base_xp * readiness_effects.xp_modifier)
+            # Validate configuration data
+            if not QUEST_THEMES:
+                sentry_sdk.capture_message("QUEST_THEMES is empty or None", level="error")
+                raise ValueError("QUEST_THEMES configuration is missing")
+                
+            if not MOVEMENT_DATA:
+                sentry_sdk.capture_message("MOVEMENT_DATA is empty or None", level="error")
+                raise ValueError("MOVEMENT_DATA configuration is missing")
             
-            # Insert quest into database
-            quest_id = await conn.fetchval(
-                """
-                INSERT INTO awakening_quests 
-                (awakening_session_id, quest_data, tier, xp_reward, status)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING id
-                """,
-                awakening_id, json.dumps(quest_data), tier, xp_reward, "available"
+            sentry_sdk.add_breadcrumb(
+                message=f"Configuration validated: QUEST_THEMES={list(QUEST_THEMES.keys())}, MOVEMENT_DATA={len(MOVEMENT_DATA)} movements",
+                level="info",
+                category="configuration"
             )
             
-            quest_data["id"] = quest_id
-            quest_data["xp_reward"] = xp_reward
-            quest_data["status"] = "available"
+            readiness_effects = self._get_readiness_effects(readiness_level)
+            user_level = user_data.get("level", 1)
             
-            quests.append(quest_data)
-        
-        return quests
+            quests = []
+            
+            for i in range(quest_count):
+                sentry_sdk.add_breadcrumb(
+                    message=f"Generating quest {i+1}/{quest_count}",
+                    level="info",
+                    category="quest_generation"
+                )
+                
+                # Determine quest tier based on readiness and position
+                tier = self._determine_quest_tier(readiness_level, i, quest_count)
+                
+                # Generate quest with readiness modifications
+                quest_data = await self._generate_single_quest(
+                    tier, user_level, readiness_effects, user_data
+                )
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"Generated quest data: {quest_data}",
+                    level="info",
+                    category="quest_generation"
+                )
+                
+                # Calculate XP reward with readiness modifier
+                base_xp = self._calculate_base_xp(tier, user_level)
+                xp_reward = int(base_xp * readiness_effects.xp_modifier)
+                
+                # Insert quest into database
+                quest_id = await conn.fetchval(
+                    """
+                    INSERT INTO awakening_quests 
+                    (awakening_session_id, quest_data, tier, xp_reward, status)
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING id
+                    """,
+                    awakening_id, json.dumps(quest_data), tier, xp_reward, "available"
+                )
+                
+                quest_data["id"] = quest_id
+                quest_data["xp_reward"] = xp_reward
+                quest_data["status"] = "available"
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"Quest {i+1} saved to database with ID: {quest_id}",
+                    level="info",
+                    category="database"
+                )
+                
+                quests.append(quest_data)
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Quest generation completed: {len(quests)} quests created",
+                level="info",
+                category="quest_generation"
+            )
+            
+            return quests
+            
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
     
     def _get_readiness_effects(self, readiness_level: ReadinessLevel) -> ReadinessEffects:
         """Get the effects of readiness level on quest generation"""
@@ -216,87 +357,163 @@ class AwakeningService:
         user_data: Dict
     ) -> Dict:
         """Generate a single quest based on tier and readiness effects"""
-        
-        # Select theme based on readiness preferences
-        available_themes = list(QUEST_THEMES.keys())
-        theme = random.choice(available_themes)
-        theme_info = QUEST_THEMES[theme]
-        
-        # Filter movements by theme and tier
-        possible_movements = [
-            m for m, data in MOVEMENT_DATA.items()
-            if data['stat'] == theme and data['tier'] <= tier
-        ]
-        
-        # Fallback if no movements found
-        if not possible_movements:
-            possible_movements = [m for m, data in MOVEMENT_DATA.items() if data['tier'] <= tier]
-        if not possible_movements:
-            possible_movements = ["Standard Push-Ups"]  # Ultimate fallback
-        
-        # Select movement(s) for the quest
-        movement_count = min(3, len(possible_movements))
-        movements = random.sample(possible_movements, movement_count)
-        
-        # Calculate reps based on tier and readiness
-        base_reps = 5 + (tier * 3)
-        adjusted_reps = int(base_reps * readiness_effects.difficulty_modifier)
-        sets = 3 + (tier - 1)  # More sets for higher tiers
-        
-        # Create quest data
-        quest_data = {
-            "tier": tier,
-            "theme": theme,
-            "name": f"T{tier}: {theme_info['name']}",
-            "flavor": random.choice(theme_info['flavor']),
-            "movements": movements,
-            "target": {"sets": sets, "reps": adjusted_reps},
-            "progress": {move: {"sets": 0, "reps": 0} for move in movements},
-            "readiness_modifier": readiness_effects.difficulty_modifier,
-            "completed": False,
-            "active": False
-        }
-        
-        return quest_data
-    
-    def _calculate_base_xp(self, tier: int, user_level: int) -> int:
-        """Calculate base XP reward for a quest"""
-        base_xp = 50 + (tier * 25)  # 75, 100, 125 for tiers 1, 2, 3
-        level_bonus = user_level * 2  # Small level scaling
-        return base_xp + level_bonus
-    
-    async def _update_awakening_stats(self, user_id: int, readiness_level: ReadinessLevel, conn: asyncpg.Connection):
-        """Update user's awakening statistics"""
-        # This could track awakening streaks, readiness patterns, etc.
-        pass
-    
-    async def _record_readiness_history(self, user_id: int, readiness_level: ReadinessLevel, conn: asyncpg.Connection):
-        """Record readiness level for historical analysis"""
-        await conn.execute(
-            """
-            INSERT INTO awakening_readiness_history (user_id, readiness_level, recorded_at)
-            VALUES ($1, $2, $3)
-            """,
-            user_id, readiness_level.value, datetime.utcnow()
-        )
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_tag("operation", "generate_single_quest")
+            scope.set_context("quest_params", {
+                "tier": tier,
+                "user_level": user_level,
+                "difficulty_modifier": readiness_effects.difficulty_modifier
+            })
+            
+        try:
+            sentry_sdk.add_breadcrumb(
+                message=f"Generating single quest: tier={tier}, user_level={user_level}",
+                level="info",
+                category="quest_generation"
+            )
+            
+            # Validate configuration data
+            if not QUEST_THEMES:
+                sentry_sdk.capture_message("QUEST_THEMES is empty during single quest generation", level="error")
+                raise ValueError("QUEST_THEMES configuration is missing")
+                
+            if not MOVEMENT_DATA:
+                sentry_sdk.capture_message("MOVEMENT_DATA is empty during single quest generation", level="error")
+                raise ValueError("MOVEMENT_DATA configuration is missing")
+            
+            # Select theme based on readiness preferences
+            available_themes = list(QUEST_THEMES.keys())
+            theme = random.choice(available_themes)
+            theme_info = QUEST_THEMES[theme]
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Selected theme: {theme} from {available_themes}",
+                level="info",
+                category="quest_generation"
+            )
+            
+            # Filter movements by theme and tier
+            possible_movements = [
+                m for m, data in MOVEMENT_DATA.items()
+                if data['stat'] == theme and data['tier'] <= tier
+            ]
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Filtered movements for theme {theme}, tier {tier}: {len(possible_movements)} movements",
+                level="info",
+                category="quest_generation"
+            )
+            
+            # Fallback if no movements found
+            if not possible_movements:
+                sentry_sdk.add_breadcrumb(
+                    message=f"No movements found for theme {theme}, tier {tier}. Using tier fallback.",
+                    level="warning",
+                    category="quest_generation"
+                )
+                possible_movements = [m for m, data in MOVEMENT_DATA.items() if data['tier'] <= tier]
+                
+            if not possible_movements:
+                sentry_sdk.add_breadcrumb(
+                    message=f"No movements found for tier {tier}. Using ultimate fallback.",
+                    level="warning",
+                    category="quest_generation"
+                )
+                possible_movements = ["Push-ups"]  # Ultimate fallback
+            
+            # Select primary movement for the quest
+            primary_movement = random.choice(possible_movements)
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Selected movement: {primary_movement}",
+                level="info",
+                category="quest_generation"
+            )
+            
+            # Calculate reps based on tier and readiness
+            base_reps = 5 + (tier * 3)
+            adjusted_reps = int(base_reps * readiness_effects.difficulty_modifier)
+            sets = 3 + (tier - 1)  # More sets for higher tiers
+            
+            # Generate quest title and description
+            flavor_text = random.choice(theme_info['flavor'])
+            title = f"Shadow Strike: {primary_movement}"
+            description = f"Standard protocol, operative. Execute with precision.\n\n**{theme_info['name']}**\n\n{flavor_text}\n\nComplete {sets} sets of {adjusted_reps} {primary_movement}. Focus on proper form."
+            
+            # Create quest data structure that matches API expectations
+            quest_data = {
+                "title": title,
+                "description": description,
+                "movement": primary_movement,
+                "target_sets": sets,
+                "target_reps": adjusted_reps,
+                "tier": tier,
+                "theme": theme,
+                "readiness_modifier": readiness_effects.difficulty_modifier,
+                "progress": {"current_sets": 0, "current_reps": 0, "completed": False}
+            }
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Quest data structure created: {quest_data}",
+                level="info",
+                category="quest_generation"
+            )
+            
+            return quest_data
+            
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
     
     async def get_awakening_quests(self, user_id: int, conn: asyncpg.Connection) -> List[Dict]:
         """Get today's awakening quests for a user"""
-        today = date.today()
-        
-        results = await conn.fetch(
-            """
-            SELECT aq.*, aws.readiness_level
-            FROM awakening_quests aq
-            JOIN awakening_sessions aws ON aq.awakening_session_id = aws.id
-            WHERE aws.user_id = $1 AND aws.awakening_date = $2
-            ORDER BY aq.tier
-            """,
-            user_id, today
-        )
-        
-        return [dict(row) for row in results]
-    
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_tag("operation", "get_awakening_quests")
+            scope.set_context("user", {"user_id": user_id})
+            
+        try:
+            today = date.today()
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Fetching awakening quests for user {user_id} on {today}",
+                level="info",
+                category="database"
+            )
+            
+            results = await conn.fetch(
+                """
+                SELECT aq.*, aws.readiness_level
+                FROM awakening_quests aq
+                JOIN awakening_sessions aws ON aq.awakening_session_id = aws.id
+                WHERE aws.user_id = $1 AND aws.awakening_date = $2
+                ORDER BY aq.tier
+                """,
+                user_id, today
+            )
+            
+            quests = [dict(row) for row in results]
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Retrieved {len(quests)} quests for user {user_id}",
+                level="info",
+                category="database"
+            )
+            
+            # Log quest data structure for debugging
+            if quests:
+                sample_quest = quests[0]
+                sentry_sdk.add_breadcrumb(
+                    message=f"Sample quest structure: {sample_quest}",
+                    level="info",
+                    category="quest_data"
+                )
+            
+            return quests
+            
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
+
     async def complete_awakening_quest(
         self,
         user_id: int,
