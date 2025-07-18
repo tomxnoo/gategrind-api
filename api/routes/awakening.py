@@ -28,8 +28,8 @@ async def get_awakening_status(
 ):
     """Get current awakening status for the user"""
     
-    # Development mode: return mock status
-    if is_development_mode() or db_pool is None:
+    # Only return mock data if explicitly in development mode, not just because db_pool is None
+    if is_development_mode():
         return {
             "status": "pending",
             "awakened": False,
@@ -39,6 +39,13 @@ async def get_awakening_status(
             "quests": [],
             "mode": "development"
         }
+    
+    # If not in development mode but no database, return error
+    if db_pool is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Database connection unavailable. Please check server configuration."
+        )
     
     user_id = current_user["user_id"]
     
@@ -167,8 +174,8 @@ async def get_awakening_quests(
         category="api"
     )
     
-    # Development mode: return mock quests
-    if is_development_mode() or db_pool is None:
+    # Only return mock data if explicitly in development mode
+    if is_development_mode():
         sentry_sdk.add_breadcrumb(
             message="API: Returning mock quests (development mode)",
             level="info",
@@ -186,6 +193,13 @@ async def get_awakening_quests(
             }
         ]
     
+    # If not in development mode but no database, return error
+    if db_pool is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Database connection unavailable. Please check server configuration."
+        )
+
     try:
         async with db_pool.acquire() as conn:
             awakening_service = AwakeningService(bot=None)
