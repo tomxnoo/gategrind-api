@@ -256,8 +256,9 @@ class APIClient:
     
     async def perform_awakening(self, discord_user, readiness_level: str) -> Dict[str, Any]:
         """Perform the daily awakening ritual via API"""
-        # Send readiness_level as query parameter, not in JSON body
-        return await self._make_request("POST", f"/awakening/awaken?readiness_level={readiness_level}", discord_user)
+        # Send readiness_level in JSON body, not as query parameter
+        data = {"readiness_level": readiness_level}
+        return await self._make_request("POST", "/awakening/awaken", discord_user, json=data)
     
     async def get_awakening_quests(self, discord_user) -> Dict[str, Any]:
         """Get today's awakening quests from API"""

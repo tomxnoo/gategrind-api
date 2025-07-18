@@ -7,6 +7,7 @@ import discord
 import asyncio
 import sentry_sdk
 import logging
+import httpx
 from typing import Union, Dict, Any, Optional, List
 from datetime import date, datetime
 
@@ -25,22 +26,25 @@ logger = logging.getLogger(__name__)
 
 # --- ENHANCED AWAKENING PANEL EMBED ---
 async def build_enhanced_awakening_embed(bot, user: Union[discord.User, discord.Member]) -> discord.Embed:
-    """Build the enhanced awakening panel embed with new quest engine integration"""
+    """Build the enhanced awakening panel embed with comprehensive error handling"""
     
     header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
     sub_header = get_panel_sub_header("awakening")
     
     try:
-        # Get awakening status from API
+        # Get awakening status from API with timeout
         api_client = APIClient()
-        status_response = await api_client.get_awakening_status(user)
+        status_response = await asyncio.wait_for(
+            api_client.get_awakening_status(user), 
+            timeout=10.0  # 10 second timeout
+        )
         
-        if status_response and "awakening_exists" in status_response:
+        if status_response and status_response.get("awakened", False):
             status = status_response
         else:
             # Fallback status
             status = {
-                "awakening_exists": False,
+                "awakened": False,
                 "status": "pending",
                 "readiness_level": None,
                 "quest_count": 0,
@@ -50,7 +54,7 @@ async def build_enhanced_awakening_embed(bot, user: Union[discord.User, discord.
             }
         
         # Build ANSI-styled content with enhanced visuals
-        if not status["awakening_exists"]:
+        if not status.get("awakened", False):
             # Ready to awaken state - Enhanced with quest engine preview
             content = (
                 f"```ansi\n"
@@ -192,38 +196,25 @@ async def build_enhanced_awakening_embed(bot, user: Union[discord.User, discord.
         # Enhanced footer with version info
         embed.set_footer(text="Shadow Archive • Awakening V2 • Quest Engine Powered")
             
+    except asyncio.TimeoutError:
+        print(f"[AWAKENING] API timeout for user {user.id}")
+        logger.error("Awakening status API call timed out")
+        sentry_sdk.capture_message(f"Awakening API timeout for user {user.id}", level="warning")
+        return await _create_fallback_embed(user, "API Request Timeout")
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            print(f"[AWAKENING] API endpoint not found (404) - checking if API server is running")
+            sentry_sdk.capture_message(f"Awakening API 404 error - possible server issue", level="error")
+            return await _create_fallback_embed(user, "Service Unavailable")
+        else:
+            print(f"[AWAKENING] API HTTP error {e.response.status_code}: {e.response.text}")
+            sentry_sdk.capture_exception(e)
+            return await _create_fallback_embed(user, f"Service Error (HTTP {e.response.status_code})")
     except Exception as e:
+        print(f"[AWAKENING] Unexpected error in build_enhanced_awakening_embed: {e}")
         logger.error(f"Error building enhanced awakening panel embed: {e}")
         sentry_sdk.capture_exception(e)
-        
-        # Enhanced fallback embed
-        content = (
-            f"```ansi\n"
-            f"{header}\n"
-            f"{sub_header}\n\n"
-            f"\x1b[1;31m● System Disruption\x1b[0m\n"
-            f"Status: \x1b[1;31m⚠️ TEMPORARILY OFFLINE\x1b[0m\n"
-            f"Engine: \x1b[1;31m🔧 MAINTENANCE MODE\x1b[0m\n"
-            f"API: \x1b[1;31m📡 CONNECTION LOST\x1b[0m\n\n"
-            f"\x1b[1;37m🛠️ Technical Details:\x1b[0m\n"
-            f"The awakening system is temporarily unavailable.\n"
-            f"Our technicians are working to restore service.\n\n"
-            f"\x1b[1;37m🔄 Recovery Actions:\x1b[0m\n"
-            f"├─ Verify network connectivity\n"
-            f"├─ Check system status updates\n"
-            f"├─ Retry in a few moments\n"
-            f"└─ Contact support if persistent\n\n"
-            f"\x1b[1;37m💡 Error Code:\x1b[0m\n"
-            f"{str(e)[:50]}{'...' if len(str(e)) > 50 else ''}\n\n"
-            f"──────────────────────────\n"
-            f"```"
-        )
-        
-        embed = discord.Embed(
-            description=content,
-            color=discord.Color.red()
-        )
-        embed.set_footer(text="Shadow Archive • Awakening V2 • Error Recovery")
+        return await _create_fallback_embed(user, "System Error")
     
     return embed
 
@@ -271,6 +262,12 @@ class EnhancedReadinessButton(discord.ui.Button):
         api_client = APIClient()
         
         try:
+            # First check if awakening is already completed
+            awakening_status = await api_client.get_awakening_status(self.view.user)
+            if awakening_status and awakening_status.get("awakening_exists", False):
+                # Awakening already exists - show the appropriate status message
+                return await self._show_already_awakened_message(awakening_status)
+            
             # Get user data for quest generation
             user_data = await api_client.get_user_profile(self.view.user)
             user_level = user_data.get("level", 1)
@@ -278,32 +275,42 @@ class EnhancedReadinessButton(discord.ui.Button):
             # user_data remains None, user_level remains 1
             pass
         
-        # Generate awakening session using new quest engine
-        quest_session = generate_awakening_for_user(
-            user_id=self.view.user.id,
-            user_level=user_level,
-            readiness_level=self.readiness_level,
-            preferences=user_data.get("preferences") if user_data else None
-        )
-        
-        # Call awakening API with correct method name and parameters
-        response = await api_client.perform_awakening(
-            self.view.user,
-            self.readiness_level.value if hasattr(self.readiness_level, 'value') else str(self.readiness_level)
-        )
-        
-        if response and "awakening" in response:
-            # Show enhanced awakening results
-            return await self._show_enhanced_awakening_results(response, quest_session)
-        else:
-            # This will automatically trigger the error recovery UI
-            raise ValueError("API response invalid or incomplete")
+        try:
+            # Generate awakening session using new quest engine
+            quest_session = generate_awakening_for_user(
+                user_id=self.view.user.id,
+                user_level=user_level,
+                readiness_level=self.readiness_level,
+                preferences=user_data.get("preferences") if user_data else None
+            )
+            
+            # Call awakening API with correct method name and parameters
+            response = await api_client.perform_awakening(
+                self.view.user,
+                self.readiness_level.value if hasattr(self.readiness_level, 'value') else str(self.readiness_level)
+            )
+            
+            if response and "awakening" in response:
+                # Show enhanced awakening results
+                return await self._show_enhanced_awakening_results(response, quest_session)
+            else:
+                # This will automatically trigger the error recovery UI
+                raise ValueError("API response invalid or incomplete")
+                
+        except Exception as e:
+            # Check if this is the "already completed" error
+            if "already completed" in str(e).lower() or "400" in str(e):
+                # Try to get current status and show appropriate message
+                try:
+                    awakening_status = await api_client.get_awakening_status(self.view.user)
+                    if awakening_status:
+                        return await self._show_already_awakened_message(awakening_status)
+                except:
+                    pass
+            # Re-raise the exception to be handled by the decorator
+            raise e
     
-    # Remove the old _show_awakening_error method - it's handled automatically!
-    # async def _show_awakening_error(self, error_msg: str) -> tuple:
-    #     """Show enhanced error message"""
-    #     # This method is now replaced by the universal error recovery system
-    #     return await self._show_awakening_error(str(e))
+
     
     async def _show_enhanced_awakening_results(self, response: Dict[str, Any], quest_session) -> tuple:
         """Show enhanced results of the awakening ritual"""
@@ -402,24 +409,163 @@ class EnhancedAwakeningPanel:
 
     @staticmethod
     async def render_embed(bot, user: Union[discord.User, discord.Member], **kwargs) -> discord.Embed:
-        return await build_enhanced_awakening_embed(bot, user)
+        try:
+            return await build_enhanced_awakening_embed(bot, user)
+        except Exception as e:
+            logger.error(f"Failed to render awakening embed: {e}")
+            sentry_sdk.capture_exception(e)
+            # Return a fallback embed
+            return await _create_fallback_embed(user, str(e))
 
     @staticmethod
     async def build_view(bot, user: Union[discord.User, discord.Member], **kwargs) -> discord.ui.View:
         # Get awakening status to determine which buttons to show
+        awakening_status = None
         try:
             api_client = APIClient()
-            awakening_status = await api_client.get_awakening_status(user)
-        except Exception:
+            awakening_status = await asyncio.wait_for(
+                api_client.get_awakening_status(user),
+                timeout=10.0  # 10 second timeout
+            )
+        except asyncio.TimeoutError:
+            print(f"[AWAKENING] API timeout in build_view for user {user.id}")
+            logger.error("Awakening status API call timed out in build_view")
+            sentry_sdk.capture_message(f"Awakening build_view API timeout for user {user.id}", level="warning")
+            awakening_status = None
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                print(f"[AWAKENING] API endpoint not found (404) in build_view - checking if API server is running")
+                sentry_sdk.capture_message(f"Awakening build_view API 404 error - possible server issue", level="error")
+                awakening_status = None
+            else:
+                print(f"[AWAKENING] API HTTP error in build_view {e.response.status_code}: {e.response.text}")
+                sentry_sdk.capture_exception(e)
+                awakening_status = None
+        except Exception as e:
+            # Log the error but don't let it break the panel
+            print(f"[AWAKENING] Unexpected error in build_view: {e}")
+            logger.error(f"Failed to get awakening status in build_view: {e}")
+            sentry_sdk.capture_exception(e)
             awakening_status = None
             
-        return EnhancedAwakeningMainView(bot, user, awakening_status)
+        try:
+            return EnhancedAwakeningMainView(bot, user, awakening_status)
+        except Exception as e:
+            print(f"[AWAKENING] Failed to create awakening view: {e}")
+            logger.error(f"Failed to create awakening view: {e}")
+            sentry_sdk.capture_exception(e)
+            # Return a minimal fallback view
+            return _create_fallback_view(bot, user)
 
 # Alias for backward compatibility
 AwakeningPanel = EnhancedAwakeningPanel
 
+# --- FALLBACK FUNCTIONS ---
+async def _create_fallback_embed(user: Union[discord.User, discord.Member], error_msg: str) -> discord.Embed:
+    """Create a fallback embed when the main embed fails to load"""
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    sub_header = get_panel_sub_header("awakening")
+    
+    content = (
+        f"```ansi\n"
+        f"{header}\n"
+        f"{sub_header}\n\n"
+        f"\x1b[1;31m● System Temporarily Unavailable\x1b[0m\n"
+        f"Status: \x1b[1;31m⚠️ CONNECTION ISSUE\x1b[0m\n"
+        f"Mode: \x1b[1;33m🔧 FALLBACK ACTIVE\x1b[0m\n\n"
+        f"\x1b[1;37m🛠️ Current Situation:\x1b[0m\n"
+        f"The awakening system is experiencing connectivity\n"
+        f"issues. You can still attempt to begin awakening.\n\n"
+        f"\x1b[1;37m🔄 Available Actions:\x1b[0m\n"
+        f"├─ Try beginning awakening (may work)\n"
+        f"├─ Refresh the panel in a moment\n"
+        f"├─ Check your network connection\n"
+        f"└─ Contact support if persistent\n\n"
+        f"\x1b[1;37m💡 Technical Note:\x1b[0m\n"
+        f"The system will attempt to recover automatically.\n"
+        f"Your progress and data remain safe.\n\n"
+        f"──────────────────────────\n"
+        f"```"
+    )
+    
+    embed = discord.Embed(
+        description=content,
+        color=discord.Color.orange()
+    )
+    embed.set_footer(text="Shadow Archive • Awakening V2 • Fallback Mode")
+    return embed
 
-# Add missing classes before the panel registration
+def _create_fallback_view(bot, user: Union[discord.User, discord.Member]) -> discord.ui.View:
+    """Create a minimal fallback view when the main view fails"""
+    view = discord.ui.View(timeout=None)
+    
+    # Add dropdown
+    try:
+        from shared.utils.common_views import EphemeralPanelSelect
+        view.add_item(EphemeralPanelSelect(bot, user.id))
+    except Exception:
+        pass  # If even the dropdown fails, continue without it
+    
+    # Add a simple awakening button
+    view.add_item(FallbackAwakeningButton(bot, user))
+    
+    return view
+
+class FallbackAwakeningButton(discord.ui.Button):
+    """Fallback awakening button when the main system is unavailable"""
+    
+    def __init__(self, bot, user):
+        super().__init__(label="🌅 Try Awakening", style=discord.ButtonStyle.primary)
+        self.bot = bot
+        self.user = user
+    
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This panel isn't for you.", ephemeral=True)
+            return
+        
+        try:
+            await interaction.response.defer()
+            
+            # Try to create a readiness selection view
+            try:
+                view = EnhancedReadinessSelectionView(self.bot, self.user)
+                
+                embed = discord.Embed(
+                    title="🌅 Begin Awakening",
+                    description="Select your current energy level to begin today's awakening ritual.",
+                    color=discord.Color.blue()
+                )
+                
+                await interaction.followup.edit_message(
+                    interaction.message.id,
+                    embed=embed,
+                    view=view
+                )
+            except Exception:
+                # If readiness selection fails, show a simple message
+                embed = discord.Embed(
+                    title="❌ System Unavailable",
+                    description="The awakening system is currently experiencing issues. Please try again later.",
+                    color=discord.Color.red()
+                )
+                
+                await interaction.followup.edit_message(
+                    interaction.message.id,
+                    embed=embed,
+                    view=None
+                )
+            
+        except Exception as e:
+            logger.error(f"Fallback awakening button failed: {e}")
+            try:
+                await interaction.followup.send(
+                    "❌ The awakening system is currently unavailable. Please try again later.",
+                    ephemeral=True
+                )
+            except Exception:
+                pass  # If even this fails, give up gracefully
+
 
 # --- ENHANCED MAIN VIEW ---
 class EnhancedAwakeningMainView(discord.ui.View):
@@ -432,22 +578,33 @@ class EnhancedAwakeningMainView(discord.ui.View):
         self.user_id = user.id
         
         # Add dropdown FIRST (above buttons like other panels)
-        from shared.utils.common_views import EphemeralPanelSelect
-        self.add_item(EphemeralPanelSelect(bot, user.id))
+        try:
+            from shared.utils.common_views import EphemeralPanelSelect
+            self.add_item(EphemeralPanelSelect(bot, user.id))
+        except Exception as e:
+            logger.error(f"Failed to add panel select dropdown: {e}")
         
         # Add buttons conditionally based on awakening status
         self._add_conditional_buttons(awakening_status)
     
     def _add_conditional_buttons(self, awakening_status=None):
         """Add buttons based on awakening status"""
-        if awakening_status and awakening_status.get("awakening_exists", False):
-            # Awakening exists - show quest management buttons
-            self.add_item(ViewQuestsButton())
-            self.add_item(ViewBriefingButton())
-            self.add_item(ViewHistoryButton())
-        else:
-            # No awakening - show begin awakening button
-            self.add_item(EnhancedAwakeningButton())
+        try:
+            if awakening_status and awakening_status.get("awakening_exists", False):
+                # Awakening exists - show quest management buttons
+                self.add_item(ViewQuestsButton())
+                self.add_item(ViewBriefingButton())
+                self.add_item(ViewHistoryButton())
+            else:
+                # No awakening - show begin awakening button
+                self.add_item(EnhancedAwakeningButton())
+        except Exception as e:
+            logger.error(f"Failed to add conditional buttons: {e}")
+            # Add a fallback button
+            try:
+                self.add_item(FallbackAwakeningButton(self.bot, self.user))
+            except Exception:
+                pass  # If even this fails, continue without buttons
     
     async def update_buttons_for_awakened_state(self):
         """Update view to show all buttons after awakening"""
@@ -490,7 +647,7 @@ class EnhancedAwakeningButton(discord.ui.Button):
             # Check current awakening status
             status_response = await api_client.get_awakening_status(self.view.user)
             
-            if status_response and status_response.get("awakening_exists", False):
+            if status_response and status_response.get("awakened", False):
                 # Awakening already exists - show appropriate message
                 return await self._show_already_awakened_message(status_response)
             else:
@@ -550,8 +707,8 @@ class EnhancedAwakeningButton(discord.ui.Button):
         )
         embed.set_footer(text="Shadow Archive • Awakening V2 • Status Check")
         
-        # Return to main view (no view change needed)
-        view = EnhancedAwakeningMainView(self.view.bot, self.view.user)
+        # Use the proper panel method to ensure consistency with main panel
+        view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
         return embed, view
 
     async def _show_readiness_selection(self):
@@ -611,16 +768,10 @@ class BackToAwakeningButton(discord.ui.Button):
         await run_with_animation(interaction, self._go_back)
     
     async def _go_back(self):
-        """Go back to main awakening panel"""
-        # Get current awakening status to show correct buttons
-        try:
-            api_client = APIClient()
-            awakening_status = await api_client.get_awakening_status(self.view.user)
-        except Exception:
-            awakening_status = None
-            
-        view = EnhancedAwakeningMainView(self.view.bot, self.view.user, awakening_status)
-        embed = await build_enhanced_awakening_embed(self.view.bot, self.view.user)
+        """Go back to main awakening panel using the proper panel method"""
+        # Use the registered panel's build_view method to ensure consistency
+        embed = await EnhancedAwakeningPanel.render_embed(self.view.bot, self.view.user)
+        view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
         return embed, view
 
 # Placeholder classes for the other buttons (these would need to be implemented)
@@ -641,27 +792,52 @@ class ViewQuestsButton(discord.ui.Button):
     async def _show_quests(self):
         """Show enhanced quest details with full functionality"""
         try:
-            # Get awakening quests from API
+            # First check awakening status to determine if there's an active session
             api_client = APIClient()
-            quests_response = await api_client.get_awakening_quests(self.view.user)
+            awakening_status = await api_client.get_awakening_status(self.view.user)
             
-            if not quests_response or "quests" not in quests_response:
+            # If no awakening exists, show the "not initiated" message
+            if not awakening_status.get("awakening_exists", False):
                 return await self._show_no_quests_available()
             
-            quests = quests_response["quests"]
-            awakening_data = quests_response.get("awakening", {})
-            
-            if not quests:
-                return await self._show_no_quests_available()
-            
-            # Create enhanced quest view
-            view = EnhancedQuestView(self.view.bot, self.view.user, quests, awakening_data)
-            embed = await self._build_quest_overview_embed(quests, awakening_data)
-            
-            return embed, view
+            # If awakening exists, try to get quests
+            try:
+                quests_response = await api_client.get_awakening_quests(self.view.user)
+                
+                if not quests_response:
+                    # Awakening exists but no quest data - show session error
+                    return await self._show_session_quest_error()
+                
+                # Handle different response formats
+                if isinstance(quests_response, list):
+                    # Direct list of quests
+                    quests = quests_response
+                    awakening_data = {
+                        "readiness_level": awakening_status.get("readiness_level", "standard"),
+                        "session_theme": awakening_status.get("session_theme", "Shadow Training")
+                    }
+                else:
+                    # Response with quests and awakening data
+                    quests = quests_response.get("quests", [])
+                    awakening_data = quests_response.get("awakening", {})
+                
+                if not quests:
+                    # Awakening exists but no quests generated yet - show session error
+                    return await self._show_session_quest_error()
+                
+                # Create enhanced quest view
+                view = EnhancedQuestView(self.view.bot, self.view.user, quests, awakening_data)
+                embed = await self._build_quest_overview_embed(quests, awakening_data)
+                
+                return embed, view
+                
+            except Exception as quest_error:
+                logger.error(f"Error fetching quests for active session: {quest_error}")
+                # Awakening exists but quest retrieval failed - show session error
+                return await self._show_session_quest_error()
             
         except Exception as e:
-            logger.error(f"Error fetching quests: {e}")
+            logger.error(f"Error checking awakening status: {e}")
             return await self._show_quest_error()
     
     async def _show_no_quests_available(self):
@@ -698,7 +874,8 @@ class ViewQuestsButton(discord.ui.Button):
         )
         embed.set_footer(text="Shadow Archive • Quest View • No Active Session")
         
-        view = EnhancedAwakeningMainView(self.view.bot, self.view.user)
+        # Use the proper panel method instead of creating a new view directly
+        view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
         return embed, view
     
     async def _show_quest_error(self):
@@ -735,7 +912,47 @@ class ViewQuestsButton(discord.ui.Button):
         )
         embed.set_footer(text="Shadow Archive • Quest View • Error Recovery")
         
-        view = EnhancedAwakeningMainView(self.view.bot, self.view.user)
+        # Use the proper panel method instead of creating a new view directly
+        view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
+        return embed, view
+    
+    async def _show_session_quest_error(self):
+        """Show error message when there's an active session but quest data is unavailable"""
+        header = get_system_status_header(self.view.user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = get_panel_sub_header("awakening")
+        
+        content = (
+            f"```ansi\n"
+            f"{header}\n"
+            f"{sub_header}\n\n"
+            f"\x1b[1;33m● Active Session - Quest Data Sync Issue\x1b[0m\n"
+            f"Status: \x1b[1;32m✅ AWAKENING ACTIVE\x1b[0m\n"
+            f"Session: \x1b[1;33m⚠️ QUEST SYNC PENDING\x1b[0m\n"
+            f"Data: \x1b[1;31m❌ TEMPORARILY UNAVAILABLE\x1b[0m\n\n"
+            f"\x1b[1;37m🔄 Synchronization Issue:\x1b[0m\n"
+            f"Your awakening session is active, but quest\n"
+            f"data is temporarily unavailable. This usually\n"
+            f"resolves automatically within moments.\n\n"
+            f"\x1b[1;37m🛠️ Quick Fixes:\x1b[0m\n"
+            f"├─ Wait 30 seconds and try again\n"
+            f"├─ Return to awakening panel and refresh\n"
+            f"├─ Check if quest generation completed\n"
+            f"└─ Contact support if persistent\n\n"
+            f"\x1b[1;37m💡 Note:\x1b[0m\n"
+            f"Your awakening progress is preserved.\n"
+            f"Quest data will sync automatically.\n\n"
+            f"──────────────────────────\n"
+            f"```"
+        )
+        
+        embed = discord.Embed(
+            description=content,
+            color=discord.Color.orange()
+        )
+        embed.set_footer(text="Shadow Archive • Quest View • Session Sync Issue")
+        
+        # Use the proper panel method instead of creating a new view directly
+        view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
         return embed, view
     
     async def _build_quest_overview_embed(self, quests, awakening_data):
@@ -990,7 +1207,7 @@ class ViewBriefingButton(discord.ui.Button):
             embed.set_footer(text="Shadow Archive • Daily Briefing • Intelligence Report")
             
             # Return to main awakening view
-            view = EnhancedAwakeningMainView(self.view.bot, self.view.user)
+            view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
             return embed, view
             
         except Exception as e:
@@ -1030,7 +1247,7 @@ class ViewBriefingButton(discord.ui.Button):
         )
         embed.set_footer(text="Shadow Archive • Daily Briefing • Error Recovery")
         
-        view = EnhancedAwakeningMainView(self.view.bot, self.view.user)
+        view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
         return embed, view
 
 class ViewHistoryButton(discord.ui.Button):
@@ -1161,7 +1378,7 @@ class ViewHistoryButton(discord.ui.Button):
             embed.set_footer(text="Shadow Archive • Awakening History • Training Records")
             
             # Return to main awakening view
-            view = EnhancedAwakeningMainView(self.view.bot, self.view.user)
+            view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
             return embed, view
             
         except Exception as e:
@@ -1201,7 +1418,7 @@ class ViewHistoryButton(discord.ui.Button):
         )
         embed.set_footer(text="Shadow Archive • Awakening History • Error Recovery")
         
-        view = EnhancedAwakeningMainView(self.view.bot, self.view.user)
+        view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)
         return embed, view
     
     async def _build_quest_detail_embed(self):
