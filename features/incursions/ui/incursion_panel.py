@@ -27,65 +27,56 @@ class IncursionPanel:
     @staticmethod
     async def render_embed(bot, user: Union[discord.User, discord.Member]) -> discord.Embed:
         """Render the main incursion panel embed"""
-        # Fix header implementation to match other panels
         header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
         sub_header = get_panel_sub_header("incursions")
-        
-        # Get active incursions from API
         try:
             response = await api_client.get_active_incursions(user)
-            # Fix: Use 'active_incursions' instead of 'incursions' to match API response
             active_incursions = response.get("active_incursions", [])
         except Exception as e:
             print(f"Error fetching active incursions: {e}")
             active_incursions = []
-        
         if not active_incursions:
             content = f"```ansi\n{header}\n{sub_header}\n\n\x1b[1;31mNo active incursions found.\x1b[0m\n\nShadow Incursions are temporary challenges that appear\nperiodically. Check back later for new opportunities.\n```"
         else:
             current_incursion = active_incursions[0]
-            # Fix ZeroDivisionError: Add safety check for target_reps
             if current_incursion.get("target_reps", 0) > 0:
                 progress_percent = min(100, (current_incursion.get("current_reps", 0) / current_incursion["target_reps"]) * 100)
             else:
                 progress_percent = 0
-            
-            # Create visual progress bar with custom emojis
-            filled_squares = int(progress_percent / 10)  # Each square represents 10%
+            filled_squares = int(progress_percent / 10)
             empty_squares = 10 - filled_squares
             progress_bar = "🟩" * filled_squares + "⬜️" * empty_squares
-            
-            # Calculate time remaining (matching details view format)
-            expires_at = datetime.fromtimestamp(current_incursion["expires_at"], tz=timezone.utc)
+            expires_at_raw = current_incursion["expires_at"]
+            if isinstance(expires_at_raw, str):
+                expires_at = datetime.fromisoformat(expires_at_raw.rstrip('Z'))
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+            else:
+                expires_at = datetime.fromtimestamp(expires_at_raw, tz=timezone.utc)
             time_left = expires_at - datetime.now(timezone.utc)
             hours_left = int(time_left.total_seconds() / 3600)
             minutes_left = int((time_left.total_seconds() % 3600) / 60)
             time_remaining_str = f"{hours_left}h {minutes_left}m"
-            
-            # Get participant count from leaderboard
             try:
                 leaderboard_response = await api_client.get_incursion_leaderboard(user, current_incursion["incursion_id"], limit=100)
                 participant_count = len(leaderboard_response.get("participants", []))
             except Exception as e:
                 print(f"Error fetching participant count: {e}")
                 participant_count = 0
-            
-            # Type-specific ANSI colors (consistent with details view)
             type_colors = {
-                "SURGE": "\x1b[1;33m",      # Bright orange
-                "CHALLENGE": "\x1b[1;36m",  # Bright cyan
-                "ANOMALY": "\x1b[1;35m"     # Bright magenta
+                "SURGE": "\x1b[1;33m",      # Orange
+                "CHALLENGE": "\x1b[1;36m",  # Cyan
+                "ANOMALY": "\x1b[1;35m"     # Magenta
             }
-            color = type_colors.get(current_incursion.get("incursion_type", ""), "\x1b[1;37m")
-            
-            # Improved layout to match other panels
+            color = type_colors.get(current_incursion.get("incursion_type", "").upper(), "\x1b[1;37m")
+            # Enhanced layout with color only for the incursion title
             content = (
                 f"```ansi\n"
                 f"{header}\n"
                 f"{sub_header}\n\n"
                 f"{color}● {current_incursion.get('title', 'Unknown Incursion')}\x1b[0m\n"
-                f"Type: {current_incursion.get('incursion_type', 'UNKNOWN').upper()}\n"
-                f"Exercise: {current_incursion.get('target_exercise', 'Unknown')}\n\n"
+                f"Type: \x1b[1;37m{current_incursion.get('incursion_type', 'UNKNOWN').upper()}\x1b[0m\n"
+                f"Exercise: \x1b[1;37m{current_incursion.get('target_exercise', 'Unknown')}\x1b[0m\n\n"
                 f"\x1b[1;37mDescription:\x1b[0m\n"
                 f"{current_incursion.get('description', 'No description available.')}\n\n"
                 f"\x1b[1;37mProgress:\x1b[0m\n"
@@ -97,12 +88,10 @@ class IncursionPanel:
                 f"──────────────────────────\n"
                 f"```"
             )
-        
         embed = discord.Embed(
             description=content,
             color=IncursionPanel._get_incursion_color(active_incursions[0].get("incursion_type") if active_incursions else None)
         )
-        # Fix footer to match panel design
         embed.set_footer(text="Shadow Archive • Incursions")
         return embed
     

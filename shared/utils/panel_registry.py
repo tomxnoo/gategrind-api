@@ -4,32 +4,43 @@
 # For maintainers: If you need to use Pycord-specific features, refer to https://docs.pycord.dev/en/master/
 import discord  # Pycord (discord.py compatible)
 
-from typing import Type
+from typing import Dict, Any, List, Type
 
 # Holds panel classes keyed by their `.key`
-_PANEL_REGISTRY: dict[str, Type] = {}
-
+_PANEL_REGISTRY: Dict[str, Any] = {}
+_PANEL_ORDER: List[str] = []
 
 def register(panel_cls: Type):
+    """Register a panel class for use in the system hub."""
+    if not hasattr(panel_cls, 'key') or not hasattr(panel_cls, 'label'):
+        raise TypeError(f"Panel class {panel_cls.__name__} must have 'key' and 'label' attributes.")
+    
+    key = panel_cls.key
+    if key in _PANEL_REGISTRY:
+        # Potentially log a warning here if re-registration is not intended
+        pass
+    _PANEL_REGISTRY[key] = panel_cls
+    return panel_cls
+
+def set_panel_order(order: List[str]):
     """
-    Call this at module‐load time in each panel's UI file
-    so the panel shows up in the main dropdown.
+    Sets the global order for panels.
     """
-    _PANEL_REGISTRY[panel_cls.key] = panel_cls
-    return panel_cls  # Ensure the decorator returns the class
+    global _PANEL_ORDER
+    _PANEL_ORDER = order
 
 
 def get_registered_panels() -> list[Type]:
     """
     Returns the list of panel classes in a specific order.
     """
-    # Define the desired order for your panels
-    desired_order = ["profile", "awakening", "log_reps", "quest_log", "buffs", "incursions"]
+    # Use the globally set order, or a default if not set.
+    order = _PANEL_ORDER or ["profile", "awakening", "log_reps", "quest_log", "buffs", "incursions"]
     
     ordered_panels = []
     
     # Add panels in the desired order
-    for key in desired_order:
+    for key in order:
         if key in _PANEL_REGISTRY:
             ordered_panels.append(_PANEL_REGISTRY[key])
     

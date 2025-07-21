@@ -250,9 +250,12 @@ class APIClient:
         return await self._make_request("POST", f"/incursions/{incursion_id}/update_metadata", discord_user, json=metadata)
     
     # Awakening endpoints
-    async def get_awakening_status(self, discord_user) -> Dict[str, Any]:
+    async def get_awakening_status(self, discord_user, include_quests: bool = False) -> Dict[str, Any]:
         """Get today's awakening status from API"""
-        return await self._make_request("GET", "/awakening/status", discord_user)
+        endpoint = "/awakening/status"
+        if include_quests:
+            endpoint += "?include_quests=true"
+        return await self._make_request("GET", endpoint, discord_user)
     
     async def perform_awakening(self, discord_user, readiness_level: str) -> Dict[str, Any]:
         """Perform the daily awakening ritual via API"""

@@ -79,10 +79,34 @@ class RealmBot(commands.AutoShardedBot):  # <-- Use AutoShardedBot
             print(f"[FAIL] Could not connect to Redis: {e}", file=sys.stderr)
             await self.close()
 
+        # Import all panels BEFORE loading cogs to ensure they're registered
+        print("[INFO] Pre-loading panel registrations...")
+        await self._preload_panels()
+
         # Load extensions after the pool is ready
         print("[INFO] Loading Discord bot extensions...")
         for ext in EXTS:
             await load_extension(self, ext)
+
+    async def _preload_panels(self):
+        """Import all panel classes to ensure they're registered before UI components are created"""
+        try:
+            # Import all panel classes to trigger their @register decorators
+            from features.awakening.ui.awakening_panel import EnhancedAwakeningPanel
+            from features.user.ui.profile_view import ProfilePanel
+            from features.logging.ui.view import LogRepsPanel
+            from features.buffs.ui.view import BuffsPanel
+            from features.incursions.ui.incursion_panel import IncursionPanel
+            from features.quests.ui.quest_panel import QuestPanel
+            
+            # Debug: Show what panels are now registered
+            from shared.utils.panel_registry import debug_registry
+            debug_registry()
+            print("[OK] All panels pre-loaded and registered")
+            
+        except Exception as e:
+            print(f"[WARN] Could not pre-load some panels: {e}")
+            # Don't fail startup if panel imports fail
 
 bot = RealmBot(command_prefix="!", intents=intents)
 

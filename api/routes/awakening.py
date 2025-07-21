@@ -24,7 +24,8 @@ router = APIRouter(tags=["awakening"])
 @router.get("/status", response_model=Dict[str, Any])
 async def get_awakening_status(
     current_user: dict = Depends(get_current_user),
-    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional),
+    include_quests: bool = False
 ):
     """Get current awakening status for the user"""
     
@@ -52,6 +53,11 @@ async def get_awakening_status(
     async with db_pool.acquire() as conn:
         awakening_service = AwakeningService(bot=None)
         status_data = await awakening_service.get_awakening_status(user_id, conn)
+        
+        if include_quests and status_data.get("awakened"):
+            quests = await awakening_service.get_awakening_quests(user_id, conn)
+            status_data["quests"] = quests
+            
         return status_data
 
 class AwakeningRequest(BaseModel):
@@ -79,39 +85,40 @@ async def perform_awakening(
             awakened_at=datetime.utcnow()
         )
         
+        mock_quests = [
+            {
+                "id": 1,
+                "title": "Shadow Strike: Push-ups",
+                "description": "Complete 3 sets of 10 Push-ups",
+                "tier": 1,
+                "xp_reward": 25,
+                "status": "available"
+            }
+        ]
+        
         return AwakeningResponse(
             awakening=mock_awakening,
-            quests=[
-                {
-                    "id": 1,
-                    "title": "Shadow Strike: Push-ups",
-                    "description": "Complete 3 sets of 10 Push-ups",
-                    "tier": 1,
-                    "xp_reward": 25,
-                    "status": "available"
-                }
-            ],
-            readiness_effects={
-                "difficulty_modifier": 1.0,
-                "xp_modifier": 1.0,
-                "description": "Development mode"
-            },
-            daily_briefing={
-                "awakening_summary": "Development awakening completed",
-                "quest_overview": ["Mock quest for testing"],
-                "readiness_impact": "Development testing",
-                "motivation_message": "Testing the system!",
-                "progress_highlights": {}
-            }
+            quests=mock_quests,
+            readiness_effects={"description": "Mock readiness effects"},
+            daily_briefing={"message": "Mock daily briefing"}
         )
-    
+
     user_id = current_user["user_id"]
     
-    async with db_pool.acquire() as conn:
-        try:
+    try:
+        async with db_pool.acquire() as conn:
             awakening_service = AwakeningService(bot=None)
             
-            # Create awakening session and generate quests
+            # **FIX: Clean up any orphaned sessions first**
+            cleaned_count = await awakening_service.cleanup_orphaned_sessions(user_id, conn)
+            if cleaned_count > 0:
+                sentry_sdk.add_breadcrumb(
+                    message=f"Cleaned up {cleaned_count} orphaned awakening sessions",
+                    level="info",
+                    category="cleanup"
+                )
+            
+            # Create awakening session with transaction safety
             result = await awakening_service.create_awakening_session(
                 user_id, request.readiness_level, conn
             )
@@ -143,16 +150,16 @@ async def perform_awakening(
                 daily_briefing=briefing
             )
             
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to perform awakening: {str(e)}"
-            )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to perform awakening: {str(e)}"
+        )
 
 @router.get("/quests", response_model=List[Dict[str, Any]])
 async def get_awakening_quests(
@@ -531,3 +538,49 @@ async def get_awakening_history(
             }
             for record in history
         ]
+
+@router.post("/recover", response_model=Dict[str, Any])
+async def recover_awakening_session(
+    current_user: dict = Depends(get_current_user),
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
+):
+    """Recover from stuck awakening sessions by cleaning up and allowing retry"""
+    
+    if is_development_mode() or db_pool is None:
+        return {"message": "Recovery not needed in development mode", "cleaned": 0}
+    
+    user_id = current_user["user_id"]
+    
+    try:
+        async with db_pool.acquire() as conn:
+            awakening_service = AwakeningService(bot=None)
+            
+            # Clean up orphaned sessions
+            cleaned_count = await awakening_service.cleanup_orphaned_sessions(user_id, conn)
+            
+            # Also clean up any sessions older than 24 hours that are still pending
+            old_sessions_cleaned = await conn.fetchval(
+                """
+                DELETE FROM awakening_sessions 
+                WHERE user_id = $1 
+                AND status = 'pending' 
+                AND created_at < NOW() - INTERVAL '24 hours'
+                RETURNING COUNT(*)
+                """,
+                user_id
+            )
+            
+            total_cleaned = cleaned_count + (old_sessions_cleaned or 0)
+            
+            return {
+                "message": f"Recovery completed. Cleaned {total_cleaned} stuck sessions.",
+                "cleaned": total_cleaned,
+                "can_retry": True
+            }
+            
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Recovery failed: {str(e)}"
+        )
