@@ -33,12 +33,12 @@ def create_stat_bar(value: int, max_value: int = 100, length: int = 8) -> str:
     return f"[{bar}]"
 
 async def build_profile_embed(bot, user: Union[discord.User, discord.Member]) -> discord.Embed:
-    """Builds the main profile embed with modern, mobile-friendly design using API data."""
+    """Builds the enhanced profile embed matching awakening/incursion panel styling."""
     try:
         # Get profile data from API
         profile_data = await api_client.get_user_profile(user)
         
-        # Build the main embed with universal header
+        # Build the enhanced embed with universal header
         header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
         sub_header = get_panel_sub_header("profile")
         
@@ -49,21 +49,32 @@ async def build_profile_embed(bot, user: Union[discord.User, discord.Member]) ->
         stats = profile_data.get('stats', {})
         username = profile_data.get('username', user.display_name)
         
-        # Create XP progress section
-        xp_bar = create_xp_bar(current_xp, max_xp)
+        # Enhanced XP progress bar with visual flair
+        if max_xp > 0:
+            progress_percent = (current_xp / max_xp) * 100
+            filled_blocks = int(progress_percent / 10)
+            progress_bar = "█" * filled_blocks + "▓" * max(0, min(1, (progress_percent % 10) // 5)) + "░" * (10 - filled_blocks - max(0, min(1, (progress_percent % 10) // 5)))
+        else:
+            progress_bar = "█" * 10
+            progress_percent = 100
         
-        # Build the main description with ANSI formatting
-        desc_content = f"""{header}
-{sub_header}
-
-🧑‍💼 OPERATIVE PROFILE
-├─ Name: {username}
-├─ Level: {level}
-└─ {xp_bar}
-
-📊 CORE ATTRIBUTES"""
+        # Clean content with minimal color usage - only for key highlights
+        content = (
+            f"```ansi\n"
+            f"{header}\n"
+            f"{sub_header}\n\n"
+            f"\x1b[1;36m● Operative Profile\x1b[0m\n"
+            f"Callsign: {username}\n"
+            f"Rank: Level {level}\n"
+            f"Status: ACTIVE DUTY\n\n"
+            f"\x1b[1;37m⚡ Experience Progress:\x1b[0m\n"
+            f"Progress: [{progress_bar}] {progress_percent:.0f}%\n"
+            f"Current XP: {current_xp:,} / {max_xp:,}\n"
+            f"Next Level: {max_xp - current_xp:,} XP remaining\n\n"
+            f"\x1b[1;37m💪 Core Attributes:\x1b[0m\n"
+        )
         
-        # Add stats with visual bars
+        # Clean stats display with minimal colors
         stat_keys = ["STR", "END", "TECH"]
         stat_emojis = {"STR": "💪", "END": "🛡️", "TECH": "🎯"}
         stat_labels = {"STR": "Strength", "END": "Endurance", "TECH": "Technique"}
@@ -81,57 +92,83 @@ async def build_profile_embed(bot, user: Union[discord.User, discord.Member]) ->
             
             emoji = stat_emojis.get(key, "•")
             label = stat_labels.get(key, key)
-            stat_bar = create_stat_bar(val, 10)  # Assuming max stat level of 10 for visual purposes
+            
+            # Create mini progress bar for stat
+            if stat_xp_max > 0:
+                stat_progress = int((stat_xp / stat_xp_max) * 5)  # 5-char mini bar
+                stat_bar = "█" * stat_progress + "░" * (5 - stat_progress)
+            else:
+                stat_bar = "█" * 5
             
             if i == len(stat_keys) - 1:  # Last item
-                desc_content += f"\n└─ {emoji} {label}: Lv.{val} {stat_bar}"
+                content += f"└─ {emoji} {label}: Lv.{val} [{stat_bar}]\n"
             else:
-                desc_content += f"\n├─ {emoji} {label}: Lv.{val} {stat_bar}"
+                content += f"├─ {emoji} {label}: Lv.{val} [{stat_bar}]\n"
         
-        # Add active buffs if available
+        # Clean active buffs section
         active_buffs = profile_data.get('active_buffs', {})
         if active_buffs:
-            desc_content += "\n\n✨ ACTIVE BUFFS"
+            content += f"\n\x1b[1;37m✨ Active Enhancements:\x1b[0m\n"
             buff_items = list(active_buffs.items())
-            for i, (buff_key, buff_data) in enumerate(buff_items):
+            for i, (buff_key, buff_data) in enumerate(buff_items[:3]):  # Show max 3 buffs
                 buff_name = buff_data.get('name', buff_key)
-                if i == len(buff_items) - 1:  # Last item
-                    desc_content += f"\n└─ 🔮 {buff_name}"
+                
+                if i == len(buff_items) - 1 or i == 2:  # Last item or max items
+                    content += f"└─ 🔮 {buff_name}\n"
                 else:
-                    desc_content += f"\n├─ 🔮 {buff_name}"
+                    content += f"├─ 🔮 {buff_name}\n"
+            
+            if len(buff_items) > 3:
+                content += f"   ... and {len(buff_items) - 3} more\n"
         else:
-            desc_content += "\n\n✨ ACTIVE BUFFS\n└─ 📊 No active buffs"
+            content += f"\n\x1b[1;37m✨ Active Enhancements:\x1b[0m\n"
+            content += f"└─ No active buffs\n"
         
-        # Create the embed
+        content += f"\n\x1b[1;37m🎯 Available Actions:\x1b[0m\n"
+        content += f"├─ View detailed statistics breakdown\n"
+        content += f"├─ Access training history archives\n"
+        content += f"├─ Review achievement progress\n"
+        content += f"└─ Manage profile settings\n\n"
+        content += f"──────────────────────────\n"
+        content += f"```"
+        
+        # Create the embed with enhanced styling
         embed = discord.Embed(
-            description=f"```ansi\n{desc_content}\n```",
-            color=0x9146FF  # Using the primary color from ui_styles
+            description=content,
+            color=discord.Color.from_rgb(145, 70, 255)  # Purple theme matching other panels
         )
         
-        # Set thumbnail
-        embed.set_thumbnail(url=user.display_avatar.url)
-        
-        # Add footer with API indicator
-        embed.set_footer(text="Shadow Archive • Profile Node • API-Powered", icon_url=user.display_avatar.url)
+        # Enhanced footer matching other panels
+        embed.set_footer(text="Shadow Archive • Profile • Operative Database")
         
     except Exception as e:
         print(f"[PROFILE] Error fetching API data: {e}")
-        # Fallback to error embed
+        # Enhanced fallback embed
         header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
         sub_header = get_panel_sub_header("profile")
-        desc_content = f"""{header}
-{sub_header}
-
-❌ ERROR: Profile data unavailable
-
-Connection to API failed.
-Please try again later."""
+        content = (
+            f"```ansi\n"
+            f"{header}\n"
+            f"{sub_header}\n\n"
+            f"\x1b[1;31m● Profile System Offline\x1b[0m\n"
+            f"Status: CONNECTION FAILED\n"
+            f"Error: API UNAVAILABLE\n\n"
+            f"\x1b[1;37m🔧 System Status:\x1b[0m\n"
+            f"Profile data temporarily unavailable.\n"
+            f"Connection to operative database failed.\n\n"
+            f"\x1b[1;37m🔄 Recommended Actions:\x1b[0m\n"
+            f"├─ Retry connection in a few moments\n"
+            f"├─ Check system status updates\n"
+            f"└─ Contact support if issue persists\n\n"
+            f"──────────────────────────\n"
+            f"```"
+        )
         
         embed = discord.Embed(
-            description=f"```ansi\n{desc_content}\n```",
+            description=content,
             color=discord.Color.red()
         )
-        embed.set_footer(text="Shadow Archive • Profile Node • Offline Mode")
+        embed.set_footer(text="Shadow Archive • Profile • Offline Mode")
     
     return embed
 
@@ -160,7 +197,7 @@ class ProfilePanel:
 # --- Enhanced Action Buttons ---
 class StatsButton(discord.ui.Button):
     def __init__(self, bot, user):
-        super().__init__(label="Detailed Stats", style=discord.ButtonStyle.primary, emoji="📈")
+        super().__init__(label="📈 Detailed Stats", style=discord.ButtonStyle.primary)
         self.bot = bot
         self.user = user
 
@@ -177,45 +214,61 @@ class StatsButton(discord.ui.Button):
                 stats = profile_data.get('stats', {})
                 level = profile_data.get('level', 1)
                 
-                desc_content = f"""{header}
-{sub_header}
-
-📊 DETAILED STATISTICS
-├─ Operative Level: {level}
-├─ Total XP: {profile_data.get('xp', 0)}
-├─ XP to Next Level: {profile_data.get('xp_max', 100) - profile_data.get('xp', 0)}
-└─ Profile Created: {profile_data.get('created_at', 'Unknown')}
-
-💪 ATTRIBUTE BREAKDOWN"""
+                content = (
+                    f"```ansi\n"
+                    f"{header}\n"
+                    f"{sub_header}\n\n"
+                    f"\x1b[1;36m● Detailed Statistics Analysis\x1b[0m\n"
+                    f"Operative Level: \x1b[1;33m{level}\x1b[0m\n"
+                    f"Total XP: \x1b[1;33m{profile_data.get('xp', 0):,}\x1b[0m\n"
+                    f"XP to Next Level: \x1b[1;37m{profile_data.get('xp_max', 100) - profile_data.get('xp', 0):,}\x1b[0m\n"
+                    f"Profile Created: \x1b[1;37m{profile_data.get('created_at', 'Unknown')}\x1b[0m\n\n"
+                    f"\x1b[1;37m💪 Attribute Breakdown:\x1b[0m\n"
+                )
                 
-                for key, stat_data in stats.items():
+                stat_colors = {"STR": "\x1b[1;31m", "END": "\x1b[1;34m", "TECH": "\x1b[1;35m"}
+                stat_labels = {"STR": "Strength", "END": "Endurance", "TECH": "Technique"}
+                
+                stat_items = list(stats.items())
+                for i, (key, stat_data) in enumerate(stat_items):
                     if isinstance(stat_data, dict):
                         level = stat_data.get('level', 1)
                         xp = stat_data.get('xp', 0)
                         xp_max = stat_data.get('xp_max', 100)
-                        desc_content += f"\n├─ {key}: Lv.{level} ({xp}/{xp_max} XP)"
+                        color = stat_colors.get(key, "\x1b[1;37m")
+                        label = stat_labels.get(key, key)
+                        
+                        if i == len(stat_items) - 1:  # Last item
+                            content += f"└─ {color}{label}\x1b[0m: Lv.\x1b[1;33m{level}\x1b[0m (\x1b[1;37m{xp}/{xp_max}\x1b[0m XP)\n"
+                        else:
+                            content += f"├─ {color}{label}\x1b[0m: Lv.\x1b[1;33m{level}\x1b[0m (\x1b[1;37m{xp}/{xp_max}\x1b[0m XP)\n"
                     else:
-                        desc_content += f"\n├─ {key}: {stat_data}"
+                        if i == len(stat_items) - 1:  # Last item
+                            content += f"└─ {key}: \x1b[1;33m{stat_data}\x1b[0m\n"
+                        else:
+                            content += f"├─ {key}: \x1b[1;33m{stat_data}\x1b[0m\n"
                 
-                # Fix the last item formatting
-                lines = desc_content.split('\n')
-                if lines and lines[-1].startswith('├─'):
-                    lines[-1] = lines[-1].replace('├─', '└─')
-                desc_content = '\n'.join(lines)
+                content += f"\n──────────────────────────\n```"
                 
             except Exception as e:
                 print(f"[STATS] Error fetching API data: {e}")
                 header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
                 sub_header = get_panel_sub_header("profile")
-                desc_content = f"""{header}
-{sub_header}
-
-❌ No detailed statistics available
-API connection failed."""
+                content = (
+                    f"```ansi\n"
+                    f"{header}\n"
+                    f"{sub_header}\n\n"
+                    f"\x1b[1;31m● Statistics Unavailable\x1b[0m\n"
+                    f"Status: \x1b[1;31mAPI CONNECTION FAILED\x1b[0m\n\n"
+                    f"Detailed statistics temporarily unavailable.\n"
+                    f"Please try again later.\n\n"
+                    f"──────────────────────────\n"
+                    f"```"
+                )
             
             embed = discord.Embed(
-                description=f"```ansi\n{desc_content}\n```",
-                color=0x9146FF
+                description=content,
+                color=discord.Color.from_rgb(145, 70, 255)
             )
             embed.set_footer(text="Shadow Archive • Statistics Division • API-Powered")
             
@@ -229,7 +282,7 @@ API connection failed."""
 
 class HistoryButton(discord.ui.Button):
     def __init__(self, bot, user):
-        super().__init__(label="History", style=discord.ButtonStyle.secondary, emoji="📜")
+        super().__init__(label="📜 History", style=discord.ButtonStyle.secondary)
         self.bot = bot
         self.user = user
 
@@ -276,7 +329,7 @@ class HistoryButton(discord.ui.Button):
 
 class ResetDataButton(discord.ui.Button):
     def __init__(self, bot, user):
-        super().__init__(label="Reset Data", style=discord.ButtonStyle.danger, emoji="🗑️")
+        super().__init__(label="🗑️ Reset Data", style=discord.ButtonStyle.danger)
         self.bot = bot
         self.user = user
 
@@ -287,21 +340,23 @@ class ResetDataButton(discord.ui.Button):
         header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
         sub_header = "[ DATA RESET WARNING ]\nSystem: SHADOW_PACT // Data Reset [CONFIRM]\n──────────────────────────"
         
-        desc_content = f"""{header}
-{sub_header}
-
-⚠️ WARNING: IRREVERSIBLE ACTION
-
-This will permanently delete:
-├─ All profile statistics
-├─ Quest completion history
-├─ Movement logs
-└─ Achievement progress
-
-Are you absolutely certain?"""
+        content = (
+            f"```ansi\n"
+            f"{header}\n"
+            f"{sub_header}\n\n"
+            f"\x1b[1;31m⚠️ WARNING: IRREVERSIBLE ACTION\x1b[0m\n\n"
+            f"\x1b[1;37mThis will permanently delete:\x1b[0m\n"
+            f"├─ All profile statistics\n"
+            f"├─ Quest completion history\n"
+            f"├─ Movement logs\n"
+            f"└─ Achievement progress\n\n"
+            f"\x1b[1;33mAre you absolutely certain?\x1b[0m\n\n"
+            f"──────────────────────────\n"
+            f"```"
+        )
         
         embed = discord.Embed(
-            description=f"```ansi\n{desc_content}\n```",
+            description=content,
             color=discord.Color.orange()
         )
         embed.set_footer(text="Shadow Archive • Data Management")
@@ -311,7 +366,7 @@ Are you absolutely certain?"""
 
 class BackToProfileButton(discord.ui.Button):
     def __init__(self, bot, user):
-        super().__init__(label="Back to Profile", style=discord.ButtonStyle.secondary, emoji="🔙")
+        super().__init__(label="🔙 Back to Profile", style=discord.ButtonStyle.secondary)
         self.bot = bot
         self.user = user
 

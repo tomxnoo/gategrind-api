@@ -32,25 +32,33 @@ class LogRepsPanel:
             f"{header}\n"
             f"{sub_header}\n\n"
             f"\x1b[1;36m● Rep Logging System\x1b[0m\n"
-            f"Status: \x1b[1;32mREADY\x1b[0m\n"
-            f"Mode: \x1b[1;33mQUICK LOG\x1b[0m\n\n"
-            f"\x1b[1;37m📝 Log Your Training:\x1b[0m\n"
+            f"Status: \x1b[1;32mOPERATIONAL\x1b[0m\n"
+            f"Mode: \x1b[1;33mQUICK ENTRY\x1b[0m\n"
+            f"Engine: \x1b[1;32mV2 TRACKING SYSTEM\x1b[0m\n\n"
+            f"\x1b[1;37m📝 Training Log Interface:\x1b[0m\n"
             f"Select a movement from the dropdown below\n"
             f"to quickly log your completed repetitions.\n\n"
-            f"\x1b[1;37m⚡ Features:\x1b[0m\n"
-            f"├─ Instant XP calculation\n"
-            f"├─ Quest progress tracking\n"
-            f"├─ Weekly contract updates\n"
-            f"└─ Activity history logging\n\n"
+            f"\x1b[1;37m⚡ Enhanced Features:\x1b[0m\n"
+            f"├─ Instant XP calculation & rewards\n"
+            f"├─ Real-time quest progress tracking\n"
+            f"├─ Weekly contract advancement\n"
+            f"├─ Activity history archival\n"
+            f"└─ Statistical analysis integration\n\n"
+            f"\x1b[1;37m🎯 Movement Categories:\x1b[0m\n"
+            f"Upper body, lower body, and core movements\n"
+            f"available for comprehensive training logs.\n\n"
+            f"\x1b[1;37m💡 Pro Tip:\x1b[0m\n"
+            f"Log immediately after completion for\n"
+            f"accurate progress tracking and momentum.\n\n"
             f"──────────────────────────\n"
             f"```"
         )
         
         embed = discord.Embed(
             description=content,
-            color=discord.Color.blue()
+            color=discord.Color.from_rgb(0, 255, 127)  # Green theme for logging
         )
-        embed.set_footer(text="Shadow Archive • Rep Logging • Quick Entry")
+        embed.set_footer(text="Shadow Archive • Rep Logging • Training Interface")
         return embed
 
     @staticmethod
@@ -58,7 +66,7 @@ class LogRepsPanel:
         return LogRepsView(bot, user)
 
 class LogRepsView(discord.ui.View):
-    """View for the rep logging panel"""
+    """Enhanced view for the rep logging panel"""
     
     def __init__(self, bot, user: Union[discord.User, discord.Member]):
         super().__init__(timeout=None)
@@ -66,27 +74,56 @@ class LogRepsView(discord.ui.View):
         self.user = user
         self.user_id = user.id
         
-        # Add dropdown for panel navigation
+        # Add dropdown for panel navigation (first, like other panels)
         from shared.utils.common_views import EphemeralPanelSelect
         self.add_item(EphemeralPanelSelect(bot, user.id))
         
         # Add movement selection dropdown
         self.add_item(MovementSelectDropdown())
+        
+        # Add quick action buttons
+        self.add_item(ViewHistoryButton(self))
+        self.add_item(RefreshButton(self))
 
 class MovementSelectDropdown(discord.ui.Select):
-    """Dropdown for selecting movement to log"""
+    """Enhanced dropdown for selecting movement to log"""
     
     def __init__(self):
         options = [
-            discord.SelectOption(label="Push-ups", value="pushups", emoji="💪"),
-            discord.SelectOption(label="Pull-ups", value="pullups", emoji="🔗"),
-            discord.SelectOption(label="Squats", value="squats", emoji="🦵"),
-            discord.SelectOption(label="Pike Push-ups", value="pike_pushups", emoji="⬆️"),
-            discord.SelectOption(label="Lateral Raises", value="lateral_raises", emoji="🔺"),
+            discord.SelectOption(
+                label="Push-ups", 
+                value="pushups", 
+                emoji="💪",
+                description="Upper body strength training"
+            ),
+            discord.SelectOption(
+                label="Pull-ups", 
+                value="pullups", 
+                emoji="🔗",
+                description="Back and bicep development"
+            ),
+            discord.SelectOption(
+                label="Squats", 
+                value="squats", 
+                emoji="🦵",
+                description="Lower body power training"
+            ),
+            discord.SelectOption(
+                label="Pike Push-ups", 
+                value="pike_pushups", 
+                emoji="⬆️",
+                description="Shoulder strength and stability"
+            ),
+            discord.SelectOption(
+                label="Lateral Raises", 
+                value="lateral_raises", 
+                emoji="🔺",
+                description="Shoulder isolation exercise"
+            ),
         ]
         
         super().__init__(
-            placeholder="Select a movement to log...",
+            placeholder="🎯 Select movement to log...",
             options=options,
             min_values=1,
             max_values=1
@@ -100,6 +137,128 @@ class MovementSelectDropdown(discord.ui.Select):
         movement = self.values[0]
         modal = LogRepsModal(self.view.bot, self.view.user, movement)
         await interaction.response.send_modal(modal)
+
+class ViewHistoryButton(discord.ui.Button):
+    def __init__(self, parent_view):
+        super().__init__(label="📊 View History", style=discord.ButtonStyle.primary)
+        self.parent_view = parent_view
+    
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.parent_view.user_id:
+            await interaction.response.send_message("❌ This panel isn't for you.", ephemeral=True)
+            return
+        
+        async def do_work():
+            try:
+                # Get recent logging history from API
+                from core.api_client import api_client
+                history_data = await api_client.get_rep_history(self.parent_view.user, limit=10)
+                logs = history_data.get("history", [])
+                
+                header = get_system_status_header(self.parent_view.user).replace('```ansi', '').replace('```', '').strip()
+                sub_header = get_panel_sub_header("log_reps")
+                
+                content = (
+                    f"```ansi\n"
+                    f"{header}\n"
+                    f"{sub_header}\n\n"
+                    f"\x1b[1;36m● Recent Training History\x1b[0m\n"
+                    f"Status: \x1b[1;32mLOADED\x1b[0m\n"
+                    f"Records: \x1b[1;33m{len(logs)}\x1b[0m entries\n\n"
+                    f"\x1b[1;37m📋 Last 10 Sessions:\x1b[0m\n"
+                )
+                
+                if logs:
+                    for i, log in enumerate(logs[:10]):
+                        movement = log.get('movement_type', 'Unknown').replace('_', ' ').title()
+                        reps = log.get('reps', 0)
+                        date = log.get('logged_at', 'Unknown')[:10]  # Just date part
+                        
+                        if i == len(logs) - 1 or i == 9:  # Last item or max items
+                            content += f"└─ \x1b[1;33m{movement}\x1b[0m: {reps} reps (\x1b[1;30m{date}\x1b[0m)\n"
+                        else:
+                            content += f"├─ \x1b[1;33m{movement}\x1b[0m: {reps} reps (\x1b[1;30m{date}\x1b[0m)\n"
+                else:
+                    content += f"└─ \x1b[1;30mNo training history found\x1b[0m\n"
+                
+                content += f"\n\x1b[1;37m📈 Quick Stats:\x1b[0m\n"
+                content += f"├─ Total sessions logged today\n"
+                content += f"├─ Weekly training frequency\n"
+                content += f"└─ Most trained movement\n\n"
+                content += f"──────────────────────────\n"
+                content += f"```"
+                
+                embed = discord.Embed(
+                    description=content,
+                    color=discord.Color.from_rgb(0, 255, 127)
+                )
+                embed.set_footer(text="Shadow Archive • Training History • Recent Activity")
+                
+                # Add back button
+                back_view = discord.ui.View(timeout=120)
+                back_view.add_item(BackToLoggingButton(self.parent_view.bot, self.parent_view.user))
+                
+                return embed, back_view
+                
+            except Exception as e:
+                print(f"[LOGGING_HISTORY] Error: {e}")
+                header = get_system_status_header(self.parent_view.user).replace('```ansi', '').replace('```', '').strip()
+                content = (
+                    f"```ansi\n"
+                    f"{header}\n\n"
+                    f"\x1b[1;31m● History Unavailable\x1b[0m\n"
+                    f"Status: \x1b[1;31mAPI CONNECTION FAILED\x1b[0m\n\n"
+                    f"Training history temporarily unavailable.\n"
+                    f"Please try again later.\n\n"
+                    f"──────────────────────────\n"
+                    f"```"
+                )
+                
+                embed = discord.Embed(
+                    description=content,
+                    color=discord.Color.red()
+                )
+                embed.set_footer(text="Shadow Archive • Error Handler")
+                
+                back_view = discord.ui.View(timeout=120)
+                back_view.add_item(BackToLoggingButton(self.parent_view.bot, self.parent_view.user))
+                
+                return embed, back_view
+        
+        await run_with_animation(interaction, do_work())
+
+class RefreshButton(discord.ui.Button):
+    def __init__(self, parent_view):
+        super().__init__(label="🔄 Refresh", style=discord.ButtonStyle.secondary)
+        self.parent_view = parent_view
+    
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.parent_view.user_id:
+            await interaction.response.send_message("❌ This panel isn't for you.", ephemeral=True)
+            return
+        
+        async def do_work():
+            embed = await LogRepsPanel.render_embed(self.parent_view.bot, interaction.user)
+            view = await LogRepsPanel.build_view(self.parent_view.bot, interaction.user)
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())
+
+class BackToLoggingButton(discord.ui.Button):
+    def __init__(self, bot, user):
+        super().__init__(label="🔙 Back to Logging", style=discord.ButtonStyle.secondary)
+        self.bot = bot
+        self.user = user
+
+    async def callback(self, interaction: discord.Interaction):
+        from shared.utils.ui_helpers import run_with_animation
+        
+        async def do_work():
+            embed = await LogRepsPanel.render_embed(self.bot, self.user)
+            view = await LogRepsPanel.build_view(self.bot, self.user)
+            return embed, view
+        
+        await run_with_animation(interaction, do_work())
 
 class LogRepsModal(discord.ui.Modal):
     def __init__(self, bot, user: Union[discord.User, discord.Member], movement: str):
@@ -144,20 +303,63 @@ class LogRepsModal(discord.ui.Modal):
                 # Handle XP and quest logic
                 xp_earned = calculate_xp_for_movement(self.movement, reps)
                 
+                # Enhanced completion embed matching other panels
+                header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+                sub_header = "[ TRAINING COMPLETE ]\nSystem: SHADOW_PACT // Training Log [SUCCESS]\n──────────────────────────"
+                
+                movement_display = self.movement.replace('_', ' ').title()
+                
+                content = (
+                    f"```ansi\n"
+                    f"{header}\n"
+                    f"{sub_header}\n\n"
+                    f"\x1b[1;32m● Training Session Logged\x1b[0m\n"
+                    f"Movement: \x1b[1;33m{movement_display}\x1b[0m\n"
+                    f"Repetitions: \x1b[1;33m{reps}\x1b[0m reps\n"
+                    f"XP Earned: \x1b[1;33m+{xp_earned}\x1b[0m points\n\n"
+                    f"\x1b[1;37m✅ Session Results:\x1b[0m\n"
+                    f"├─ Training data archived successfully\n"
+                    f"├─ Quest progress updated automatically\n"
+                    f"├─ Weekly contracts advanced\n"
+                    f"└─ Experience points awarded\n\n"
+                    f"\x1b[1;37m🎯 Next Steps:\x1b[0m\n"
+                    f"Continue your training regimen or\n"
+                    f"check quest progress for new objectives.\n\n"
+                    f"──────────────────────────\n"
+                    f"```"
+                )
+                
                 embed = discord.Embed(
-                    title="✅ Reps Logged",
-                    description=f"Successfully logged **{reps} {self.movement.replace('_', ' ').title()}** and earned **{xp_earned} XP**!",
+                    description=content,
                     color=discord.Color.green()
                 )
+                embed.set_footer(text="Shadow Archive • Training Complete • Session Archived")
+                
                 return embed, None
 
             except Exception as e:
                 logger.error(f"Error logging reps for {self.user.id}: {e}", exc_info=True)
+                
+                # Enhanced error embed
+                header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+                content = (
+                    f"```ansi\n"
+                    f"{header}\n\n"
+                    f"\x1b[1;31m● Logging System Error\x1b[0m\n"
+                    f"Status: \x1b[1;31mFAILED TO RECORD\x1b[0m\n"
+                    f"Error: \x1b[1;33mDATABASE UNAVAILABLE\x1b[0m\n\n"
+                    f"Training session could not be logged.\n"
+                    f"Please try again in a few moments.\n\n"
+                    f"──────────────────────────\n"
+                    f"```"
+                )
+                
                 error_embed = discord.Embed(
-                    title="❌ Error",
-                    description="An error occurred while logging your reps. Please try again later.",
+                    description=content,
                     color=discord.Color.red()
                 )
+                error_embed.set_footer(text="Shadow Archive • Error Handler")
+                
                 return error_embed, None
 
         await run_with_animation(interaction, do_work, ephemeral=True)

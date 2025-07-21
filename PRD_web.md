@@ -195,3 +195,207 @@ The web application must integrate with the existing FastAPI backend that powers
 * **Database**: PostgreSQL with AsyncPG connection pooling
 
 #### Key API Endpoints for Web Integration
+/api/auth/
+├── /discord/callback     # Discord OAuth2 callback
+├── /login               # JWT token generation
+└── /refresh             # Token refresh
+
+/api/users/
+├── /me                  # Current user profile
+└── /{user_id}          # Public user profile
+
+/api/awakening/
+├── /status              # Daily awakening status
+├── /awaken              # Perform awakening ritual
+└── /quests              # Get today's quests
+
+/api/quests/
+├── /daily               # Daily quest management
+├── /weekly              # Weekly quest management
+└── /history             # Quest completion history
+
+/api/logging/
+├── /reps                # Log workout reps
+└── /history             # Workout history
+
+/api/incursions/
+├── /active              # Active Shadow Incursions
+└── /history             # Incursion history
+
+/api/buffs/
+├── /active              # Active user buffs
+└── /available           # Available buffs
+
+
+#### Authentication Flow
+1. **Discord OAuth2**: User authenticates 
+via Discord
+2. **JWT Generation**: Backend creates 
+JWT token with user claims
+3. **Session Management**: Web app stores 
+JWT in httpOnly cookies
+4. **API Requests**: All API calls 
+include JWT for authentication
+
+#### Data Models (TypeScript Types Needed)
+
+// User Models
+interface UserProfile {
+  user_id: number;
+  discord_id: string;
+  username: string;
+  level: number;
+  xp: number;
+  xp_max: number;
+  stats: {
+    STR: StatData;
+    END: StatData;
+    TECH: StatData;
+  };
+  active_buffs: Record<string, BuffData>;
+  created_at: string;
+  updated_at: string;
+}
+
+interface StatData {
+  level: number;
+  xp: number;
+  xp_max: number;
+}
+
+// Quest Models
+interface Quest {
+  id: number;
+  title: string;
+  description: string;
+  tier: 1 | 2 | 3; // Practice, 
+  Technique, Intensity
+  xp_reward: number;
+  status: 'available' | 'active' | 
+  'completed' | 'expired';
+  progress: QuestProgress;
+  expires_at?: string;
+}
+
+// Awakening Models
+interface AwakeningStatus {
+  awakened: boolean;
+  readiness_level?: 'shadow' | 
+  'warrior' | 'ascendant';
+  quest_count: number;
+  quests: Quest[];
+}
+
+
+### DBI-2: Core Game Mechanics Integration
+
+#### The Awakening System
+The web dashboard must integrate with the 
+core "Awakening" ritual:
+1. **Status Check**: Display if user has 
+awakened today
+2. **Readiness Selection**: Allow users 
+to choose energy level (Shadow/Warrior/
+Ascendant)
+3. **Quest Generation**: Show generated 
+quests based on readiness level
+4. **Progress Tracking**: Display quest 
+completion status
+
+#### Quest System Integration
+* **Daily Quests**: Generated through 
+Awakening ritual
+* **Weekly Contracts**: Long-term 
+objectives
+* **Quest Tiers**: 
+  - Tier 1 (Practice): Volume-based, 
+  rewards END
+  - Tier 2 (Technique): Form-focused, 
+  rewards TECH  
+  - Tier 3 (Intensity): High-intensity, 
+  rewards STR
+
+#### Shadow Incursions (Dynamic Events)
+* **Active Events**: Display current 
+world events
+* **Community Progress**: Show 
+server-wide participation
+* **Time-Limited**: Events have 
+expiration timers
+
+### DBI-3: Development Mode Support
+The FastAPI backend includes development 
+mode for testing:
+* **Mock Data**: Returns sample data when 
+`DEV_MODE=true`
+* **No Database Required**: Can run 
+without PostgreSQL connection
+* **Authentication Bypass**: Simplified 
+auth for development
+
+### DBI-4: Environment Configuration
+Required environment variables for web 
+app:
+
+
+# API Configuration
+API_BASE_URL=http://localhost:8000/api
+JWT_SECRET_KEY=your-jwt-secret
+
+# Discord OAuth
+DISCORD_CLIENT_ID=your-discord-client-id
+DISCORD_CLIENT_SECRET=your-discord-client-
+secret
+DISCORD_REDIRECT_URI=http://
+localhost:3000/api/auth/callback
+
+# Development
+DEV_MODE=false
+NODE_ENV=development
+
+
+## 8. Monitoring & Analytics Requirements
+
+### MA-1: Performance Monitoring
+
+#### V1 Basic Monitoring
+* Basic Vercel Analytics for Core Web 
+Vitals tracking
+* Console-based error logging
+
+#### V1.5 Advanced Monitoring
+* Comprehensive error tracking with 
+Sentry integration
+* Custom performance metrics for 
+cinematic sequence loading
+* Bundle size monitoring in CI/CD pipeline
+
+#### V2 Production Monitoring
+* Real-time performance monitoring and 
+alerting
+* Advanced analytics with user behavior 
+tracking
+* Performance budgets with automated 
+enforcement
+
+### MA-2: User Analytics
+
+#### V1 Basic Analytics
+* Basic conversion tracking from landing 
+page to Discord authentication
+* Simple user engagement metrics
+
+#### V1.5 Enhanced Analytics
+* Detailed user engagement tracking with 
+cinematic sequence
+* Dashboard widget usage and interaction 
+patterns
+* User retention and feature adoption 
+analysis
+
+#### V2 Advanced Analytics
+* Comprehensive user journey analysis
+* A/B testing framework for feature 
+optimization
+* Advanced retention and engagement 
+metrics

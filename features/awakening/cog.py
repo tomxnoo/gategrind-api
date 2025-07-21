@@ -1,36 +1,35 @@
-"""
-Awakening System Cog
-Handles awakening commands and panel registration
-"""
-
 import discord
 from discord.ext import commands
-from features.awakening.ui.awakening_panel import AwakeningPanel  # This import triggers the @register decorator
+import sentry_sdk
+import logging
+
+from core.api_client import APIClient
+from features.awakening.ui.awakening_panel import EnhancedAwakeningPanel
+
+logger = logging.getLogger(__name__)
 
 class AwakeningCog(commands.Cog):
-    """Cog for the Awakening System"""
-    
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command(name="awakening", aliases=["awaken", "ritual"])
-    async def awakening_panel(self, ctx: commands.Context):
-        """Display the awakening panel"""
-        user = ctx.author
+    @commands.command(name="awakening")
+    async def awakening(self, ctx: commands.Context):
+        """
+        Displays the user's daily awakening panel.
+        """
         try:
-            embed = await AwakeningPanel.render_embed(self.bot, user)
-            view = await AwakeningPanel.build_view(self.bot, user)
-            await ctx.send(embed=embed, view=view)
-        except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            embed = discord.Embed(
-                title="❌ AWAKENING ERROR",
-                description=f"```\n{tb}\n```",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=embed)
+            user = await APIClient.get_user(ctx.author.id)
+            if not user:
+                await ctx.send("User not found.", ephemeral=True)
+                return
 
-async def setup(bot):
-    """Setup function to load the AwakeningCog"""
+            embed = await EnhancedAwakeningPanel.render_embed(self.bot, user)
+            view = EnhancedAwakeningPanel.build_view(self.bot, user)
+            await ctx.send(embed=embed, view=view, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error in awakening command: {e}", exc_info=True)
+            sentry_sdk.capture_exception(e)
+            await ctx.send("An unexpected error occurred while displaying the awakening panel.", ephemeral=True)
+
+async def setup(bot: commands.Bot):
     await bot.add_cog(AwakeningCog(bot))

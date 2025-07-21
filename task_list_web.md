@@ -203,3 +203,43 @@ The web application integrates with an existing FastAPI backend that powers the 
 - Set up automated type synchronization in CI/CD
 
 ### Repository Structure
+gategrind-api/          # Python/FastAPI/Pycord backend
+gategrind-web/          # TypeScript/Next.js frontend
+gategrind-shared/       # Shared documentation and contracts (optional)
+
+
+### Development Workflow
+- Maintain API-first development approach
+- Use feature branches with clear naming 
+conventions
+- Implement automated testing for API 
+contract compliance
+- Set up cross-repo integration testing 
+for critical flows
+
+### Core Game Mechanics for Web 
+Integration
+#### The Awakening System
+- **Daily Ritual**: Users choose 
+readiness level (Shadow/Warrior/Ascendant)
+- **Quest Generation**: Readiness affects 
+quest difficulty and type
+- **Progress Tracking**: Web dashboard 
+shows awakening status and generated 
+quests
+
+#### Quest Tiers & Rewards
+- **Tier 1 (Practice)**: Volume-based 
+quests, rewards END stat
+- **Tier 2 (Technique)**: Form-focused 
+quests, rewards TECH stat
+- **Tier 3 (Intensity)**: High-intensity 
+quests, rewards STR stat
+
+#### User Terminology
+- Users are called "Ascendants" (not 
+"Operatives")
+- Greeting format: "Continue your 
+Ascension, Ascendant [Username]"
+- Maintains immersive "shadow realm" 
+theme throughout

@@ -7,7 +7,7 @@ import os
 production_vars = {
     "DEV_MODE": "false",
     "DEVELOPMENT_MODE": "false",
-    "JWT_SECRET_KEY": "your-production-secret-key-here",  # Change this!
+    "JWT_SECRET_KEY": "JWT_SECRET_KEY=BdqRian9Q0Q5g0UlfPTD_VaiCdRT-pdjW_p1wrt1KC4",  # Change this!
     "API_BASE_URL": "http://localhost:8000/api"  # Or your production URL
 }
 

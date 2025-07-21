@@ -78,108 +78,126 @@ class AwakeningService:
                 "date": date.today().isoformat()
             })
             
-        try:
-            today = date.today()
-            
-            sentry_sdk.add_breadcrumb(
-                message=f"Creating awakening session for user {user_id} with readiness {readiness_level.value}",
-                level="info",
-                category="awakening"
-            )
-            
-            # Check if awakening already exists for today
-            existing = await self.get_today_awakening(user_id, conn)
-            if existing:
+        # **FIX: Wrap entire awakening creation in a transaction**
+        async with conn.transaction():
+            try:
+                today = date.today()
+                
                 sentry_sdk.add_breadcrumb(
-                    message=f"Awakening already exists: {existing}",
-                    level="warning",
+                    message=f"Creating awakening session for user {user_id} with readiness {readiness_level.value}",
+                    level="info",
                     category="awakening"
                 )
-                raise ValueError("Awakening already completed for today")
-            
-            # Get user data for quest generation
-            user_data = await get_unified_user_data(conn, user_id, self.bot)
-            user_level = user_data.get("level", 1)
-            
-            sentry_sdk.add_breadcrumb(
-                message=f"User data retrieved: level={user_level}, data_keys={list(user_data.keys())}",
-                level="info",
-                category="user_data"
-            )
-            
-            # Determine quest count based on readiness and user level
-            quest_count = self._calculate_quest_count(readiness_level, user_level)
-            
-            sentry_sdk.add_breadcrumb(
-                message=f"Calculated quest count: {quest_count}",
-                level="info",
-                category="quest_generation"
-            )
-            
-            # Create awakening session
-            awakening_id = await conn.fetchval(
-                """
-                INSERT INTO awakening_sessions 
-                (user_id, awakening_date, readiness_level, quest_count, awakened_at, status)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                RETURNING id
-                """,
-                user_id, today, readiness_level.value, quest_count, datetime.utcnow(), AwakeningStatus.AWAKENED.value
-            )
-            
-            sentry_sdk.add_breadcrumb(
-                message=f"Created awakening session with ID: {awakening_id}",
-                level="info",
-                category="database"
-            )
-            
-            # Generate quests based on readiness level
-            quests = await self._generate_awakening_quests(
-                awakening_id, user_id, readiness_level, quest_count, user_data, conn
-            )
-            
-            sentry_sdk.add_breadcrumb(
-                message=f"Generated {len(quests)} quests: {[q.get('id') for q in quests]}",
-                level="info",
-                category="quest_generation"
-            )
-            
-            # Update awakening session with quest IDs
-            quest_ids = [quest["id"] for quest in quests]
-            await conn.execute(
-                """
-                UPDATE awakening_sessions 
-                SET generated_quests = $1, updated_at = $2
-                WHERE id = $3
-                """,
-                quest_ids, datetime.utcnow(), awakening_id
-            )
-            
-            # Update user's awakening stats
-            await self._update_awakening_stats(user_id, readiness_level, conn)
-            
-            # Record readiness history
-            await self._record_readiness_history(user_id, readiness_level, conn)
-            
-            result = {
-                "awakening_id": awakening_id,
-                "readiness_level": readiness_level.value,
-                "quest_count": quest_count,
-                "quests": quests,
-                "awakened_at": datetime.utcnow().isoformat()
-            }
-            
-            sentry_sdk.add_breadcrumb(
-                message=f"Awakening session created successfully: {awakening_id}",
-                level="info",
-                category="awakening"
-            )
-            
-            return result
-            
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            raise
+                
+                # Check if awakening already exists for today
+                existing = await self.get_today_awakening(user_id, conn)
+                if existing:
+                    sentry_sdk.add_breadcrumb(
+                        message=f"Awakening already exists: {existing}",
+                        level="warning",
+                        category="awakening"
+                    )
+                    raise ValueError("Awakening already completed for today")
+                
+                # Get user data for quest generation
+                user_data = await get_unified_user_data(conn, user_id, self.bot)
+                user_level = user_data.get("level", 1)
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"User data retrieved: level={user_level}, data_keys={list(user_data.keys())}",
+                    level="info",
+                    category="user_data"
+                )
+                
+                # Determine quest count based on readiness and user level
+                quest_count = self._calculate_quest_count(readiness_level, user_level)
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"Calculated quest count: {quest_count}",
+                    level="info",
+                    category="quest_generation"
+                )
+                
+                # **FIX: Create awakening session with 'pending' status initially**
+                awakening_id = await conn.fetchval(
+                    """
+                    INSERT INTO awakening_sessions 
+                    (user_id, awakening_date, readiness_level, quest_count, awakened_at, status)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    RETURNING id
+                    """,
+                    user_id, today, readiness_level.value, quest_count, datetime.utcnow(), "pending"
+                )
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"Created awakening session with ID: {awakening_id} (status: pending)",
+                    level="info",
+                    category="database"
+                )
+                
+                # Generate quests based on readiness level
+                quests = await self._generate_awakening_quests(
+                    awakening_id, user_id, readiness_level, quest_count, user_data, conn
+                )
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"Generated {len(quests)} quests: {[q.get('id') for q in quests]}",
+                    level="info",
+                    category="quest_generation"
+                )
+                
+                # **FIX: Validate quest generation was successful**
+                if len(quests) != quest_count:
+                    raise ValueError(f"Quest generation failed: expected {quest_count}, got {len(quests)}")
+                
+                # Update awakening session with quest IDs and mark as awakened
+                quest_ids = [quest["id"] for quest in quests]
+                await conn.execute(
+                    """
+                    UPDATE awakening_sessions 
+                    SET generated_quests = $1, updated_at = $2, status = $3
+                    WHERE id = $4
+                    """,
+                    quest_ids, datetime.utcnow(), AwakeningStatus.AWAKENED.value, awakening_id
+                )
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"Updated awakening session {awakening_id} to 'awakened' status with {len(quest_ids)} quest IDs",
+                    level="info",
+                    category="database"
+                )
+                
+                # Update user's awakening stats
+                await self._update_awakening_stats(user_id, readiness_level, conn)
+                
+                # Record readiness history
+                await self._record_readiness_history(user_id, readiness_level, conn)
+                
+                result = {
+                    "awakening_id": awakening_id,
+                    "readiness_level": readiness_level.value,
+                    "quest_count": quest_count,
+                    "quests": quests,
+                    "awakened_at": datetime.utcnow().isoformat()
+                }
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"Awakening session created successfully: {awakening_id}",
+                    level="info",
+                    category="awakening"
+                )
+                
+                return result
+                
+            except Exception as e:
+                sentry_sdk.add_breadcrumb(
+                    message=f"Awakening creation failed, transaction will rollback: {e}",
+                    level="error",
+                    category="awakening"
+                )
+                sentry_sdk.capture_exception(e)
+                # Transaction will automatically rollback due to exception
+                raise
     
     async def _generate_awakening_quests(
         self,
@@ -349,6 +367,16 @@ class AwakeningService:
             tier_weights = [0.2, 0.4, 0.4]  # 20% tier 1, 40% tier 2, 40% tier 3
             return random.choices([1, 2, 3], weights=tier_weights)[0]
     
+    def _calculate_base_xp(self, tier: int, user_level: int) -> int:
+        """Calculate base XP reward for a quest based on tier and user level"""
+        # Base XP scales with tier (similar to quest templates)
+        base_xp = 50 * tier  # Lower than weekly contracts (500) since these are daily awakening quests
+        
+        # Small level bonus to keep higher level users engaged
+        level_bonus = min(user_level * 2, 50)  # Cap at 50 bonus XP
+        
+        return base_xp + level_bonus
+
     async def _generate_single_quest(
         self,
         tier: int,
@@ -658,6 +686,9 @@ class AwakeningService:
     def _generate_quest_summary(self, quest: Dict) -> str:
         """Generate individual quest summary"""
         quest_data = quest["quest_data"]
+        # Parse JSON string if needed
+        if isinstance(quest_data, str):
+            quest_data = json.loads(quest_data)
         return f"**{quest_data['title']}** - {quest_data['target_sets']} sets × {quest_data['target_reps']} reps"
     
     def _generate_readiness_impact(self, readiness_level: str) -> str:
@@ -719,3 +750,149 @@ class AwakeningService:
             level_counts[awakening["readiness_level"]] += 1
         
         return max(level_counts, key=level_counts.get)
+
+    def _calculate_base_xp(self, tier: int, user_level: int) -> int:
+        """Calculate base XP reward for a quest based on tier and user level"""
+        # Base XP scales with tier (similar to quest templates)
+        base_xp = 50 * tier  # Lower than weekly contracts (500) since these are daily awakening quests
+        
+        # Small level bonus to keep higher level users engaged
+        level_bonus = min(user_level * 2, 50)  # Cap at 50 bonus XP
+        
+        return base_xp + level_bonus
+
+    async def _update_awakening_stats(self, user_id: int, readiness_level: ReadinessLevel, conn: asyncpg.Connection) -> None:
+        """Update user's awakening statistics"""
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_tag("operation", "update_awakening_stats")
+            scope.set_context("user", {"user_id": user_id, "readiness_level": readiness_level.value})
+            
+        try:
+            # Get current user data
+            user_data = await get_unified_user_data(conn, user_id, self.bot)
+            awakening_stats = user_data.get("awakening_stats", {})
+            
+            # Update awakening statistics
+            awakening_stats["total_awakenings"] = awakening_stats.get("total_awakenings", 0) + 1
+            awakening_stats["last_awakening_date"] = date.today().isoformat()
+            awakening_stats["last_readiness_level"] = readiness_level.value
+            
+            # Calculate average readiness (simple moving average of last 7 days)
+            recent_readiness = await conn.fetch(
+                """
+                SELECT readiness_level FROM readiness_history 
+                WHERE user_id = $1 AND date >= $2
+                ORDER BY date DESC LIMIT 7
+                """,
+                user_id, date.today() - timedelta(days=7)
+            )
+            
+            if recent_readiness:
+                readiness_counts = {"low": 0, "standard": 0, "high": 0}
+                for record in recent_readiness:
+                    readiness_counts[record["readiness_level"]] += 1
+                awakening_stats["average_readiness"] = max(readiness_counts, key=readiness_counts.get)
+            else:
+                awakening_stats["average_readiness"] = readiness_level.value
+            
+            # Update the awakening_stats in user data
+            user_data["awakening_stats"] = awakening_stats
+            
+            # Use the proper update function for user_json_data table
+            await update_user_json_data(conn, user_id, user_data, self.bot)
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Updated awakening stats for user {user_id}: {awakening_stats}",
+                level="info",
+                category="user_stats"
+            )
+            
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
+
+    async def _record_readiness_history(self, user_id: int, readiness_level: ReadinessLevel, conn: asyncpg.Connection) -> None:
+        """Record readiness level in history for pattern tracking"""
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_tag("operation", "record_readiness_history")
+            scope.set_context("user", {"user_id": user_id, "readiness_level": readiness_level.value})
+            
+        try:
+            today = date.today()
+            
+            # Insert or update readiness history for today
+            await conn.execute(
+                """
+                INSERT INTO readiness_history (user_id, date, readiness_level, factors)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (user_id, date) 
+                DO UPDATE SET 
+                    readiness_level = EXCLUDED.readiness_level,
+                    factors = EXCLUDED.factors,
+                    created_at = CURRENT_TIMESTAMP
+                """,
+                user_id, today, readiness_level.value, json.dumps({})
+            )
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Recorded readiness history for user {user_id}: {readiness_level.value} on {today}",
+                level="info",
+                category="readiness_tracking"
+            )
+            
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
+
+    async def cleanup_orphaned_sessions(self, user_id: int, conn: asyncpg.Connection) -> int:
+        """Clean up orphaned awakening sessions (sessions without quests)"""
+        with sentry_sdk.configure_scope() as scope:
+            scope.set_tag("operation", "cleanup_orphaned_sessions")
+            scope.set_context("user", {"user_id": user_id})
+            
+        try:
+            today = date.today()
+            
+            # Find awakening sessions that have no associated quests
+            orphaned_sessions = await conn.fetch(
+                """
+                SELECT aws.id, aws.status, aws.created_at
+                FROM awakening_sessions aws
+                LEFT JOIN awakening_quests aq ON aws.id = aq.awakening_session_id
+                WHERE aws.user_id = $1 
+                AND aws.awakening_date = $2
+                AND aq.id IS NULL
+                AND aws.status IN ('pending', 'awakened')
+                """,
+                user_id, today
+            )
+            
+            if not orphaned_sessions:
+                return 0
+            
+            sentry_sdk.add_breadcrumb(
+                message=f"Found {len(orphaned_sessions)} orphaned sessions for user {user_id}",
+                level="warning",
+                category="cleanup"
+            )
+            
+            # Delete orphaned sessions
+            deleted_count = 0
+            for session in orphaned_sessions:
+                await conn.execute(
+                    "DELETE FROM awakening_sessions WHERE id = $1",
+                    session['id']
+                )
+                deleted_count += 1
+                
+                sentry_sdk.add_breadcrumb(
+                    message=f"Deleted orphaned session {session['id']} (status: {session['status']})",
+                    level="info",
+                    category="cleanup"
+                )
+            
+            return deleted_count
+            
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
