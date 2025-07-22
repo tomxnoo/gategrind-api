@@ -1,31 +1,23 @@
-
 language = "python3"
-run = "python3 main.py"
-
 modules = ["python-3.11", "python-3.10"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["glibcLocales", "libsodium"]
-
-[workflows]
-runButton = "Main App"
+packages = ["glibcLocales", "libsodium", "postgresql"]
 
 [env]
 REPLIT_PYTHON_PACKAGE_LAYER = "1"
 
-[deployment]
-run = ["sh", "-c", "gunicorn --bind 0.0.0.0:8080 --workers 1 --timeout 30 main:flask_app"]
+# This is the primary command that runs when you press the "Run" button.
+# It will also be used for deployment.
+run = "python3 main.py"
 
+# Background processes
+[[processes]]
+name = "cloudflare-tunnel"
+command = "cloudflared tunnel --url http://localhost:5000 run --token $CLOUDFLARE_TUNNEL_TOKEN"
+
+# This section tells Replit which port to expose to the web.
 [[ports]]
-localPort = 8080
+localPort = 5000
 externalPort = 80
-
-[[workflows.workflow]]
-name = "Main App"
-author = 27178458
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python3 main.py"

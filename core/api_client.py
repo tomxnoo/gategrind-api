@@ -13,14 +13,46 @@ class APIClient:
     """Client for making authenticated requests to the FastAPI backend"""
     
     def __init__(self, base_url: str = None):
-        self.base_url = base_url or os.getenv("API_BASE_URL", "http://localhost:8000/api")
+        # Debug logging to understand environment
+        replit_url = os.getenv("REPLIT_URL")
+        custom_api_domain = os.getenv("CUSTOM_API_DOMAIN")
+        print(f"[API_CLIENT] REPLIT_URL: {replit_url}")
+        print(f"[API_CLIENT] CUSTOM_API_DOMAIN: {custom_api_domain}")
+        
+        # Check if we're in Replit by looking for multiple indicators
+        is_replit = (
+            os.getenv("REPLIT_URL") is not None or 
+            os.getenv("REPL_SLUG") is not None or 
+            os.getenv("REPL_OWNER") is not None or
+            os.path.exists("/.replit")
+        )
+        
+        if is_replit:
+            # In Replit, the bot and API run in the same container. Always use localhost for internal communication.
+            self.base_url = "http://127.0.0.1:5000/api"
+            print(f"[API_CLIENT] Using Replit internal connection: {self.base_url}")
+        elif base_url:
+            self.base_url = base_url
+            print(f"[API_CLIENT] Using provided base_url: {self.base_url}")
+        else:
+            # For external clients or local development
+            if custom_api_domain:
+                # Remove any existing protocol prefix to avoid double https://
+                domain = custom_api_domain.replace("https://", "").replace("http://", "")
+                self.base_url = f"https://{domain}/api"
+                print(f"[API_CLIENT] Using custom domain: {self.base_url}")
+            else:
+                # Fallback for local development, assuming API runs on port 5000.
+                self.base_url = os.getenv("API_BASE_URL", "http://localhost:5000/api")
+                print(f"[API_CLIENT] Using fallback: {self.base_url}")
+
         self.jwt_secret = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
         self.jwt_algorithm = "HS256"
         self._user_tokens: Dict[int, str] = {}  # Cache tokens by discord user_id
         self._system_token: Optional[str] = None  # Cache system token
         
         # Check if we're in development mode
-        self.dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+        self.dev_mode = os.getenv("DEVELOPMENT_MODE", "false").lower() == "true"
         if self.dev_mode:
             print(f"[API_CLIENT] Running in development mode - authentication disabled")
         
@@ -198,86 +230,46 @@ class APIClient:
     async def grant_random_buff(self, discord_user, rarity: str = None) -> Dict[str, Any]:
         """Grant a random buff to user (admin/testing) via API"""
         data = {}
-        if rarity:
-            data["rarity"] = rarity
-        return await self._make_request("POST", "/buffs/random", discord_user, json=data)
-    
-    # Health endpoint
-    async def get_health_status(self) -> Dict[str, Any]:
-        """Get API health status (no auth required)"""
-        url = f"{self.base_url}/health/"
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.json()
-    
+
     # Incursion endpoints
     async def get_active_incursions(self, discord_user) -> Dict[str, Any]:
         """Get active incursions from API"""
         return await self._make_request("GET", "/incursions/active", discord_user)
-    
-    async def get_incursion(self, discord_user, incursion_id: str) -> Dict[str, Any]:
-        """Get specific incursion by ID from API"""
-        return await self._make_request("GET", f"/incursions/{incursion_id}", discord_user)
-    
-    async def contribute_to_incursion(self, discord_user, incursion_id: str, reps: int) -> Dict[str, Any]:
-        """Contribute reps to an incursion via API"""
-        data = {"reps": reps}
-        return await self._make_request("POST", f"/incursions/{incursion_id}/contribute", discord_user, json=data)
-    
-    async def get_incursion_leaderboard(self, discord_user, incursion_id: str) -> Dict[str, Any]:
-        """Get incursion leaderboard from API"""
-        return await self._make_request("GET", f"/incursions/{incursion_id}/leaderboard", discord_user)
-    
+
     async def create_incursion(self, discord_user, incursion_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new incursion via API"""
         return await self._make_request("POST", "/incursions/", discord_user, json=incursion_data)
-    
-    async def complete_incursion(self, discord_user, incursion_id: str) -> Dict[str, Any]:
-        """Complete an incursion via API"""
-        return await self._make_request("POST", f"/incursions/{incursion_id}/complete", discord_user)
-    
-    async def cleanup_expired_incursions(self, discord_user) -> Dict[str, Any]:
-        """Clean up expired incursions via API"""
-        return await self._make_request("POST", "/incursions/cleanup", discord_user)
-    
-    async def mark_incursion_inactive(self, discord_user, incursion_id: str) -> Dict[str, Any]:
-        """Mark an incursion as inactive via API"""
-        return await self._make_request("POST", f"/incursions/{incursion_id}/mark_inactive", discord_user)
-    
-    async def update_incursion_metadata(self, discord_user, incursion_id: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Update incursion metadata via API"""
-        return await self._make_request("POST", f"/incursions/{incursion_id}/update_metadata", discord_user, json=metadata)
-    
+
     # Awakening endpoints
     async def get_awakening_status(self, discord_user, include_quests: bool = False) -> Dict[str, Any]:
-        """Get today's awakening status from API"""
-        endpoint = "/awakening/status"
-        if include_quests:
-            endpoint += "?include_quests=true"
-        return await self._make_request("GET", endpoint, discord_user)
-    
-    async def perform_awakening(self, discord_user, readiness_level: str) -> Dict[str, Any]:
-        """Perform the daily awakening ritual via API"""
-        # Send readiness_level in JSON body, not as query parameter
-        data = {"readiness_level": readiness_level}
-        return await self._make_request("POST", "/awakening/awaken", discord_user, json=data)
-    
+        """Get awakening status from API"""
+        params = {"include_quests": include_quests}
+        return await self._make_request("GET", "/awakening/status", discord_user, params=params)
+
+    async def perform_awakening(self, discord_user, readiness: str) -> Dict[str, Any]:
+        """Perform awakening via API"""
+        return await self._make_request("POST", "/awakening/action", discord_user, json={"readiness_level": readiness})
+
     async def get_awakening_quests(self, discord_user) -> Dict[str, Any]:
-        """Get today's awakening quests from API"""
-        return await self._make_request("GET", "/awakening/quests", discord_user)
-    
+        """Get awakening quests from API"""
+        # Use the status endpoint with include_quests=True instead of non-existent action endpoint
+        return await self.get_awakening_status(discord_user, include_quests=True)
+
     async def complete_awakening_quest(self, discord_user, quest_id: int) -> Dict[str, Any]:
         """Complete an awakening quest via API"""
-        return await self._make_request("POST", f"/awakening/quests/{quest_id}/complete", discord_user)
-    
-    async def get_awakening_briefing(self, discord_user) -> Dict[str, Any]:
-        """Get daily briefing after awakening from API"""
-        return await self._make_request("GET", "/awakening/briefing", discord_user)
-    
-    async def get_awakening_history(self, discord_user) -> Dict[str, Any]:
-        """Get user's awakening history from API"""
-        return await self._make_request("GET", "/awakening/history", discord_user)
+        return await self._make_request("POST", f"/awakening/complete_quest/{quest_id}", discord_user)
 
-# Global API client instance
+    async def get_awakening_briefing(self, discord_user) -> Dict[str, Any]:
+        """Get awakening briefing from API"""
+        return await self._make_request("GET", "/awakening/daily_briefing", discord_user)
+
+    async def get_awakening_history(self, discord_user, limit: int = 10) -> Dict[str, Any]:
+        """Get awakening history from API"""
+        return await self._make_request("GET", f"/awakening/history?limit={limit}", discord_user)
+
+    async def recover_awakening_session(self, discord_user) -> Dict[str, Any]:
+        """Recover awakening session via API"""
+        return await self._make_request("POST", "/awakening/recover", discord_user)
+
+
 api_client = APIClient()

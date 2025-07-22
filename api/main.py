@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     print("[INFO] Starting FastAPI application...")
     
     # Check if we're in development mode (no database/redis required)
-    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+    dev_mode = os.getenv("DEVELOPMENT_MODE", "false").lower() == "true"
     
     # Initialize database pool
     app.state.db_pool = None
@@ -123,4 +123,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

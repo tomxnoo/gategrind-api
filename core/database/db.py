@@ -28,6 +28,50 @@ class DateTimeEncoder(json.JSONEncoder):
             return o.isoformat()
         return super().default(o)
 
+async def get_user_profile_from_db(conn: asyncpg.Connection, user_id: int) -> Optional[Dict[str, Any]]:
+    """Fetches a user's profile data from the users table."""
+    row = await conn.fetchrow(
+        'SELECT user_id, discord_id, username, display_name, created_at, updated_at FROM users WHERE user_id = $1',
+        user_id
+    )
+    return dict(row) if row else None
+
+async def create_user_profile(conn: asyncpg.Connection, user_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Creates a new user profile and returns it."""
+    # Ensure all required fields are present
+    required_fields = ["user_id", "discord_id", "username", "display_name"]
+    if not all(field in user_data for field in required_fields):
+        raise ValueError("Missing required fields for user creation")
+
+    # Insert into the users table
+    row = await conn.fetchrow(
+        """
+        INSERT INTO users (user_id, discord_id, username, display_name, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, NOW(), NOW())
+        ON CONFLICT (user_id) DO NOTHING
+        RETURNING user_id, discord_id, username, display_name, created_at, updated_at
+        """,
+        user_data["user_id"],
+        user_data["discord_id"],
+        user_data["username"],
+        user_data["display_name"],
+    )
+    if not row:
+        # If row is None, it means the user already existed (ON CONFLICT)
+        # so we fetch the existing user's data.
+        return await get_user_profile_from_db(conn, user_data["user_id"])
+
+    # Initialize other related data for the new user
+    user_id = row['user_id']
+    await conn.execute('INSERT INTO user_json_data (user_id, data) VALUES ($1, $2)', user_id, json.dumps({}))
+    for stat in ['STR', 'END', 'TECH']:
+        await conn.execute(
+            'INSERT INTO user_stats (user_id, stat_name, level, xp) VALUES ($1, $2, 1, 0)',
+            user_id, stat
+        )
+    return dict(row)
+
+
 async def get_user(conn: asyncpg.Connection, user_id: int):
     """Fetches a user's core data."""
     row = await conn.fetchrow('SELECT * FROM users WHERE user_id = $1', user_id)
@@ -201,6 +245,83 @@ async def reroll_weekly_contract(conn: asyncpg.Connection, user_id: int) -> bool
     return await reroll_weekly_contracts(user_id)
 
 # Add these optimized functions to the existing db.py file
+
+async def get_user_profile_from_db(conn: asyncpg.Connection, user_id: int, bot=None) -> Optional[Dict[str, Any]]:
+    """Fetches a complete user profile from the database, structured to match the UserProfile model."""
+    if bot is not None:
+        cache_key = bot.redis.get_cache_key('user_profile', user_id=user_id)
+        cached_profile = await bot.redis.get_json(cache_key)
+        if cached_profile:
+            # Pydantic needs a real datetime object, not an ISO string
+            if 'created_at' in cached_profile and isinstance(cached_profile['created_at'], str):
+                cached_profile['created_at'] = datetime.fromisoformat(cached_profile['created_at'])
+            if 'updated_at' in cached_profile and isinstance(cached_profile['updated_at'], str):
+                cached_profile['updated_at'] = datetime.fromisoformat(cached_profile['updated_at'])
+            return cached_profile
+
+    query = """
+    SELECT 
+        u.user_id, 
+        u.user_id AS discord_id, -- Aliasing user_id to discord_id
+        u.username, 
+        u.xp, 
+        u.level, 
+        u.xp_max, 
+        u.created_at, 
+        u.created_at as updated_at, -- Use created_at as a fallback for updated_at
+        ujd.data as json_data,
+        json_object_agg(
+            us.stat_name, 
+            json_build_object('level', us.level, 'xp', us.xp)
+        ) FILTER (WHERE us.stat_name IS NOT NULL) as stats
+    FROM users u
+    LEFT JOIN user_json_data ujd ON u.user_id = ujd.user_id
+    LEFT JOIN user_stats us ON u.user_id = us.user_id
+    WHERE u.user_id = $1
+    GROUP BY u.user_id, u.username, u.xp, u.level, u.xp_max, u.created_at, ujd.data
+    """
+    
+    row = await conn.fetchrow(query, user_id)
+    
+    if not row:
+        return None
+
+    data = dict(row)
+    
+    # Start building the final profile dictionary
+    profile = {
+        'user_id': data.get('user_id'),
+        'discord_id': str(data.get('discord_id', '0')),  # Ensure discord_id is a string
+        'username': data.get('username', 'Unknown User'),
+        'xp': data.get('xp', 0),
+        'level': data.get('level', 1),
+        'xp_max': data.get('xp_max', 100),
+        'created_at': data.get('created_at') or datetime.utcnow(),
+        'updated_at': data.get('updated_at') or datetime.utcnow(),
+        'active_buffs': {},
+        'stats': {}
+    }
+
+    # Process stats, ensuring all base stats are present
+    user_stats = data.get('stats') or {}
+    for stat_name in ['STR', 'END', 'TECH']:
+        if stat_name not in user_stats:
+            user_stats[stat_name] = {'level': 1, 'xp': 0}
+    profile['stats'] = user_stats
+
+    # Process JSON data for active_buffs and other dynamic fields
+    if data.get('json_data'):
+        json_data = json.loads(data['json_data']) if isinstance(data['json_data'], str) else data['json_data']
+        profile['active_buffs'] = json_data.get('active_buffs', {})
+        # Add any other fields from json_data that might be part of the profile
+        # For now, we only explicitly need active_buffs for the UserProfile model
+
+    if bot is not None:
+        ttl = bot.redis.get_ttl('user_profile')
+        # Use custom encoder for datetime objects before caching
+        await bot.redis.set_json(cache_key, profile, expire=ttl, default=DateTimeEncoder().default)
+
+    return profile
 
 async def get_unified_user_data_optimized(conn: asyncpg.Connection, user_id: int, bot=None) -> dict:
     """Optimized version with better caching and single query where possible"""
