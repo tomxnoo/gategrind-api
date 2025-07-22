@@ -15,6 +15,24 @@ class AwakeningStatus(str, Enum):
     AWAKENED = "awakened"     # Awakened, quests generated
     COMPLETED = "completed"   # All daily quests completed
 
+class AwakeningAction(str, Enum):
+    """Actions for the main awakening endpoint"""
+    GET_STATUS = "get_status"
+    AWAKEN = "awaken"
+    GET_QUESTS = "get_quests"
+    GET_BRIEFING = "get_briefing"
+
+class Quest(BaseModel):
+    """Model for a single awakening quest"""
+    id: int
+    quest_data: Dict[str, Any]
+    tier: int
+    xp_reward: int
+    status: str
+    progress: Optional[Dict[str, Any]] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+
 class AwakeningBase(BaseModel):
     """Base awakening model"""
     readiness_level: ReadinessLevel
@@ -41,12 +59,22 @@ class Awakening(AwakeningBase):
     class Config:
         from_attributes = True
 
-class AwakeningResponse(BaseModel):
-    """Awakening response with quest details"""
-    awakening: Awakening
-    quests: List[Dict[str, Any]]
-    readiness_effects: Dict[str, Any]
-    daily_briefing: Dict[str, Any]
+class AwakeningStatusResponse(BaseModel):
+    """Response model for awakening status endpoint"""
+    status: str
+    awakened: bool
+    quests_available: bool
+    readiness_level: Optional[str] = None
+    quest_count: Optional[int] = None
+    completed_quests: int = 0
+    total_xp_gained: int = 0
+    session_theme: str = "Shadow Training"
+    quests: List[Quest] = Field(default_factory=list)
+    active_session: Optional[Dict[str, Any]] = None
+
+class AwakeningActionRequest(BaseModel):
+    """Request model for the awakening action endpoint"""
+    readiness_level: ReadinessLevel
 
 class ReadinessEffects(BaseModel):
     """Effects of readiness level on quest generation"""
@@ -63,3 +91,30 @@ class DailyBriefing(BaseModel):
     readiness_impact: str
     motivation_message: str
     progress_highlights: Dict[str, Any]
+
+class AwakeningSession(BaseModel):
+    """Represents a single day's awakening session in the history"""
+    date: date
+    readiness: str
+    status: str
+    quests_completed: int
+    total_quests: int
+    total_xp: int
+
+class AwakeningHistory(BaseModel):
+    """Model for the user's awakening history"""
+    sessions: List[AwakeningSession]
+
+class AwakeningActionRequest(BaseModel):
+    """Request model for the consolidated awakening endpoint"""
+    action: AwakeningAction
+    readiness_level: Optional[ReadinessLevel] = None # Only for 'awaken' action
+
+class AwakeningResponse(BaseModel):
+    """Unified awakening response model"""
+    status: AwakeningStatus
+    awakening: Optional[Awakening] = None
+    quests: Optional[List[Quest]] = None
+    readiness_effects: Optional[Dict[str, Any]] = None
+    daily_briefing: Optional[Dict[str, Any]] = None
+    is_mock: bool = False

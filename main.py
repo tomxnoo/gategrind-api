@@ -35,7 +35,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")  # <-- Get DB URL from .env
 
 def run_fastapi():
     """Run FastAPI server in a separate thread"""
-    port = int(os.environ.get("API_PORT", 8000))
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(fastapi_app, host="0.0.0.0", port=port, log_level="info")
 
 # ---- DISCORD BOT SETUP ----
@@ -199,50 +199,18 @@ async def load_extension(bot_instance, ext):
         await bot_instance.load_extension(ext)
         print(f"[OK] {ext}")
     except Exception as e:
-        print(f"[FAIL] {ext}: Extension '{ext}' raised an error: {type(e).__name__}: {e}", file=sys.stderr)
-        # Don't re-raise the exception to allow other extensions to load
-
-async def discord_bot_main():
-    """Main Discord bot coroutine"""
-    if not TOKEN:
-        print("[FAIL] DISCORD_TOKEN not found in environment variables.", file=sys.stderr)
-        return
-    
-    if not DATABASE_URL:
-        print("[FAIL] DATABASE_URL not found in environment variables.", file=sys.stderr)
-        return
-    
-    # The setup_hook now handles loading extensions
-    print("[INFO] Starting Discord bot...")
-    try:
-        await bot.start(TOKEN)
-    except Exception as e:
-        print(f"[FAIL] Discord bot failed to start: {e}", file=sys.stderr)
-        traceback.print_exc()
-
-def start_bot_thread():
-    """Start the Discord bot in an asyncio event loop"""
-    try:
-        asyncio.run(discord_bot_main())
-    except KeyboardInterrupt:
-        print("[INFO] Discord bot shutdown requested")
-    except Exception as e:
-        print(f"[FAIL] Discord bot thread error: {e}", file=sys.stderr)
+        print(f"[FAIL] {ext} - {e}", file=sys.stderr)
         traceback.print_exc()
 
 if __name__ == "__main__":
-    print("🌒 Starting Realm of Shadows - Dual Mode (FastAPI + Discord Bot)")
-    print("=" * 60)
-    
-    # Start FastAPI in a thread
-    print("[INFO] Starting FastAPI server...")
+    # Start the FastAPI server in a separate thread
+    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
+    fastapi_thread.start()
+
+    # Start the Discord bot
     try:
-        fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
-        fastapi_thread.start()
-        print("[OK] FastAPI server thread started")
+        print("[INFO] Starting Discord bot...")
+        bot.run(TOKEN)
     except Exception as e:
-        print(f"[FAIL] Could not start FastAPI server: {e}", file=sys.stderr)
-    
-    # Start Discord bot in main thread
-    print("[INFO] Starting Discord bot...")
-    start_bot_thread()
+        print(f"[FATAL] Bot failed to start: {e}", file=sys.stderr)
+        traceback.print_exc()

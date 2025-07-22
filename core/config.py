@@ -1,4 +1,29 @@
 
+import os
+from functools import lru_cache
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+class Settings(BaseModel):
+    """Application settings"""
+    DISCORD_BOT_TOKEN: str = os.getenv("DISCORD_BOT_TOKEN", "")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost")
+    API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000/api")
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
+    DEV_MODE: bool = os.getenv("DEV_MODE", "false").lower() == "true"
+    SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+
+@lru_cache()
+def get_settings():
+    return Settings()
+
+settings = get_settings()
+
+
 # --- CLASS EVOLUTIONS ---
 CLASS_EVOLUTIONS = {
     "Shadow Initiate": ["Abyssal Seeker", "Lunar Disciple"],

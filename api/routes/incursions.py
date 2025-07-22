@@ -4,7 +4,8 @@ import os
 import asyncpg
 import json
 from datetime import datetime
-from api.dependencies import get_current_user, get_db_pool_optional
+from api.dependencies import get_current_user, get_current_user_with_optional_db, get_db_pool_optional
+from api.models.user import UserProfile
 from api.models.incursion import (
     Incursion, IncursionCreate, IncursionContribution, 
     IncursionLeaderboard, IncursionSummary, IncursionListResponse, IncursionFullListResponse
@@ -91,8 +92,8 @@ class APIIncursionManager:
 
 @router.get("/active", response_model=IncursionFullListResponse)
 async def get_active_incursions(
-    current_user: dict = Depends(get_current_user),
-    db_pool: asyncpg.Pool = Depends(get_db_pool_optional)
+    current_user: UserProfile = Depends(get_current_user_with_optional_db),
+    db_pool: Optional[asyncpg.Pool] = Depends(get_db_pool_optional)
 ):
     """Get all currently active incursions with full details"""
     # Check for development mode OR if db_pool is None
