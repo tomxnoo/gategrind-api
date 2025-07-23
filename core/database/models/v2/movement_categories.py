@@ -27,7 +27,6 @@ class MovementCategory(BaseModel):
     primary_stat = Column(Enum('STR', 'END', 'TECH', name='stat_enum'), nullable=False)
     
     # Relationships to other tables
-    movements = relationship("Movement", back_populates="category", cascade="all, delete-orphan")
     skill_tree_nodes = relationship("SkillTreeNode", back_populates="category", cascade="all, delete-orphan")
     
     def __repr__(self):
