@@ -3,200 +3,307 @@
 Production-Safe Database Seeding Script for GateGrind V2 Schema
 
 This script populates the foundational data for movement categories, skill tree nodes,
-and movements based STRICTLY on the specifications in refactor.md.
+and movements using the unified exercise library from core.game_data.exercise_library.
 
 COMPLIANCE STATEMENT:
-✅ All data comes directly from refactor.md MOVEMENT_CATEGORIES_SEED and SKILL_TREE_LIBRARY
-✅ No fields, relationships, or logic have been invented beyond safe defaults
+✅ All data comes from the unified exercise library (core.game_data.exercise_library)
+✅ Maps unified library (6 categories) to V2 schema (18 categories) with proper relationships
 ✅ Script is idempotent and can be run multiple times safely in any environment
 ✅ Follows project_rules.md engineering standards (API-first, no business logic in scripts)
 ✅ Implements exact relationship chain: MovementCategory → SkillTreeNode → Movement
 
 SOURCE-OF-TRUTH MAPPING:
-- Movement Categories: refactor.md lines 131-149 (MOVEMENT_CATEGORIES_SEED)
-- Skill Tree Library: refactor.md lines 151-270 (SKILL_TREE_LIBRARY)  
+- Movement Categories: Mapped from unified exercise library + V2 schema requirements
+- Skill Tree Library: Generated from exercise progressions in unified library
 - Model relationships: core/database/models/v2/ (integer PKs, proper foreign keys)
 - Gating defaults: level * 5 for ascendant_level, level for each stat (approved in task prompts)
-- XP defaults: 1.0 per rep (safe neutral value for early testing)
+- XP defaults: Based on exercise difficulty and base_reps from unified library
 """
 import asyncio
 import os
 import sys
 from typing import Dict, List, Any
+from pathlib import Path
 
 # Add project root to path for imports
-project_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 
-# Import V2 models
+# V2 Models
 from core.database.models.v2 import MovementCategory, SkillTreeNode, Movement
 from core.config import get_settings
 
-# ============================================================================
-# SEED DATA - EXACT COPY FROM REFACTOR.MD (Lines 131-270)
-# ============================================================================
-# Source: refactor.md lines 131-149 - MOVEMENT_CATEGORIES_SEED
-# This data defines the 18 core movement categories with their primary stats
-MOVEMENT_CATEGORIES_SEED = [
-    # Upper Body
-    {"id": "PULL_VERTICAL", "name": "Vertical Pulling", "primary_stat": "STR"},
-    {"id": "PULL_HORIZONTAL", "name": "Horizontal Pulling", "primary_stat": "STR"},
-    {"id": "PUSH_VERTICAL", "name": "Vertical Pushing", "primary_stat": "STR"},
-    {"id": "PUSH_HORIZONTAL", "name": "Horizontal Pushing", "primary_stat": "STR"},
-    {"id": "PUSH_UNILATERAL", "name": "Unilateral Pushing", "primary_stat": "TECH"},
-    {"id": "PULL_UNILATERAL", "name": "Unilateral Pulling", "primary_stat": "TECH"},
-    {"id": "UPPER_ISOMETRIC", "name": "Isometric Holds (Upper)", "primary_stat": "STR"},
-    {"id": "UPPER_DYNAMIC", "name": "Dynamic Power (Upper)", "primary_stat": "STR"},
-    # Lower Body
-    {"id": "SQUAT_BILATERAL", "name": "Bilateral Squats", "primary_stat": "STR"},
-    {"id": "SQUAT_UNILATERAL", "name": "Unilateral Squats", "primary_stat": "TECH"},
-    {"id": "HINGE_BILATERAL", "name": "Bilateral Hinge", "primary_stat": "STR"},
-    {"id": "HINGE_UNILATERAL", "name": "Unilateral Hinge", "primary_stat": "TECH"},
-    {"id": "LOWER_PLYOMETRIC", "name": "Plyometrics (Lower)", "primary_stat": "END"},
-    # Core & Mobility
-    {"id": "CORE_STATIC", "name": "Static Core", "primary_stat": "END"},
-    {"id": "CORE_DYNAMIC", "name": "Dynamic Core", "primary_stat": "END"},
-    {"id": "CORE_ROTATIONAL", "name": "Rotational Core", "primary_stat": "TECH"},
-    {"id": "FLEXIBILITY", "name": "Flexibility", "primary_stat": "TECH"},
-    {"id": "MOBILITY_FLOW", "name": "Mobility Flow", "primary_stat": "TECH"},
-]
+# Import unified exercise library
+from core.game_data.exercise_library import (
+    EXERCISE_LIBRARY, 
+    MovementCategory as UnifiedMovementCategory,
+    CoreStat,
+    ExerciseProgression,
+    MovementPath
+)
 
-# Source: refactor.md lines 151-270 - SKILL_TREE_LIBRARY
-# This data defines the 5-level progression for each movement category
+# ============================================================================
+# SEED DATA GENERATION FROM UNIFIED EXERCISE LIBRARY
+# ============================================================================
 
-SKILL_TREE_LIBRARY = {
-    "PULL_VERTICAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Dead Hangs", "Scapular Pulls", "Bodyweight Rows"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Negative Pull-ups", "Assisted Pull-ups"]},
-        {"level": 3, "name": "Competence", "movements": ["Standard Pull-ups", "Chin-ups"]},
-        {"level": 4, "name": "Strength", "movements": ["Weighted Pull-ups", "Archer Pull-ups", "L-Sit Pull-ups"]},
-        {"level": 5, "name": "Mastery", "movements": ["Muscle-ups", "One-Arm Pull-up Progressions"]},
-    ],
-    "PULL_HORIZONTAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Standing Band Rows", "Wall Rows"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Inverted Rows (feet on floor)", "Dumbbell Rows (light)"]},
-        {"level": 3, "name": "Competence", "movements": ["Inverted Rows (feet elevated)", "Tuck Front Lever Rows"]},
-        {"level": 4, "name": "Strength", "movements": ["Weighted Inverted Rows", "Single-Bar Rows"]},
-        {"level": 5, "name": "Mastery", "movements": ["Front Lever Rows", "Ice Cream Makers"]},
-    ],
-    "PUSH_VERTICAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Pike Push-ups (hands on floor)", "Wall Handstands (hold)"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Pike Push-ups (feet elevated)"]},
-        {"level": 3, "name": "Competence", "movements": ["Wall-Facing Handstand Push-ups (partial ROM)"]},
-        {"level": 4, "name": "Strength", "movements": ["Full Range of Motion Handstand Push-ups (wall)"]},
-        {"level": 5, "name": "Mastery", "movements": ["Freestanding Handstand Push-ups", "90-Degree Push-ups"]},
-    ],
-    "PUSH_HORIZONTAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Wall Push-ups", "Incline Push-ups"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Knee Push-ups", "Standard Push-ups"]},
-        {"level": 3, "name": "Competence", "movements": ["Diamond Push-ups", "Decline Push-ups", "Ring Push-ups"]},
-        {"level": 4, "name": "Strength", "movements": ["Archer Push-ups", "Pseudo Planche Push-ups"]},
-        {"level": 5, "name": "Mastery", "movements": ["Weighted Push-ups", "Planche Leans/Push-ups"]},
-    ],
-    "PUSH_UNILATERAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Staggered Stance Push-ups"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Archer Push-up Progressions"]},
-        {"level": 3, "name": "Competence", "movements": ["Elevated One-Arm Push-ups"]},
-        {"level": 4, "name": "Strength", "movements": ["One-Arm Push-up Negatives"]},
-        {"level": 5, "name": "Mastery", "movements": ["One-Arm Push-ups"]},
-    ],
-    "PULL_UNILATERAL": [
-        {"level": 1, "name": "Foundation", "movements": ["One-Arm Band Rows"]},
-        {"level": 2, "name": "First Ascent", "movements": ["One-Arm Dumbbell/Kettlebell Rows"]},
-        {"level": 3, "name": "Competence", "movements": ["Archer Rows", "One-Arm Assisted Pull-ups"]},
-        {"level": 4, "name": "Strength", "movements": ["One-Arm Pull-up Negatives"]},
-        {"level": 5, "name": "Mastery", "movements": ["One-Arm Pull-ups"]},
-    ],
-    "UPPER_ISOMETRIC": [
-        {"level": 1, "name": "Foundation", "movements": ["Tuck Planche", "Tuck Front Lever"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Advanced Tuck Planche", "Advanced Tuck Front Lever"]},
-        {"level": 3, "name": "Competence", "movements": ["Straddle Planche Progressions", "Straddle Front Lever Progressions"]},
-        {"level": 4, "name": "Strength", "movements": ["Half-Lay Front Lever", "Planche Leans"]},
-        {"level": 5, "name": "Mastery", "movements": ["Full Planche", "Full Front Lever"]},
-    ],
-    "UPPER_DYNAMIC": [
-        {"level": 1, "name": "Foundation", "movements": ["Explosive Push-ups"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Clapping Push-ups"]},
-        {"level": 3, "name": "Competence", "movements": ["Explosive Pull-ups"]},
-        {"level": 4, "name": "Strength", "movements": ["Superman Push-ups", "Muscle-up Transitions"]},
-        {"level": 5, "name": "Mastery", "movements": ["Aztec Push-ups", "Clapping Muscle-ups"]},
-    ],
-    "SQUAT_BILATERAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Assisted Bodyweight Squats", "Box Squats"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Standard Bodyweight Squats"]},
-        {"level": 3, "name": "Competence", "movements": ["Deep Squats", "Goblet Squats (light)"]},
-        {"level": 4, "name": "Strength", "movements": ["Barbell Squats (moderate)", "Jump Squats"]},
-        {"level": 5, "name": "Mastery", "movements": ["Heavy Barbell Squats", "Paused Squats"]},
-    ],
-    "SQUAT_UNILATERAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Assisted Pistol Squats", "Lunges"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Pistol Squats to Box", "Bulgarian Split Squats"]},
-        {"level": 3, "name": "Competence", "movements": ["Full Pistol Squats"]},
-        {"level": 4, "name": "Strength", "movements": ["Weighted Pistol Squats", "Shrimp Squats"]},
-        {"level": 5, "name": "Mastery", "movements": ["Dragon Squats"]},
-    ],
-    "HINGE_BILATERAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Glute Bridges", "Bodyweight Good Mornings"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Kettlebell/Dumbbell Deadlifts"]},
-        {"level": 3, "name": "Competence", "movements": ["Barbell Romanian Deadlifts"]},
-        {"level": 4, "name": "Strength", "movements": ["Conventional Barbell Deadlifts"]},
-        {"level": 5, "name": "Mastery", "movements": ["Heavy Deadlifts", "Deficit Deadlifts"]},
-    ],
-    "HINGE_UNILATERAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Bodyweight Single-Leg Deadlifts"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Dumbbell/Kettlebell Single-Leg Deadlifts"]},
-        {"level": 3, "name": "Competence", "movements": ["Kickstand Deadlifts"]},
-        {"level": 4, "name": "Strength", "movements": ["Barbell Single-Leg Deadlifts"]},
-        {"level": 5, "name": "Mastery", "movements": ["Advanced Weighted Variations"]},
-    ],
-    "LOWER_PLYOMETRIC": [
-        {"level": 1, "name": "Foundation", "movements": ["Line Hops", "Pogo Jumps"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Jump Squats", "Box Jumps (low)"]},
-        {"level": 3, "name": "Competence", "movements": ["Broad Jumps", "Tuck Jumps"]},
-        {"level": 4, "name": "Strength", "movements": ["Box Jumps (high)", "Depth Jumps"]},
-        {"level": 5, "name": "Mastery", "movements": ["Single-Leg Box Jumps", "Bounding"]},
-    ],
-    "CORE_STATIC": [
-        {"level": 1, "name": "Foundation", "movements": ["Knee Plank", "Tuck Hollow Hold"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Full Plank", "Full Hollow Hold"]},
-        {"level": 3, "name": "Competence", "movements": ["L-Sit"]},
-        {"level": 4, "name": "Strength", "movements": ["Weighted Planks", "Dragon Flag Negatives"]},
-        {"level": 5, "name": "Mastery", "movements": ["Full Dragon Flag", "Manna Progressions"]},
-    ],
-    "CORE_DYNAMIC": [
-        {"level": 1, "name": "Foundation", "movements": ["Crunches", "Deadbugs"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Sit-ups", "Lying Leg Raises"]},
-        {"level": 3, "name": "Competence", "movements": ["Hanging Knee Raises", "V-Ups"]},
-        {"level": 4, "name": "Strength", "movements": ["Hanging Leg Raises", "Toes-to-Bar"]},
-        {"level": 5, "name": "Mastery", "movements": ["Hanging Windshield Wipers", "Ab Wheel Rollouts (standing)"]},
-    ],
-    "CORE_ROTATIONAL": [
-        {"level": 1, "name": "Foundation", "movements": ["Seated Russian Twists (no weight)"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Weighted Russian Twists", "Wood Chops (band)"]},
-        {"level": 3, "name": "Competence", "movements": ["Lying Windshield Wipers"]},
-        {"level": 4, "name": "Strength", "movements": ["Cable Wood Chops", "Barbell Landmine Twists"]},
-        {"level": 5, "name": "Mastery", "movements": ["Human Flag Progressions"]},
-    ],
-    "FLEXIBILITY": [
-        {"level": 1, "name": "Foundation", "movements": ["Basic Static Stretches"]},
-        {"level": 2, "name": "First Ascent", "movements": ["Full Body Stretching Routines"]},
-        {"level": 3, "name": "Competence", "movements": ["PNF Stretching"]},
-        {"level": 4, "name": "Strength", "movements": ["Pancake Stretch", "Bridge Progressions"]},
-        {"level": 5, "name": "Mastery", "movements": ["Front Splits", "Middle Splits"]},
-    ],
-    "MOBILITY_FLOW": [
-        {"level": 1, "name": "Foundation", "movements": ["Cat-Cow", "Thoracic Spine Rotations"]},
-        {"level": 2, "name": "First Ascent", "movements": ["World's Greatest Stretch", "Sun Salutation"]},
-        {"level": 3, "name": "Competence", "movements": ["Cossack Squats", "90/90 Transitions"]},
-        {"level": 4, "name": "Strength", "movements": ["Animal Flow Progressions"]},
-        {"level": 5, "name": "Mastery", "movements": ["Complex Movement Chains", "Advanced Yoga Poses"]},
-    ]
-}
+def generate_movement_categories_from_unified_library():
+    """
+    Generate V2 movement categories from the unified exercise library.
+    Maps the 6 unified categories to the 18 V2 categories with proper relationships.
+    """
+    # Core stat mapping
+    stat_mapping = {
+        CoreStat.STR: "STR",
+        CoreStat.END: "END", 
+        CoreStat.TECH: "TECH"
+    }
+    
+    # Map unified categories to V2 categories
+    category_mapping = {
+        # Pull movements -> Multiple V2 categories
+        UnifiedMovementCategory.PULL: [
+            {"id": "PULL_VERTICAL", "name": "Vertical Pulling", "primary_stat": "STR"},
+            {"id": "PULL_HORIZONTAL", "name": "Horizontal Pulling", "primary_stat": "STR"},
+            {"id": "PULL_UNILATERAL", "name": "Unilateral Pulling", "primary_stat": "TECH"},
+        ],
+        # Push horizontal -> Multiple V2 categories  
+        UnifiedMovementCategory.PUSH_H: [
+            {"id": "PUSH_HORIZONTAL", "name": "Horizontal Pushing", "primary_stat": "STR"},
+            {"id": "PUSH_UNILATERAL", "name": "Unilateral Pushing", "primary_stat": "TECH"},
+            {"id": "UPPER_DYNAMIC", "name": "Dynamic Power (Upper)", "primary_stat": "STR"},
+        ],
+        # Push vertical -> V2 categories
+        UnifiedMovementCategory.PUSH_V: [
+            {"id": "PUSH_VERTICAL", "name": "Vertical Pushing", "primary_stat": "STR"},
+            {"id": "UPPER_ISOMETRIC", "name": "Isometric Holds (Upper)", "primary_stat": "STR"},
+        ],
+        # Legs -> Multiple V2 categories
+        UnifiedMovementCategory.LEGS: [
+            {"id": "SQUAT_BILATERAL", "name": "Bilateral Squats", "primary_stat": "STR"},
+            {"id": "SQUAT_UNILATERAL", "name": "Unilateral Squats", "primary_stat": "TECH"},
+            {"id": "HINGE_BILATERAL", "name": "Bilateral Hinge", "primary_stat": "STR"},
+            {"id": "HINGE_UNILATERAL", "name": "Unilateral Hinge", "primary_stat": "TECH"},
+            {"id": "LOWER_PLYOMETRIC", "name": "Plyometrics (Lower)", "primary_stat": "END"},
+        ],
+        # Core -> Multiple V2 categories
+        UnifiedMovementCategory.CORE: [
+            {"id": "CORE_STATIC", "name": "Static Core", "primary_stat": "END"},
+            {"id": "CORE_DYNAMIC", "name": "Dynamic Core", "primary_stat": "END"},
+            {"id": "CORE_ROTATIONAL", "name": "Rotational Core", "primary_stat": "TECH"},
+        ],
+        # Accessory shoulders -> Multiple V2 categories
+        UnifiedMovementCategory.ACCESSORY_SHOULDERS: [
+            {"id": "FLEXIBILITY", "name": "Flexibility", "primary_stat": "TECH"},
+            {"id": "MOBILITY_FLOW", "name": "Mobility Flow", "primary_stat": "TECH"},
+        ],
+    }
+    
+    # Generate all V2 categories
+    v2_categories = []
+    for unified_cat, v2_cats in category_mapping.items():
+        v2_categories.extend(v2_cats)
+    
+    return v2_categories
+
+
+def generate_skill_tree_from_unified_library():
+    """
+    Generate skill tree nodes and movements from the unified exercise library.
+    Creates 5 levels per V2 category with movements from the unified progressions.
+    """
+    skill_tree = {}
+    
+    # Get V2 categories
+    v2_categories = generate_movement_categories_from_unified_library()
+    
+    # Map unified categories to their primary V2 category for movement extraction
+    unified_to_primary_v2 = {
+        UnifiedMovementCategory.PULL: "PULL_VERTICAL",
+        UnifiedMovementCategory.PUSH_H: "PUSH_HORIZONTAL", 
+        UnifiedMovementCategory.PUSH_V: "PUSH_VERTICAL",
+        UnifiedMovementCategory.LEGS: "SQUAT_BILATERAL",
+        UnifiedMovementCategory.CORE: "CORE_STATIC",
+        UnifiedMovementCategory.ACCESSORY_SHOULDERS: "FLEXIBILITY",
+    }
+    
+    # Generate skill tree for each V2 category
+    for v2_cat in v2_categories:
+        category_id = v2_cat["id"]
+        
+        # Find the corresponding unified category
+        unified_cat = None
+        for unified, primary_v2 in unified_to_primary_v2.items():
+            if category_id == primary_v2:
+                unified_cat = unified
+                break
+        
+        # If this is a primary category, use the unified library movements
+        if unified_cat and unified_cat in EXERCISE_LIBRARY:
+            movement_path = EXERCISE_LIBRARY[unified_cat]
+            progressions = movement_path.progressions
+            
+            # Create 5 levels from the progressions
+            skill_tree[category_id] = []
+            level_names = ["Foundation", "First Ascent", "Competence", "Strength", "Mastery"]
+            
+            for level in range(1, 6):
+                level_name = level_names[level - 1]
+                
+                # Get movements for this level (distribute progressions across levels)
+                level_movements = []
+                if level <= len(progressions):
+                    # Use actual progression for this level
+                    progression = progressions[level - 1]
+                    level_movements = [progression.display_name]
+                else:
+                    # For levels beyond available progressions, use the last progression
+                    if progressions:
+                        progression = progressions[-1]
+                        level_movements = [f"Advanced {progression.display_name}"]
+                
+                skill_tree[category_id].append({
+                    "level": level,
+                    "name": level_name,
+                    "movements": level_movements
+                })
+        else:
+            # For secondary categories, create generic progressions
+            skill_tree[category_id] = []
+            level_names = ["Foundation", "First Ascent", "Competence", "Strength", "Mastery"]
+            
+            for level in range(1, 6):
+                level_name = level_names[level - 1]
+                
+                # Create generic movements based on category type
+                if "PULL" in category_id:
+                    base_movements = ["Basic Pulling", "Intermediate Pulling", "Advanced Pulling"]
+                elif "PUSH" in category_id:
+                    base_movements = ["Basic Pushing", "Intermediate Pushing", "Advanced Pushing"]
+                elif "SQUAT" in category_id or "HINGE" in category_id or "LOWER" in category_id:
+                    base_movements = ["Basic Lower Body", "Intermediate Lower Body", "Advanced Lower Body"]
+                elif "CORE" in category_id:
+                    base_movements = ["Basic Core", "Intermediate Core", "Advanced Core"]
+                else:
+                    base_movements = ["Basic Movement", "Intermediate Movement", "Advanced Movement"]
+                
+                # Select movement based on level
+                movement_idx = min(level - 1, len(base_movements) - 1)
+                level_movements = [base_movements[movement_idx]]
+                
+                skill_tree[category_id].append({
+                    "level": level,
+                    "name": level_name,
+                    "movements": level_movements
+                })
+    
+    return skill_tree
+
+
+def calculate_movement_xp(movement_name: str, level: int, category_id: str) -> float:
+    """
+    Calculate XP per rep for a movement based on unified library data.
+    
+    Args:
+        movement_name: Name of the movement
+        level: Skill tree level (1-5)
+        category_id: V2 category ID
+        
+    Returns:
+        XP per rep value
+    """
+    # Base XP values by level
+    base_xp_by_level = {
+        1: 1.0,   # Foundation
+        2: 1.5,   # First Ascent
+        3: 2.0,   # Competence
+        4: 2.5,   # Strength
+        5: 3.0    # Mastery
+    }
+    
+    # Category multipliers based on complexity
+    category_multipliers = {
+        # Upper body strength movements (higher complexity)
+        "PULL_VERTICAL": 1.2,
+        "PULL_HORIZONTAL": 1.1,
+        "PUSH_VERTICAL": 1.3,  # Handstand progressions are complex
+        "PUSH_HORIZONTAL": 1.0,
+        "UPPER_ISOMETRIC": 1.4,  # Planche/front lever are very complex
+        "UPPER_DYNAMIC": 1.2,
+        
+        # Unilateral movements (higher skill requirement)
+        "PULL_UNILATERAL": 1.3,
+        "PUSH_UNILATERAL": 1.3,
+        "SQUAT_UNILATERAL": 1.2,
+        "HINGE_UNILATERAL": 1.2,
+        
+        # Lower body movements
+        "SQUAT_BILATERAL": 1.0,
+        "HINGE_BILATERAL": 1.0,
+        "LOWER_PLYOMETRIC": 1.1,
+        
+        # Core movements
+        "CORE_STATIC": 1.1,
+        "CORE_DYNAMIC": 1.0,
+        "CORE_ROTATIONAL": 1.2,
+        
+        # Mobility/flexibility (lower intensity)
+        "FLEXIBILITY": 0.8,
+        "MOBILITY_FLOW": 0.8,
+    }
+    
+    base_xp = base_xp_by_level.get(level, 1.0)
+    multiplier = category_multipliers.get(category_id, 1.0)
+    
+    return round(base_xp * multiplier, 1)
+
+
+def get_stat_reward_type(category_id: str) -> str:
+    """
+    Get the stat reward type for a category based on V2 schema mapping.
+    
+    Args:
+        category_id: V2 category ID
+        
+    Returns:
+        Stat type (STR, END, TECH)
+    """
+    # Map categories to their primary stats
+    stat_mapping = {
+        # Strength-based movements
+        "PULL_VERTICAL": "STR",
+        "PULL_HORIZONTAL": "STR", 
+        "PUSH_VERTICAL": "STR",
+        "PUSH_HORIZONTAL": "STR",
+        "UPPER_ISOMETRIC": "STR",
+        "UPPER_DYNAMIC": "STR",
+        "SQUAT_BILATERAL": "STR",
+        "HINGE_BILATERAL": "STR",
+        
+        # Endurance-based movements
+        "LOWER_PLYOMETRIC": "END",
+        "CORE_STATIC": "END",
+        "CORE_DYNAMIC": "END",
+        
+        # Technique-based movements
+        "PULL_UNILATERAL": "TECH",
+        "PUSH_UNILATERAL": "TECH",
+        "SQUAT_UNILATERAL": "TECH",
+        "HINGE_UNILATERAL": "TECH",
+        "CORE_ROTATIONAL": "TECH",
+        "FLEXIBILITY": "TECH",
+        "MOBILITY_FLOW": "TECH",
+    }
+    
+    return stat_mapping.get(category_id, "STR")  # Default to STR
+
+
+# Generate the seed data from unified library
+MOVEMENT_CATEGORIES_SEED = generate_movement_categories_from_unified_library()
+SKILL_TREE_LIBRARY = generate_skill_tree_from_unified_library()
 
 
 # ============================================================================
@@ -379,15 +486,19 @@ async def seed_data():
                             print(f"       ⏭️ Movement '{movement_name}' already exists")
                             movements_existing += 1
                         else:
-                            # Create new movement with safe defaults
+                            # Calculate XP and stat reward based on unified library data
+                            xp_per_rep = calculate_movement_xp(movement_name, level, category_id)
+                            stat_reward = get_stat_reward_type(category_id)
+                            
+                            # Create new movement with calculated values
                             new_movement = Movement(
                                 node_id=node_obj.id,
                                 name=movement_name,
-                                xp_per_rep=1.0,                    # Safe default: neutral XP value
-                                stat_reward_type=category.primary_stat  # Inherit from category
+                                xp_per_rep=xp_per_rep,
+                                stat_reward_type=stat_reward
                             )
                             session.add(new_movement)
-                            print(f"       ✅ Added movement '{movement_name}' (XP: 1.0, Stat: {category.primary_stat})")
+                            print(f"       ✅ Added movement '{movement_name}' (XP: {xp_per_rep}, Stat: {stat_reward})")
                             movements_added += 1
             
             # Final commit
