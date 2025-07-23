@@ -57,11 +57,11 @@ This task list represents the definitive construction plan for the GateGrind V2 
 - [ ] Add schema versioning for future compatibility
 
 **T1.4: Database Migration & Setup**
-- [ ] Create Alembic migration for V2 schema (Fresh Start - V2 only)
-- [ ] Implement database initialization scripts
-- [ ] Create seed data for movement categories and base skill trees
-- [ ] Set up database connection pooling for V2
-- [ ] Implement proper database session management
+- [✅] Create Alembic migration for V2 schema (Fresh Start - V2 only)
+- [✅] Implement database initialization scripts
+- [✅] Create seed data for movement categories and base skill trees
+- [✅] Set up database connection pooling for V2
+- [✅] Implement proper database session management
 
 **Success Criteria**: Complete V2 database schema with all models, relationships, and migrations ready for service layer integration.
 
