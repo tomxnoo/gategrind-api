@@ -26,15 +26,15 @@
       "args": ["-m", "mcp_server_fastapi", "--app", "api.main:app"]
     },
     "http": {
-      "command": "python",
+      "command": "npx",
       "args": ["-m", "mcp_server_http"]
     },
     "discord": {
-      "command": "python",
+      "command": "npx",
       "args": ["-m", "mcp_server_discord"]
     },
     "git": {
-      "command": "python",
+      "command": "npx",
       "args": ["-m", "mcp_server_git"]
     },
     "filesystem": {

@@ -46,6 +46,7 @@ class Ascendant(BaseModel):
     stats = relationship("AscendantStats", back_populates="ascendant", uselist=False, cascade="all, delete-orphan")
     skill_progress = relationship("UserSkillProgress", back_populates="ascendant", cascade="all, delete-orphan")
     quests = relationship("Quest", back_populates="ascendant", cascade="all, delete-orphan")
+    quest_completions = relationship("QuestCompletion", back_populates="ascendant", cascade="all, delete-orphan")
     dungeon_keys = relationship("DungeonKey", back_populates="ascendant", cascade="all, delete-orphan")
     dungeon_progress = relationship("DungeonProgress", back_populates="ascendant", uselist=False, cascade="all, delete-orphan")
     

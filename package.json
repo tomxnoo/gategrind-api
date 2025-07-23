@@ -1,0 +1,32 @@
+{
+  "name": "ros-trae",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A unified codebase for running both your Discord bot and iOS Shortcuts-compatible Flask API on Fly.io or Replit.",
+  "main": "index.js",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tomxnoo/RoS-TRAE.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tomxnoo/RoS-TRAE/issues"
+  },
+  "homepage": "https://github.com/tomxnoo/RoS-TRAE#readme",
+  "devDependencies": {
+    "@bunas/fs-mcp": "^1.0.16",
+    "@modelcontextprotocol/sdk": "^1.16.0",
+    "patch-package": "^8.0.0",
+    "postinstall-postinstall": "^2.1.0",
+    "zod": "^3.25.76"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "mcp-sdk": "node ./node_modules/@modelcontextprotocol/sdk/dist/cjs/cli.js",
+    "mcp-fs": "node -e \"require('@bunas/fs-mcp')\"",
+    "postinstall": "patch-package"
+  }
+}
