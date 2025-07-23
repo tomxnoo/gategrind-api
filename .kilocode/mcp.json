@@ -1,31 +1,47 @@
 {
   "mcpServers": {
     "sentry": {
-      "command": "python",
+      "command": "npx",
       "args": [
-        "-m",
-        "mcp_server_sentry",
-        "--auth-token",
-        "https://a79a94e31ba80fa8835018abc3e28dfb@o4509645249118208.ingest.de.sentry.io/4509645253312592"
+        "-m", "mcp_server_sentry",
+        "--auth-token", "https://a79a94e31ba80fa8835018abc3e28dfb@o4509645249118208.ingest.de.sentry.io/4509645253312592"
       ]
     },
     "postgres": {
-      "command": "docker",
+      "command": "npx",
       "args": [
-        "run",
-        "-i",
-        "--rm",
-        "mcp/postgres",
+        "run", "-i", "--rm", "mcp/postgres",
         "postgresql://neondb_owner:npg_QPNvy9ORUwf7@ep-polished-frost-a9na50tb-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require"
       ]
     },
     "redis": {
-      "command": "python",
+      "command": "npx",
       "args": [
-        "-m",
-        "mcp_server_redis",
-        "--url",
-        "rediss://default:AUwGAAIjcDFhZDU1MWI2NjVmMzY0ZTFjOTIzNDU1MDRmM2M3Mjc0M3AxMA@vocal-meerkat-19462.upstash.io:6379"
+        "-m", "mcp_server_redis",
+        "--url", "rediss://default:AUwGAAIjcDFhZDU1MWI2NjVmMzY0ZTFjOTIzNDU1MDRmM2M3Mjc0M3AxMA@vocal-meerkat-19462.upstash.io:6379"
+      ]
+    },
+    "fastapi": {
+      "command": "npx",
+      "args": ["-m", "mcp_server_fastapi", "--app", "api.main:app"]
+    },
+    "http": {
+      "command": "python",
+      "args": ["-m", "mcp_server_http"]
+    },
+    "discord": {
+      "command": "python",
+      "args": ["-m", "mcp_server_discord"]
+    },
+    "git": {
+      "command": "python",
+      "args": ["-m", "mcp_server_git"]
+    },
+    "filesystem": {
+      "command": "uvx",
+      "args": [
+        "-m", "mcp_server_filesystem",
+        "--root", "c:\\Users\\sakko\\Documents\\GitHub\\RoS-TRAE"
       ]
     }
   }

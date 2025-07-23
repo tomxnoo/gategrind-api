@@ -34,30 +34,30 @@ This task list represents the definitive construction plan for the GateGrind V2 
 - [ ] Include database triggers for auto-calculated fields (aura updates)
 - [ ] Document schema design decisions and rationale
 
-**T1.2: SQLAlchemy Models Implementation**
-- [ ] Create `models/v2/ascendants.py` - Ascendant model with level, stats, aura
-- [ ] Create `models/v2/stats.py` - Stats model for STR, END, TECH tracking
-- [ ] Create `models/v2/movement_categories.py` - 18 movement categories with metadata
-- [ ] Create `models/v2/skill_tree_nodes.py` - Skill tree structure and unlocking logic
-- [ ] Create `models/v2/movements.py` - Movement library with difficulty levels
-- [ ] Create `models/v2/user_skill_progress.py` - Individual skill progression tracking
-- [ ] Create `models/v2/quests.py` - Dynamic quest system models
-- [ ] Create `models/v2/dungeon_keys.py` - Shadow Keys and dungeon access
-- [ ] Create `models/v2/dungeon_progress.py` - Dungeon completion and rewards
-- [ ] Implement all model relationships and cascade behaviors
+**T1.2: SQLAlchemy Models Implementation** ✅ COMPLETE
+- [✅] Create `models/v2/ascendants.py` - Ascendant model with level, stats, aura
+- [✅] Create `models/v2/stats.py` - Stats model for STR, END, TECH tracking
+- [✅] Create `models/v2/movement_categories.py` - 18 movement categories with metadata
+- [✅] Create `models/v2/skill_tree_nodes.py` - Skill tree structure and unlocking logic
+- [✅] Create `models/v2/movements.py` - Movement library with difficulty levels
+- [✅] Create `models/v2/user_skill_progress.py` - Individual skill progression tracking
+- [✅] Create `models/v2/quests.py` - Dynamic quest system models
+- [✅] Create `models/v2/dungeon_keys.py` - Shadow Keys and dungeon access
+- [✅] Create `models/v2/dungeon_progress.py` - Dungeon completion and rewards
+- [✅] Implement all model relationships and cascade behaviors
 
 **T1.3: Pydantic Schema Definitions**
-- [ ] Create `schemas/v2/ascendant_schemas.py` - Request/response models
-- [ ] Create `schemas/v2/movement_schemas.py` - Movement library schemas
-- [ ] Create `schemas/v2/skill_tree_schemas.py` - Skill progression schemas
-- [ ] Create `schemas/v2/quest_schemas.py` - Quest generation and completion schemas
-- [ ] Create `schemas/v2/dungeon_schemas.py` - Dungeon system schemas
-- [ ] Create `schemas/v2/profile_schemas.py` - Unified profile response schema
+- [✅] Create `schemas/v2/ascendant_schemas.py` - Request/response models
+- [✅] Create `schemas/v2/movement_schemas.py` - Movement library schemas
+- [✅] Create `schemas/v2/skill_tree_schemas.py` - Skill progression schemas
+- [✅] Create `schemas/v2/quest_schemas.py` - Quest generation and completion schemas
+- [✅] Create `schemas/v2/dungeon_schemas.py` - Dungeon system schemas
+- [✅] Create `schemas/v2/profile_schemas.py` - Unified profile response schema
 - [ ] Implement proper validation rules and error messages
 - [ ] Add schema versioning for future compatibility
 
 **T1.4: Database Migration & Setup**
-- [ ] Create Alembic migration for V2 schema
+- [ ] Create Alembic migration for V2 schema (Fresh Start - V2 only)
 - [ ] Implement database initialization scripts
 - [ ] Create seed data for movement categories and base skill trees
 - [ ] Set up database connection pooling for V2

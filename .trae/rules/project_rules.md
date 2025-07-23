@@ -1,3 +1,16 @@
+## The Golden Rule: The Three Sources of Truth
+
+**This is the most important rule for all development.**
+
+Before generating any code or making any architectural decision for a given task, you must first mentally re-verify that your approach is fully consistent with the three master documents:
+
+1.  **`project_rules.md` (This Document):** The engineering standards.
+2.  **`refactor.md` (The GDD):** The game design and feature specifications.
+3.  **`task_list.md`:** The phased construction plan.
+
+All output must be in direct service of the vision and constraints defined in these three files.
+
+
 # Realm of Shadows - Project Rules & Development Guidelines
 Version: 4.0 | Last Updated: January 2025
 

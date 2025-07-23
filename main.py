@@ -35,7 +35,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")  # <-- Get DB URL from .env
 
 def run_fastapi():
     """Run FastAPI server in a separate thread"""
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 5000))
     uvicorn.run(fastapi_app, host="0.0.0.0", port=port, log_level="info")
 
 # ---- DISCORD BOT SETUP ----
