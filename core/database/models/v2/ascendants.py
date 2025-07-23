@@ -4,7 +4,7 @@ Ascendant SQLAlchemy model for V2 database schema
 This model represents the core user data in the GateGrind V2 system.
 Each Ascendant has progression stats, skill tree points, and aura calculations.
 """
-from sqlalchemy import Column, String, Integer, BigInteger, Index
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Index
 from sqlalchemy.orm import relationship
 from .base import BaseModel
 
@@ -22,6 +22,7 @@ class Ascendant(BaseModel):
     - technique_points: Points available to spend on TECH skill tree nodes
     - aura: Current aura level (stored value, not calculated)
     - rested_xp_pool: Accumulated rested XP for bonus progression
+    - last_login: Timestamp of user's last login for activity tracking
     """
     __tablename__ = "ascendants"
     
@@ -42,6 +43,9 @@ class Ascendant(BaseModel):
     # Rested XP system for bonus progression
     rested_xp_pool = Column(Integer, default=0, nullable=False)
     
+    # User activity tracking
+    last_login = Column(DateTime(timezone=True), nullable=True, index=True)
+    
     # Relationships
     stats = relationship("AscendantStats", back_populates="ascendant", uselist=False, cascade="all, delete-orphan")
     skill_progress = relationship("UserSkillProgress", back_populates="ascendant", cascade="all, delete-orphan")
@@ -56,6 +60,7 @@ class Ascendant(BaseModel):
         Index('idx_ascendant_level', 'level'),
         Index('idx_ascendant_global_xp', 'global_xp'),
         Index('idx_ascendant_aura', 'aura'),
+        Index('idx_ascendant_last_login', 'last_login'),
     )
     
     def __repr__(self):

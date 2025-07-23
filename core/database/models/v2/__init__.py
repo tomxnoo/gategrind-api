@@ -8,7 +8,7 @@ from .movement_categories import MovementCategory
 from .skill_tree_nodes import SkillTreeNode
 from .movements import Movement
 from .user_skill_progress import UserSkillProgress
-from .quests import Quest
+from .quests import Quest, QuestCompletion
 from .dungeon_keys import DungeonKey
 from .dungeon_progress import DungeonProgress
 
@@ -21,6 +21,7 @@ __all__ = [
     "Movement",
     "UserSkillProgress",
     "Quest",
+    "QuestCompletion",
     "DungeonKey",
     "DungeonProgress"
 ]
