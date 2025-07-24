@@ -3,7 +3,7 @@ Base SQLAlchemy model for V2 database schema
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, DateTime
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
 Base = declarative_base()

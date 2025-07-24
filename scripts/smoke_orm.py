@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.abspath("."))
 # --- Imports ---------------------------------------------------------------
 try:
     from core.config import get_settings
-    from core.database.models.v2 import MovementCategory, SkillTreeNode, Movement
+    from app.infrastructure.database.models.v2 import MovementCategory, SkillTreeNode, Movement
 except Exception as import_err:  # pragma: no cover
     print("IMPORT ERROR:", import_err)
     traceback.print_exc()

@@ -5,7 +5,7 @@ import pytest
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 
-from core.database.models.v2 import (
+from app.infrastructure.database.models.v2 import (
     Ascendant, AscendantStats, MovementCategory, SkillTreeNode, 
     Movement, UserSkillProgress, Quest, QuestCompletion,
     DungeonKey, DungeonProgress
@@ -119,9 +119,10 @@ class TestMovementCategory:
         db_session.add(category1)
         db_session.commit()
         
-        # Try to create another category with same name
-        sample_movement_category_data["primary_stat"] = "different_stat"
-        category2 = MovementCategory(**sample_movement_category_data)
+        # Try to create another category with same name but different ID
+        category2_data = sample_movement_category_data.copy()
+        category2_data["id"] = "PULL_VERTICAL_2"  # Different ID but same name
+        category2 = MovementCategory(**category2_data)
         db_session.add(category2)
         
         with pytest.raises(IntegrityError):

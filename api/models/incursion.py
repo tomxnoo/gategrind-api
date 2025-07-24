@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
@@ -55,8 +55,7 @@ class Incursion(IncursionBase):
     expires_at: datetime
     is_active: bool = True
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IncursionContribution(BaseModel):
     """Model for contributing reps to an incursion"""

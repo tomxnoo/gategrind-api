@@ -15,7 +15,7 @@ COMPLIANCE STATEMENT:
 SOURCE-OF-TRUTH MAPPING:
 - Movement Categories: Mapped from unified exercise library + V2 schema requirements
 - Skill Tree Library: Generated from exercise progressions in unified library
-- Model relationships: core/database/models/v2/ (integer PKs, proper foreign keys)
+- Model relationships: app/infrastructure/database/models/v2/ (integer PKs, proper foreign keys)
 - Gating defaults: level * 5 for ascendant_level, level for each stat (approved in task prompts)
 - XP defaults: Based on exercise difficulty and base_reps from unified library
 """
@@ -34,7 +34,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 
 # V2 Models
-from core.database.models.v2 import MovementCategory, SkillTreeNode, Movement
+from app.infrastructure.database.models.v2 import MovementCategory, SkillTreeNode, Movement
 from core.config import get_settings
 
 # Import unified exercise library

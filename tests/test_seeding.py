@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from core.database.models.v2 import MovementCategory, SkillTreeNode, Movement
+from app.infrastructure.database.models.v2 import MovementCategory, SkillTreeNode, Movement
 from scripts.seed import (
     generate_movement_categories_from_unified_library,
     generate_skill_tree_from_unified_library,
