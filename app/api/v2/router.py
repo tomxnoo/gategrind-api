@@ -10,6 +10,7 @@ from fastapi import APIRouter
 from app.api.v2.movements import router as movements_router
 from app.api.v2.progression import router as progression_router
 from app.api.v2.events import router as events_router
+from app.api.v2.incursions import router as incursions_router
 
 
 # Create the main v2 API router
@@ -19,6 +20,7 @@ api_v2_router = APIRouter(prefix="/api")
 api_v2_router.include_router(movements_router)
 api_v2_router.include_router(progression_router)
 api_v2_router.include_router(events_router)
+api_v2_router.include_router(incursions_router)
 
 # Export for easy import
 __all__ = ["api_v2_router"]
