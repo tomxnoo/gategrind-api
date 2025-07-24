@@ -21,6 +21,8 @@ sentry-sdk = "^1.0.0"
 pytest = "^8.0.0"
 pytest-cov = "^6.0.0"
 
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
