@@ -44,7 +44,7 @@ class TestProgressionService:
             username="testuser",
             level=5,
             global_xp=1000,
-            aura=100,
+            aura=65,  # Correct calculated aura for user with default stats: (5*10) + (1+1+1)*5 = 50 + 15 = 65
             strength_points=10,
             endurance_points=10,
             technique_points=10,
@@ -432,3 +432,417 @@ class TestProgressionService:
         assert progress['current_level'] == 1
         assert progress['current_xp'] == 0
         assert progress['progress_percentage'] == 0.0
+
+
+class TestMilestoneProgression:
+    """Test suite for milestone progression functionality."""
+    
+    @pytest.fixture
+    def mock_session(self):
+        """Create a mock async session."""
+        session = AsyncMock(spec=AsyncSession)
+        return session
+    
+    @pytest.fixture
+    def progression_service(self, mock_session):
+        """Create a ProgressionService instance with mocked session."""
+        service = ProgressionService(session=mock_session)
+        # Mock the execute_in_transaction method to directly call the function
+        async def mock_execute_in_transaction(func):
+            return await func(mock_session)
+        service.execute_in_transaction = mock_execute_in_transaction
+        return service
+    
+    @pytest.fixture
+    def sample_user(self):
+        """Create a sample Ascendant user for testing."""
+        user = Ascendant(
+            id=1,
+            discord_id="123456789",
+            username="testuser",
+            level=5,
+            global_xp=1000,
+            aura=65,  # Correct calculated aura for user with default stats: (5*10) + (1+1+1)*5 = 50 + 15 = 65
+            strength_points=10,
+            endurance_points=10,
+            technique_points=10,
+            rested_xp_pool=0
+        )
+        return user
+    
+    @pytest.fixture
+    def sample_user_with_stats(self):
+        """Create a sample user with stats for milestone testing."""
+        user = Ascendant(
+            id=1,
+            discord_id="123456789",
+            username="testuser",
+            level=5,
+            global_xp=1000,
+            aura=65,  # Correct calculated aura: (5*10) + (1+1+1)*5 = 50 + 15 = 65
+            strength_points=10,
+            endurance_points=10,
+            technique_points=10,
+            rested_xp_pool=0
+        )
+        
+        stats = AscendantStats(
+            ascendant_id=1,
+            str_level=1,
+            str_xp=0,
+            end_level=1,
+            end_xp=0,
+            tech_level=1,
+            tech_xp=0,
+            str_value=10,  # Default stat values
+            end_value=10,
+            tech_value=10
+        )
+        
+        user.stats = stats
+        return user
+    
+    def test_check_stat_milestones_no_milestones(self, progression_service):
+        """Test milestone detection when no milestones are crossed."""
+        milestones = progression_service._check_stat_milestones(50, 100)
+        assert milestones == []
+    
+    def test_check_stat_milestones_single_milestone(self, progression_service):
+        """Test milestone detection for a single milestone."""
+        # From 100 to 200 should cross the 150 milestone
+        milestones = progression_service._check_stat_milestones(100, 200)
+        assert milestones == [150]
+    
+    def test_check_stat_milestones_multiple_milestones(self, progression_service):
+        """Test milestone detection for multiple milestones."""
+        # From 50 to 500 should cross 150, 300, and 450 milestones
+        milestones = progression_service._check_stat_milestones(50, 500)
+        assert milestones == [150, 300, 450]
+    
+    def test_check_stat_milestones_exact_milestone_start(self, progression_service):
+        """Test milestone detection when starting exactly at a milestone."""
+        # From 150 to 350 should cross 300 milestone only
+        milestones = progression_service._check_stat_milestones(150, 350)
+        assert milestones == [300]
+    
+    def test_check_stat_milestones_exact_milestone_end(self, progression_service):
+        """Test milestone detection when ending exactly at a milestone."""
+        # From 50 to 150 should cross the 150 milestone
+        milestones = progression_service._check_stat_milestones(50, 150)
+        assert milestones == [150]
+    
+    def test_check_stat_milestones_large_gap(self, progression_service):
+        """Test milestone detection with a large XP gap."""
+        # From 0 to 1000 should cross 150, 300, 450, 600, 750, 900 milestones
+        milestones = progression_service._check_stat_milestones(0, 1000)
+        expected = [150, 300, 450, 600, 750, 900]
+        assert milestones == expected
+    
+    def test_check_stat_milestones_zero_start(self, progression_service):
+        """Test milestone detection starting from zero XP."""
+        # From 0 to 200 should cross the 150 milestone
+        milestones = progression_service._check_stat_milestones(0, 200)
+        assert milestones == [150]
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_xp_with_single_milestone(self, progression_service, mock_session, sample_user_with_stats):
+        """Test adding stat XP that triggers a single milestone."""
+        # Set initial XP to 100, add 100 to reach 200 (crosses 150 milestone)
+        sample_user_with_stats.stats.str_xp = 100
+        
+        # Mock database query
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_user_with_stats
+        mock_session.execute.return_value = mock_result
+        
+        # Add XP that will trigger milestone
+        result = await progression_service.add_xp(1, 100, 'strength')
+        
+        # Verify milestone achievement
+        assert result.user_id == 1
+        assert result.xp_added == 100
+        assert result.category == 'strength'
+        assert 'strength' in result.milestone_rewards
+        assert result.milestone_rewards['strength'] == [150]
+        
+        # Verify stat points awarded for milestone
+        assert result.stat_points_awarded['strength_points'] == 1  # 1 milestone = 1 stat point
+        assert sample_user_with_stats.strength_points == 11  # 10 + 1
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_xp_with_multiple_milestones(self, progression_service, mock_session, sample_user_with_stats):
+        """Test adding stat XP that triggers multiple milestones."""
+        # Set initial XP to 50, add 400 to reach 450 (crosses 150, 300, 450 milestones)
+        sample_user_with_stats.stats.end_xp = 50
+        
+        # Mock database query
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_user_with_stats
+        mock_session.execute.return_value = mock_result
+        
+        # Add XP that will trigger multiple milestones
+        result = await progression_service.add_xp(1, 400, 'endurance')
+        
+        # Verify milestone achievements
+        assert result.user_id == 1
+        assert result.xp_added == 400
+        assert result.category == 'endurance'
+        assert 'endurance' in result.milestone_rewards
+        assert result.milestone_rewards['endurance'] == [150, 300, 450]
+        
+        # Verify stat points awarded for milestones + level-ups
+        # 450 XP = level 2 (1 level gained) + 3 milestones = 4 total points
+        assert result.stat_points_awarded['endurance_points'] == 4  # 3 milestones + 1 level-up = 4 stat points
+        assert sample_user_with_stats.endurance_points == 14  # 10 + 4
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_xp_no_milestones(self, progression_service, mock_session, sample_user_with_stats):
+        """Test adding stat XP that doesn't trigger any milestones."""
+        # Set initial XP to 100, add 30 to reach 130 (no milestones crossed)
+        sample_user_with_stats.stats.tech_xp = 100
+        
+        # Mock database query
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_user_with_stats
+        mock_session.execute.return_value = mock_result
+        
+        # Add XP that won't trigger milestones
+        result = await progression_service.add_xp(1, 30, 'technique')
+        
+        # Verify no milestone achievements
+        assert result.user_id == 1
+        assert result.xp_added == 30
+        assert result.category == 'technique'
+        assert result.milestone_rewards == {}  # No milestones achieved
+        
+        # Verify no stat points awarded for milestones
+        assert 'technique_points' not in result.stat_points_awarded or result.stat_points_awarded['technique_points'] == 0
+        assert sample_user_with_stats.technique_points == 10  # No change
+    
+    @pytest.mark.asyncio
+    async def test_milestone_rewards_in_result_to_dict(self, progression_service):
+        """Test that milestone rewards are included in ProgressionResult.to_dict()."""
+        result = ProgressionResult()
+        result.user_id = 1
+        result.xp_added = 200
+        result.category = 'strength'
+        result.milestone_rewards = {'strength': [150, 300]}
+        result.stat_points_awarded = {'strength_points': 2}
+        result.level_changes = {}
+        result.new_aura = 100
+        result.previous_aura = 100
+        
+        result_dict = result.to_dict()
+        
+        # Verify milestone rewards are included
+        assert 'milestone_rewards' in result_dict
+        assert result_dict['milestone_rewards'] == {'strength': [150, 300]}
+    
+    @pytest.mark.asyncio
+    async def test_milestone_with_level_up_combination(self, progression_service, mock_session, sample_user_with_stats):
+        """Test milestone achievement combined with level-up."""
+        # Set stats to trigger both milestone and level-up
+        sample_user_with_stats.stats.str_xp = 100  # Will cross 150 milestone
+        sample_user_with_stats.stats.str_level = 1  # Low level for easy level-up
+        
+        # Mock database query
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_user_with_stats
+        mock_session.execute.return_value = mock_result
+        
+        # Add XP that will trigger both milestone and level-up
+        result = await progression_service.add_xp(1, 300, 'strength')
+        
+        # Verify both milestone and level-up occurred
+        assert result.user_id == 1
+        assert result.category == 'strength'
+        assert 'strength' in result.milestone_rewards
+        assert len(result.milestone_rewards['strength']) > 0  # At least one milestone
+        assert 'strength' in result.level_changes  # Level-up occurred
+        
+        # Verify stat points from both sources
+        milestone_points = len(result.milestone_rewards['strength'])
+        level_points = result.level_changes['strength']['gained'] if 'strength' in result.level_changes else 0
+        total_expected = milestone_points + level_points
+        assert result.stat_points_awarded['strength_points'] == total_expected
+    
+    @pytest.mark.asyncio
+    async def test_milestone_configuration_custom_interval(self, mock_session):
+        """Test milestone detection with custom interval configuration."""
+        # Create service with custom milestone interval
+        service = ProgressionService(session=mock_session)
+        service.milestone_interval = 100  # Custom interval of 100 instead of default 150
+        
+        # Test milestone detection with custom interval
+        milestones = service._check_stat_milestones(50, 350)
+        expected = [100, 200, 300]  # Should use 100 interval
+        assert milestones == expected
+    
+    @pytest.mark.asyncio
+    async def test_milestone_edge_case_exact_boundaries(self, progression_service):
+        """Test milestone detection at exact boundary conditions."""
+        # Test various boundary conditions
+        assert progression_service._check_stat_milestones(149, 150) == [150]
+        assert progression_service._check_stat_milestones(150, 151) == []
+        assert progression_service._check_stat_milestones(149, 151) == [150]
+        assert progression_service._check_stat_milestones(299, 301) == [300]
+    
+    @pytest.mark.asyncio
+    async def test_milestone_performance_large_numbers(self, progression_service):
+        """Test milestone detection performance with large XP values."""
+        # Test with very large XP values to ensure no performance issues
+        start_time = asyncio.get_event_loop().time()
+        milestones = progression_service._check_stat_milestones(0, 100000)
+        end_time = asyncio.get_event_loop().time()
+        
+        # Should complete quickly (less than 1 second)
+        assert (end_time - start_time) < 1.0
+        
+        # Should find correct number of milestones
+        expected_count = 100000 // 150  # 666 milestones
+        assert len(milestones) == expected_count
+
+    # Tests for add_stat_rewards method (Approach A)
+    @pytest.mark.asyncio
+    async def test_add_stat_rewards_success(self, progression_service, mock_session, sample_user_with_stats):
+        """Test successful stat rewards addition."""
+        # Mock database query
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_user_with_stats
+        mock_session.execute.return_value = mock_result
+        
+        # Add stat rewards
+        result = await progression_service.add_stat_rewards(1, str_reward=5, end_reward=3, tech_reward=2)
+        
+        # Verify results
+        assert result.user_id == 1
+        assert result.category == ''  # category is not set for stat rewards
+        assert result.stat_rewards_awarded['str_reward'] == 5
+        assert result.stat_rewards_awarded['end_reward'] == 3
+        assert result.stat_rewards_awarded['tech_reward'] == 2
+        
+        # Verify stats were updated
+        assert sample_user_with_stats.stats.str_value == 15  # 10 + 5
+        assert sample_user_with_stats.stats.end_value == 13  # 10 + 3
+        assert sample_user_with_stats.stats.tech_value == 12  # 10 + 2
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_rewards_partial(self, progression_service, mock_session, sample_user_with_stats):
+        """Test adding only some stat rewards."""
+        # Mock database query
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_user_with_stats
+        mock_session.execute.return_value = mock_result
+        
+        # Add only strength and technique rewards
+        result = await progression_service.add_stat_rewards(1, str_reward=3, tech_reward=4)
+        
+        # Verify results
+        assert result.user_id == 1
+        assert result.category == ''  # category is not set for stat rewards
+        assert result.stat_rewards_awarded['str_reward'] == 3
+        assert result.stat_rewards_awarded['end_reward'] == 0
+        assert result.stat_rewards_awarded['tech_reward'] == 4
+        
+        # Verify stats were updated correctly
+        assert sample_user_with_stats.stats.str_value == 13  # 10 + 3
+        assert sample_user_with_stats.stats.end_value == 10  # No change
+        assert sample_user_with_stats.stats.tech_value == 14  # 10 + 4
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_rewards_zero_values(self, progression_service):
+        """Test adding stat rewards with all zero values raises error."""
+        # Test that error is raised for all zero values
+        with pytest.raises(ValueError, match="At least one stat reward must be greater than 0"):
+            await progression_service.add_stat_rewards(1, str_reward=0, end_reward=0, tech_reward=0)
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_rewards_creates_stats_if_missing(self, progression_service, mock_session, sample_user):
+        """Test that stats are created if they don't exist when adding stat rewards."""
+        # User without stats
+        sample_user.stats = None
+        
+        # Mock database query
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_user
+        mock_session.execute.return_value = mock_result
+        
+        # Add stat rewards
+        result = await progression_service.add_stat_rewards(1, str_reward=2, end_reward=1, tech_reward=3)
+        
+        # Verify stats were created
+        assert sample_user.stats is not None
+        assert sample_user.stats.ascendant_id == 1
+        
+        # Verify stat rewards were applied
+        assert result.stat_rewards_awarded['str_reward'] == 2
+        assert result.stat_rewards_awarded['end_reward'] == 1
+        assert result.stat_rewards_awarded['tech_reward'] == 3
+        assert sample_user.stats.str_value == 12  # 10 (default) + 2
+        assert sample_user.stats.end_value == 11  # 10 (default) + 1
+        assert sample_user.stats.tech_value == 13  # 10 (default) + 3
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_rewards_negative_values_error(self, progression_service):
+        """Test error handling for negative stat reward values."""
+        with pytest.raises(ValueError, match="Stat rewards must be non-negative"):
+            await progression_service.add_stat_rewards(1, str_reward=-1, end_reward=2, tech_reward=1)
+        
+        with pytest.raises(ValueError, match="Stat rewards must be non-negative"):
+            await progression_service.add_stat_rewards(1, str_reward=1, end_reward=-2, tech_reward=1)
+        
+        with pytest.raises(ValueError, match="Stat rewards must be non-negative"):
+            await progression_service.add_stat_rewards(1, str_reward=1, end_reward=2, tech_reward=-1)
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_rewards_user_not_found_error(self, progression_service, mock_session):
+        """Test error handling when user is not found for stat rewards."""
+        # Mock database query returning None
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_result
+        
+        # Test that error is raised
+        with pytest.raises(Exception, match="User with ID 999 not found"):
+            await progression_service.add_stat_rewards(999, str_reward=1, end_reward=1, tech_reward=1)
+    
+    @pytest.mark.asyncio
+    async def test_add_stat_rewards_aura_update(self, progression_service, mock_session, sample_user_with_stats):
+        """Test that aura is updated when adding stat rewards."""
+        # Mock database query
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = sample_user_with_stats
+        mock_session.execute.return_value = mock_result
+        
+        # Store initial aura
+        initial_aura = sample_user_with_stats.aura
+        
+        # Add stat rewards
+        result = await progression_service.add_stat_rewards(1, str_reward=2, end_reward=2, tech_reward=2)
+        
+        # Verify aura was updated
+        assert result.new_aura >= initial_aura  # Aura should increase or stay same
+        assert result.previous_aura == initial_aura
+        assert sample_user_with_stats.aura == result.new_aura
+    
+    @pytest.mark.asyncio
+    async def test_stat_rewards_result_to_dict(self):
+        """Test ProgressionResult to_dict conversion for stat rewards."""
+        result = ProgressionResult()
+        result.user_id = 1
+        result.category = ''  # category is not set for stat rewards
+        result.stat_rewards_awarded = {'str_reward': 3, 'end_reward': 2, 'tech_reward': 1}
+        result.level_changes = {}
+        result.milestone_rewards = {}
+        result.stat_points_awarded = {}
+        result.new_aura = 150
+        result.previous_aura = 140
+        
+        result_dict = result.to_dict()
+        
+        # Verify stat rewards are included
+        assert 'stat_rewards_awarded' in result_dict
+        assert result_dict['stat_rewards_awarded'] == {'str_reward': 3, 'end_reward': 2, 'tech_reward': 1}
+        assert result_dict['category'] == ''
+        assert result_dict['aura_change']['new'] == 150
+        assert result_dict['aura_change']['previous'] == 140

@@ -15,25 +15,31 @@ class AscendantStats(BaseModel):
 
     Fields:
     - ascendant_id: Foreign key to the Ascendant model.
-    - str_level / str_xp: Tracks Strength progression.
-    - end_level / end_xp: Tracks Endurance progression.
-    - tech_level / tech_xp: Tracks Technique progression.
+    - str_level / str_xp: Tracks Strength progression for milestone calculations.
+    - end_level / end_xp: Tracks Endurance progression for milestone calculations.
+    - tech_level / tech_xp: Tracks Technique progression for milestone calculations.
+    - str_value / end_value / tech_value: Actual stat values displayed to users (STR: 245).
     """
     __tablename__ = 'ascendant_stats'
 
     ascendant_id = Column(Integer, ForeignKey('ascendants.id', ondelete='CASCADE'), unique=True, nullable=False)
 
-    # Strength progression
+    # Strength progression (for milestone calculations)
     str_level = Column(Integer, default=1, nullable=False)
     str_xp = Column(Float, default=0.0, nullable=False)
-
-    # Endurance progression
+    
+    # Endurance progression (for milestone calculations)
     end_level = Column(Integer, default=1, nullable=False)
     end_xp = Column(Float, default=0.0, nullable=False)
 
-    # Technique progression
+    # Technique progression (for milestone calculations)
     tech_level = Column(Integer, default=1, nullable=False)
     tech_xp = Column(Float, default=0.0, nullable=False)
+    
+    # Direct stat values (Approach A - what users see: STR: 245)
+    str_value = Column(Integer, default=10, nullable=False)  # Starting value: 10
+    end_value = Column(Integer, default=10, nullable=False)  # Starting value: 10
+    tech_value = Column(Integer, default=10, nullable=False)  # Starting value: 10
 
     # Relationships
     ascendant = relationship("Ascendant", back_populates="stats")
@@ -47,6 +53,9 @@ class AscendantStats(BaseModel):
         CheckConstraint('end_xp >= 0', name='check_end_xp_non_negative'),
         CheckConstraint('tech_level >= 1', name='check_tech_level_positive'),
         CheckConstraint('tech_xp >= 0', name='check_tech_xp_non_negative'),
+        CheckConstraint('str_value >= 1', name='check_str_value_positive'),
+        CheckConstraint('end_value >= 1', name='check_end_value_positive'),
+        CheckConstraint('tech_value >= 1', name='check_tech_value_positive'),
     )
 
     def __repr__(self):

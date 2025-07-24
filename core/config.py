@@ -16,6 +16,9 @@ class Settings(BaseModel):
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
     DEV_MODE: bool = os.getenv("DEV_MODE", "false").lower() == "true"
     SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+    
+    # Stat Milestone Configuration
+    STAT_MILESTONE_INTERVAL: int = int(os.getenv("STAT_MILESTONE_INTERVAL", "150"))
 
 @lru_cache()
 def get_settings():

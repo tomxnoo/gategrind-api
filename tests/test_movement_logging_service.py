@@ -46,7 +46,7 @@ class TestMovementLoggingService:
     
     @pytest.mark.asyncio
     async def test_log_movement_success(self, movement_service, mock_session, sample_movement, mock_progression_service):
-        """Test successful movement logging with XP calculation."""
+        """Test successful movement logging with XP calculation and stat rewards."""
         # Setup
         user_id = 1
         reps = 10
@@ -71,7 +71,15 @@ class TestMovementLoggingService:
         strength_result.previous_aura = 1000
         strength_result.new_aura = 1025
         
-        mock_progression_service.add_xp.side_effect = [global_result, strength_result]
+        # Mock stat rewards result
+        stat_rewards_result = ProgressionResult()
+        stat_rewards_result.stat_rewards_awarded = {"str_reward": 5, "end_reward": 1, "tech_reward": 0}
+        stat_rewards_result.level_changes = {"strength": {"new": 5, "gained": 2}}
+        stat_rewards_result.previous_aura = 1025
+        stat_rewards_result.new_aura = 1030
+        
+        mock_progression_service.add_xp.return_value = global_result
+        mock_progression_service.add_stat_rewards.return_value = stat_rewards_result
         
         # Mock transaction execution
         async def mock_transaction(func):
@@ -94,8 +102,12 @@ class TestMovementLoggingService:
         assert result.xp_earned["global"] == 50  # 5 * 10
         assert result.xp_earned["strength"] == 37  # 50 * 0.75
         
+        # Verify stat rewards
+        assert result.stat_rewards == {"str_reward": 5, "end_reward": 1, "tech_reward": 0}
+        
         # Verify progression service calls
-        assert mock_progression_service.add_xp.call_count == 2
+        assert mock_progression_service.add_xp.call_count == 1  # Only global XP now
+        assert mock_progression_service.add_stat_rewards.call_count == 1
         
         # Verify level-ups
         assert len(result.level_ups) == 1
@@ -104,9 +116,9 @@ class TestMovementLoggingService:
         assert result.level_ups[0]["points_earned"] == 2
         
         # Verify aura update
-        assert result.aura_update["previous_aura"] == 1000
-        assert result.aura_update["new_aura"] == 1025
-        assert result.aura_update["change"] == 25
+        assert result.aura_update["previous_aura"] == 1025
+        assert result.aura_update["new_aura"] == 1030
+        assert result.aura_update["change"] == 5
     
     @pytest.mark.asyncio
     async def test_log_movement_invalid_reps(self, movement_service):
@@ -152,53 +164,77 @@ class TestMovementLoggingService:
     
     @pytest.mark.asyncio
     async def test_calculate_movement_xp_strength(self, movement_service, sample_movement):
-        """Test XP calculation for strength movement."""
+        """Test XP and stat rewards calculation for strength movement."""
         sample_movement.stat_reward_type = "STR"
         sample_movement.xp_per_rep = 5
         
-        xp = await movement_service._calculate_movement_xp(sample_movement, 10)
+        result = await movement_service._calculate_movement_xp(sample_movement, 10)
         
-        assert xp["global"] == 50  # 5 * 10
-        assert xp["strength"] == 37  # 50 * 0.75
-        assert "endurance" not in xp
-        assert "technique" not in xp
+        # Verify XP calculations
+        assert result["global"] == 50  # 5 * 10
+        assert result["strength"] == 37  # 50 * 0.75
+        assert "endurance" not in result
+        assert "technique" not in result
+        
+        # Verify stat rewards calculations
+        assert result["str_reward"] == 5  # 0.5 * 10
+        assert result["end_reward"] == 1  # 0.25 * 0.5 * 10 = 1.25, int() = 1
+        assert result["tech_reward"] == 0  # 0.16 * 0.5 * 10 = 0.8, int() = 0
     
     @pytest.mark.asyncio
     async def test_calculate_movement_xp_endurance(self, movement_service, sample_movement):
-        """Test XP calculation for endurance movement."""
+        """Test XP and stat rewards calculation for endurance movement."""
         sample_movement.stat_reward_type = "END"
         sample_movement.xp_per_rep = 3
         
-        xp = await movement_service._calculate_movement_xp(sample_movement, 15)
+        result = await movement_service._calculate_movement_xp(sample_movement, 15)
         
-        assert xp["global"] == 45  # 3 * 15
-        assert xp["endurance"] == 33  # 45 * 0.75
-        assert "strength" not in xp
-        assert "technique" not in xp
+        # Verify XP calculations
+        assert result["global"] == 45  # 3 * 15
+        assert result["endurance"] == 33  # 45 * 0.75
+        assert "strength" not in result
+        assert "technique" not in result
+        
+        # Verify stat rewards calculations
+        assert result["end_reward"] == 7  # 0.5 * 15 = 7.5, int() = 7
+        assert result["str_reward"] == 1  # 0.25 * 0.5 * 15 = 1.875, int() = 1
+        assert result["tech_reward"] == 1  # 0.16 * 0.5 * 15 = 1.2, int() = 1
     
     @pytest.mark.asyncio
     async def test_calculate_movement_xp_technique(self, movement_service, sample_movement):
-        """Test XP calculation for technique movement."""
+        """Test XP and stat rewards calculation for technique movement."""
         sample_movement.stat_reward_type = "TECH"
         sample_movement.xp_per_rep = 8
         
-        xp = await movement_service._calculate_movement_xp(sample_movement, 5)
+        result = await movement_service._calculate_movement_xp(sample_movement, 5)
         
-        assert xp["global"] == 40  # 8 * 5
-        assert xp["technique"] == 30  # 40 * 0.75
-        assert "strength" not in xp
-        assert "endurance" not in xp
+        # Verify XP calculations
+        assert result["global"] == 40  # 8 * 5
+        assert result["technique"] == 30  # 40 * 0.75
+        assert "strength" not in result
+        assert "endurance" not in result
+        
+        # Verify stat rewards calculations
+        assert result["tech_reward"] == 2  # 0.5 * 5 = 2.5, int() = 2
+        assert result["str_reward"] == 0  # 0.25 * 0.5 * 5 = 0.625, int() = 0
+        assert result["end_reward"] == 0  # 0.16 * 0.5 * 5 = 0.4, int() = 0
     
     @pytest.mark.asyncio
     async def test_calculate_movement_xp_unknown_stat(self, movement_service, sample_movement):
-        """Test XP calculation for movement with unknown stat type."""
+        """Test XP and stat rewards calculation for movement with unknown stat type."""
         sample_movement.stat_reward_type = "UNKNOWN"
         sample_movement.xp_per_rep = 4
         
-        xp = await movement_service._calculate_movement_xp(sample_movement, 12)
+        result = await movement_service._calculate_movement_xp(sample_movement, 12)
         
-        assert xp["global"] == 48  # 4 * 12
-        assert len(xp) == 1  # Only global XP
+        # Verify XP calculations
+        assert result["global"] == 48  # 4 * 12
+        assert len([k for k in result.keys() if k in ["strength", "endurance", "technique"]]) == 0  # No stat-specific XP
+        
+        # Verify stat rewards calculations (should default to balanced distribution)
+        assert result["str_reward"] == 6  # 0.5 * 12
+        assert result["end_reward"] == 1  # 0.25 * 0.5 * 12 = 1.5, int() = 1
+        assert result["tech_reward"] == 0  # 0.16 * 0.5 * 12 = 0.96, int() = 0 (rounded down)
     
     @pytest.mark.asyncio
     async def test_get_movement_by_id_success(self, movement_service, mock_session, sample_movement):
@@ -391,7 +427,8 @@ class TestMovementLogResult:
             "xp_earned": {},
             "level_ups": [],
             "aura_update": {},
-            "session_id": None
+            "session_id": None,
+            "stat_rewards": {}
         }
         
         assert dict_result == expected

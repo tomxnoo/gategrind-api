@@ -31,6 +31,7 @@ class MovementLogResult:
         self.movement_name: str = ""
         self.reps_logged: int = 0
         self.xp_earned: Dict[str, int] = {}
+        self.stat_rewards: Dict[str, int] = {}  # NEW: Direct stat rewards (Approach A)
         self.level_ups: List[Dict[str, Any]] = []
         self.aura_update: Dict[str, Any] = {}
         self.session_id: Optional[str] = None
@@ -44,6 +45,7 @@ class MovementLogResult:
             },
             "reps_logged": self.reps_logged,
             "xp_earned": self.xp_earned,
+            "stat_rewards": self.stat_rewards,  # NEW: Direct stat rewards (Approach A)
             "level_ups": self.level_ups,
             "aura_update": self.aura_update,
             "session_id": self.session_id
@@ -120,38 +122,43 @@ class MovementLoggingService(BaseService):
                 
                 result.movement_name = movement.name
                 
-                # Calculate XP based on movement data
-                xp_calculations = await self._calculate_movement_xp(movement, reps)
-                result.xp_earned = xp_calculations
+                # Calculate XP and stat rewards based on movement data
+                reward_calculations = await self._calculate_movement_xp(movement, reps)
+                result.xp_earned = {k: v for k, v in reward_calculations.items() if k not in ['str_reward', 'end_reward', 'tech_reward']}
                 
-                # Get progression service and apply XP
+                # Get progression service and apply rewards
                 progression_service = await self.get_progression_service()
                 progression_results = []
                 
-                # Apply global XP
-                if xp_calculations.get('global', 0) > 0:
+                # Apply global XP (still using XP system for global progression)
+                if reward_calculations.get('global', 0) > 0:
                     global_result = await progression_service.add_xp(
                         user_id=user_id,
-                        amount=xp_calculations['global'],
+                        amount=reward_calculations['global'],
                         category='global'
                     )
                     progression_results.append(('global', global_result))
                 
-                # Apply stat-specific XP
-                stat_mapping = {
-                    'STR': 'strength',
-                    'END': 'endurance', 
-                    'TECH': 'technique'
-                }
+                # Apply direct stat rewards (Approach A)
+                str_reward = reward_calculations.get('str_reward', 0)
+                end_reward = reward_calculations.get('end_reward', 0)
+                tech_reward = reward_calculations.get('tech_reward', 0)
                 
-                stat_category = stat_mapping.get(movement.stat_reward_type)
-                if stat_category and xp_calculations.get(stat_category, 0) > 0:
-                    stat_result = await progression_service.add_xp(
+                if str_reward > 0 or end_reward > 0 or tech_reward > 0:
+                    stat_result = await progression_service.add_stat_rewards(
                         user_id=user_id,
-                        amount=xp_calculations[stat_category],
-                        category=stat_category
+                        str_reward=str_reward,
+                        end_reward=end_reward,
+                        tech_reward=tech_reward
                     )
-                    progression_results.append((stat_category, stat_result))
+                    progression_results.append(('stats', stat_result))
+                    
+                    # Add stat rewards to result for API response
+                    result.stat_rewards = {
+                        'str_reward': str_reward,
+                        'end_reward': end_reward,
+                        'tech_reward': tech_reward
+                    }
                 
                 # Process progression results
                 await self._process_progression_results(progression_results, result)
@@ -172,38 +179,59 @@ class MovementLoggingService(BaseService):
     
     async def _calculate_movement_xp(self, movement: Movement, reps: int) -> Dict[str, int]:
         """
-        Calculate XP earned for a movement.
+        Calculate XP and stat rewards earned for a movement.
         
         Args:
             movement: Movement database object
             reps: Number of repetitions
             
         Returns:
-            Dict with XP amounts for different categories
+            Dict with XP amounts and stat rewards for different categories
         """
-        # Calculate base XP from movement data
+        # Calculate base XP from movement data (still used for global progression)
         base_xp_per_rep = movement.xp_per_rep
         total_base_xp = int(base_xp_per_rep * reps)
         
-        # XP distribution logic
+        # XP calculations (global XP still awarded)
         xp_calculations = {
             'global': total_base_xp,  # All movements give global XP
         }
         
-        # Add stat-specific XP based on movement type
+        # Add stat-specific XP (75% of global XP for the primary stat)
         stat_mapping = {
             'STR': 'strength',
-            'END': 'endurance',
+            'END': 'endurance', 
             'TECH': 'technique'
         }
         
-        stat_category = stat_mapping.get(movement.stat_reward_type)
-        if stat_category:
-            # Stat-specific XP is typically 75% of base XP
-            stat_xp = int(total_base_xp * 0.75)
-            xp_calculations[stat_category] = stat_xp
+        primary_stat_xp_key = stat_mapping.get(movement.stat_reward_type)
+        if primary_stat_xp_key:
+            xp_calculations[primary_stat_xp_key] = int(total_base_xp * 0.75)
         
-        self.logger.info(f"Calculated XP for movement {movement.name} ({reps} reps): {xp_calculations}")
+        # Calculate direct stat rewards (Approach A)
+        # Base stat reward per rep (can be adjusted for balancing)
+        base_stat_per_rep = 0.5  # Each rep gives 0.5 stat points
+        
+        # Distribute stat rewards based on movement type
+        if movement.stat_reward_type == 'STR':
+            xp_calculations['str_reward'] = int(base_stat_per_rep * reps)
+            xp_calculations['end_reward'] = int(0.25 * base_stat_per_rep * reps)
+            xp_calculations['tech_reward'] = int(0.16 * base_stat_per_rep * reps)
+        elif movement.stat_reward_type == 'END':
+            xp_calculations['end_reward'] = int(base_stat_per_rep * reps)
+            xp_calculations['str_reward'] = int(0.25 * base_stat_per_rep * reps)
+            xp_calculations['tech_reward'] = int(0.16 * base_stat_per_rep * reps)
+        elif movement.stat_reward_type == 'TECH':
+            xp_calculations['tech_reward'] = int(base_stat_per_rep * reps)
+            xp_calculations['str_reward'] = int(0.25 * base_stat_per_rep * reps)
+            xp_calculations['end_reward'] = int(0.16 * base_stat_per_rep * reps)
+        else:
+            # Unknown stat type - default to balanced distribution
+            xp_calculations['str_reward'] = int(base_stat_per_rep * reps)
+            xp_calculations['end_reward'] = int(0.25 * base_stat_per_rep * reps)
+            xp_calculations['tech_reward'] = int(0.16 * base_stat_per_rep * reps)
+        
+        self.logger.info(f"Calculated rewards for movement {movement.name} ({reps} reps): {xp_calculations}")
         
         return xp_calculations
     
