@@ -6,9 +6,45 @@ import asyncpg
 import os
 import sys
 from dotenv import load_dotenv
+import logfire
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Configure Sentry (using DSN from environment)
+sentry_dsn = os.getenv('SENTRY_DSN')
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        environment="development",
+        traces_sample_rate=1.0,
+        integrations=[
+            FastApiIntegration(),
+            SqlalchemyIntegration(),
+        ],
+        send_default_pii=True,
+        # Prevent pickling errors by excluding frame locals
+        include_local_variables=False,
+        include_source_context=False,
+    )
+    print(f"[OK] Sentry initialized with DSN: {sentry_dsn[:50]}...")
+else:
+    print("[WARN] No Sentry DSN found in environment variables")
+
+# Debug: Check if token is loaded
+logfire_token = os.getenv('LOGFIRE_TOKEN')
+print(f"[DEBUG] Logfire token loaded: {logfire_token[:20]}..." if logfire_token else "[DEBUG] No Logfire token found")
+
+# Configure Logfire early in the application startup
+logfire.configure(
+    token=logfire_token,
+    service_name='realm-of-shadows-api',
+    service_version='2.0.0'
+)
+logfire.instrument_sqlalchemy()
 
 # Add project root to path for imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -68,7 +104,7 @@ async def lifespan(app: FastAPI):
         await app.state.db_pool.close()
         print("[OK] Database pool closed.")
     if app.state.redis:
-        await app.state.redis.disconnect()
+        await app.state.redis.close()
         print("[OK] Redis disconnected.")
     print("[OK] FastAPI application shutdown complete.")
 
@@ -80,6 +116,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Instrument the FastAPI app with Logfire
+logfire.instrument_fastapi(app)
 
 # CORS middleware
 app.add_middleware(

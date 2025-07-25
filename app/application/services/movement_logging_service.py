@@ -239,21 +239,31 @@ class MovementLoggingService(BaseService):
                                          result: MovementLogResult) -> None:
         """Process progression results and update the movement log result."""
         all_level_changes = {}
-        aura_info = None
+        first_aura = None
+        last_aura = None
+        aura_reasons = []
         
         for category, progression_result in progression_results:
             # Collect level changes
             if progression_result.level_changes:
                 all_level_changes.update(progression_result.level_changes)
             
-            # Use the last aura update (they should all be the same)
+            # Track aura changes across all progression results
             if progression_result.new_aura != progression_result.previous_aura:
-                aura_info = {
-                    'previous_aura': progression_result.previous_aura,
-                    'new_aura': progression_result.new_aura,
-                    'change': progression_result.new_aura - progression_result.previous_aura,
-                    'reason': f'{category.title()} progression'
-                }
+                if first_aura is None:
+                    first_aura = progression_result.previous_aura
+                last_aura = progression_result.new_aura
+                aura_reasons.append(f'{category.title()} progression')
+        
+        # Calculate total aura change if there were any aura updates
+        aura_info = None
+        if first_aura is not None and last_aura is not None:
+            aura_info = {
+                'previous_aura': first_aura,
+                'new_aura': last_aura,
+                'change': last_aura - first_aura,
+                'reason': ', '.join(aura_reasons) if len(aura_reasons) > 1 else aura_reasons[0]
+            }
         
         # Format level-ups for API response
         level_ups = []

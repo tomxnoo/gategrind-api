@@ -33,8 +33,8 @@ def get_database_url() -> str:
 
 def create_engine():
     """Create the async database engine."""
-    if is_test_environment() or is_development_mode():
-        return None  # Don't create engine in test or development environment
+    if is_test_environment():
+        return None  # Don't create engine in test environment
     
     database_url = get_database_url()
     
@@ -57,7 +57,7 @@ def initialize_database():
     """Initialize database engine and session factory if not already done."""
     global engine, async_session_factory
     
-    if engine is None and not is_test_environment() and not is_development_mode():
+    if engine is None and not is_test_environment():
         engine = create_engine()
         if engine:
             async_session_factory = async_sessionmaker(
@@ -79,9 +79,6 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """
     if is_test_environment():
         raise RuntimeError("Database sessions should be mocked in test environment")
-    
-    if is_development_mode():
-        raise RuntimeError("Database sessions are disabled in development mode")
     
     # Initialize database if not already done
     initialize_database()

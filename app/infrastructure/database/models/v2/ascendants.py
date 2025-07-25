@@ -4,7 +4,7 @@ Ascendant SQLAlchemy model for V2 database schema
 This model represents the core user data in the GateGrind V2 system.
 Each Ascendant has progression stats, skill tree points, and aura calculations.
 """
-from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Index
+from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Date, Index
 from sqlalchemy.orm import relationship
 from .base import BaseModel
 
@@ -42,19 +42,27 @@ class Ascendant(BaseModel):
     endurance_points = Column(Integer, default=0, nullable=False)
     technique_points = Column(Integer, default=0, nullable=False)
     
+    # Dungeon currency - keys for accessing dungeons
+    shadow_keys = Column(Integer, default=0, nullable=False)
+    
     # Rested XP system for bonus progression
     rested_xp_pool = Column(Integer, default=0, nullable=False)
     
     # User activity tracking
     last_login = Column(DateTime(timezone=True), nullable=True, index=True)
     
+    # Awakening system fields
+    awakening_streak = Column(Integer, default=0, nullable=False)
+    last_reset_date = Column(Date, nullable=True)
+    
     # Relationships
-    stats = relationship("AscendantStats", back_populates="ascendant", uselist=False, cascade="all, delete-orphan")
-    skill_progress = relationship("UserSkillProgress", back_populates="ascendant", cascade="all, delete-orphan")
-    quests = relationship("Quest", back_populates="ascendant", cascade="all, delete-orphan")
-    quest_completions = relationship("QuestCompletion", back_populates="ascendant", cascade="all, delete-orphan")
-    dungeon_keys = relationship("DungeonKey", back_populates="ascendant", cascade="all, delete-orphan")
-    dungeon_progress = relationship("DungeonProgress", back_populates="ascendant", uselist=False, cascade="all, delete-orphan")
+    stats = relationship("AscendantStats", back_populates="ascendant", uselist=False, cascade="all, delete-orphan", lazy="selectin")
+    skill_progress = relationship("UserSkillProgress", back_populates="ascendant", cascade="all, delete-orphan", lazy="selectin")
+    quests = relationship("Quest", back_populates="ascendant", cascade="all, delete-orphan", lazy="selectin")
+    quest_completions = relationship("QuestCompletion", back_populates="ascendant", cascade="all, delete-orphan", lazy="selectin")
+    dungeon_keys = relationship("DungeonKey", back_populates="ascendant", cascade="all, delete-orphan", lazy="selectin")
+    dungeon_progress = relationship("DungeonProgress", back_populates="ascendant", uselist=False, cascade="all, delete-orphan", lazy="selectin")
+    awakening_sessions = relationship("AwakeningSession", back_populates="ascendant", cascade="all, delete-orphan", lazy="selectin")
     
     # Indexes for performance
     __table_args__ = (

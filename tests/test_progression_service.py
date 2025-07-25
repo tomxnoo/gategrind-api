@@ -361,9 +361,9 @@ class TestProgressionService:
         assert result_dict['category'] == 'global'
         assert result_dict['level_changes'] == {'global': {'previous': 5, 'new': 6, 'gained': 1}}
         assert result_dict['stat_points_awarded'] == {'strength_points': 1, 'endurance_points': 1, 'technique_points': 1}
-        assert result_dict['aura_change']['previous'] == 100
-        assert result_dict['aura_change']['new'] == 150
-        assert result_dict['aura_change']['difference'] == 50
+        assert result_dict['aura_update']['previous_aura'] == 100
+        assert result_dict['aura_update']['new_aura'] == 150
+        assert result_dict['aura_update']['change'] == 50
     
     @pytest.mark.asyncio
     async def test_multiple_level_ups(self, progression_service, mock_session, sample_user):
@@ -845,5 +845,5 @@ class TestMilestoneProgression:
         assert 'stat_rewards_awarded' in result_dict
         assert result_dict['stat_rewards_awarded'] == {'str_reward': 3, 'end_reward': 2, 'tech_reward': 1}
         assert result_dict['category'] == ''
-        assert result_dict['aura_change']['new'] == 150
-        assert result_dict['aura_change']['previous'] == 140
+        assert result_dict['aura_update']['new_aura'] == 150
+        assert result_dict['aura_update']['previous_aura'] == 140

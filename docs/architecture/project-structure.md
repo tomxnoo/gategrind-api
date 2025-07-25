@@ -253,7 +253,7 @@ class Settings(BaseSettings):
 ```python
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+from api.main import app
 from app.infrastructure.db.database import get_db
 
 @pytest.fixture

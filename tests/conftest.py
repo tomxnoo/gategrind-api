@@ -3,50 +3,37 @@ Pytest configuration and fixtures for GateGrind V2 tests.
 """
 import pytest
 import asyncio
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.infrastructure.database.models.v2 import Base
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+
 
 
 @pytest.fixture(scope="function")
-def db_engine():
+async def db_engine():
     """Create an in-memory SQLite database engine for testing."""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        echo=False
-    )
-    
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
-    
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     yield engine
-    
-    # Clean up
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
+
+    await engine.dispose()
 
 
 @pytest.fixture(scope="function")
-def db_session(db_engine):
+async def db_session(db_engine):
     """Create a database session for testing."""
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
-    session = SessionLocal()
-    
-    yield session
-    
-    session.close()
+    async_session = sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async with async_session() as session:
+        yield session
 
 
 @pytest.fixture

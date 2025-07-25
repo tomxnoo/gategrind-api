@@ -10,6 +10,7 @@ from .quests import Quest, QuestCompletion
 from .dungeon_keys import DungeonKey
 from .dungeon_progress import DungeonProgress
 from .incursions import Incursion, IncursionParticipant, IncursionType, RewardType, IncursionStatus
+from .awakening import AwakeningSession, AwakeningQuest, AwakeningReward, UserAwakeningProgress
 
 __all__ = [
     "Base",
@@ -29,4 +30,8 @@ __all__ = [
     "IncursionType",
     "RewardType",
     "IncursionStatus",
+    "AwakeningSession",
+    "AwakeningQuest",
+    "AwakeningReward",
+    "UserAwakeningProgress",
 ]

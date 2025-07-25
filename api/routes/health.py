@@ -65,3 +65,8 @@ async def detailed_health_check(
         message="Detailed health check completed",
         data=health_data
     )
+
+@router.get("/test-error")
+async def test_error():
+    """Test endpoint to trigger a Sentry error for testing purposes"""
+    raise Exception("This is a test error for Sentry integration testing")

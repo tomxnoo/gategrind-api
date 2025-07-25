@@ -115,10 +115,10 @@ class TestMovementLoggingService:
         assert result.level_ups[0]["new_level"] == 5
         assert result.level_ups[0]["points_earned"] == 2
         
-        # Verify aura update
-        assert result.aura_update["previous_aura"] == 1025
-        assert result.aura_update["new_aura"] == 1030
-        assert result.aura_update["change"] == 5
+        # Verify aura update (total change across all progression results)
+        assert result.aura_update["previous_aura"] == 1000  # First progression's previous_aura
+        assert result.aura_update["new_aura"] == 1030       # Last progression's new_aura
+        assert result.aura_update["change"] == 30           # Total change: 1030 - 1000
     
     @pytest.mark.asyncio
     async def test_log_movement_invalid_reps(self, movement_service):

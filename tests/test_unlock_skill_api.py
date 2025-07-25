@@ -94,8 +94,8 @@ class TestUnlockSkillAPI:
         assert data["data"]["skill_points_deducted"]["strength_skill_points"] == 3
         assert data["data"]["skill_points_deducted"]["endurance_skill_points"] == 2
         assert data["data"]["skill_points_deducted"]["technique_skill_points"] == 4
-        assert data["data"]["aura_change"]["difference"] == 25
-        assert data["data"]["aura_change"]["new"] == 175
+        assert data["data"]["aura_update"]["change"] == 25
+        assert data["data"]["aura_update"]["new_aura"] == 175
         
         # Verify service was called correctly
         mock_progression_service.unlock_skill.assert_called_once_with(user_id=1, node_id="UPPER_DYNAMIC_L2")

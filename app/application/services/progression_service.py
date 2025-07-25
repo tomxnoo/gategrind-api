@@ -128,50 +128,73 @@ class ProgressionService(BaseService):
         result.aura_change_reason = "Stat rewards"  # Set aura change reason
         
         try:
-            # Execute all progression logic in a single transaction
-            async def progression_transaction(session: AsyncSession):
-                # Fetch user with stats
-                user = await self._get_user_with_stats(session, user_id)
-                if not user:
-                    raise Exception(f"User with ID {user_id} not found")
+            # Check if we're already in a transaction
+            session = await self.get_session()
+            if session.in_transaction():
+                # Use existing transaction
+                return await self._add_stat_rewards_in_session(session, user_id, str_reward, end_reward, tech_reward, result)
+            else:
+                # Execute all progression logic in a new transaction
+                async def progression_transaction(session: AsyncSession):
+                    return await self._add_stat_rewards_in_session(session, user_id, str_reward, end_reward, tech_reward, result)
                 
-                # Ensure user has stats record
-                if not user.stats:
-                    user.stats = AscendantStats(ascendant_id=user.id)
-                    session.add(user.stats)
-                
-                stats = user.stats
-                
-                # Store original aura for comparison
-                result.previous_aura = user.aura
-                
-                # Award direct stat values
-                if str_reward > 0:
-                    current_str = stats.str_value or 10
-                    stats.str_value = current_str + str_reward
-                    
-                if end_reward > 0:
-                    current_end = stats.end_value or 10
-                    stats.end_value = current_end + end_reward
-                    
-                if tech_reward > 0:
-                    current_tech = stats.tech_value or 10
-                    stats.tech_value = current_tech + tech_reward
-                
-                # Check for stat value milestones (every 150 points awards 1 skill point)
-                await self._check_stat_value_milestones(session, user, result)
-                
-                # Calculate and update aura
-                new_aura = await self._calculate_and_update_aura(session, user)
-                result.new_aura = new_aura
-                
-                return result
-            
-            return await self.execute_in_transaction(progression_transaction)
+                return await self.execute_in_transaction(progression_transaction)
             
         except Exception as e:
             self.handle_service_error(e, f"add_stat_rewards(user_id={user_id}, str={str_reward}, end={end_reward}, tech={tech_reward})")
             raise
+
+    async def _add_stat_rewards_in_session(self, session: AsyncSession, user_id: int, str_reward: int, end_reward: int, tech_reward: int, result: ProgressionResult) -> ProgressionResult:
+        """
+        Add stat rewards within an existing session/transaction.
+        
+        Args:
+            session: Database session to use
+            user_id: The user's database ID
+            str_reward: Direct strength points to award
+            end_reward: Direct endurance points to award
+            tech_reward: Direct technique points to award
+            result: ProgressionResult to populate
+            
+        Returns:
+            ProgressionResult: Complete progression update information
+        """
+        # Fetch user with stats
+        user = await self._get_user_with_stats(session, user_id)
+        if not user:
+            raise Exception(f"User with ID {user_id} not found")
+        
+        # Ensure user has stats record
+        if not user.stats:
+            user.stats = AscendantStats(ascendant_id=user.id)
+            session.add(user.stats)
+        
+        stats = user.stats
+        
+        # Store original aura for comparison
+        result.previous_aura = user.aura
+        
+        # Award direct stat values
+        if str_reward > 0:
+            current_str = stats.str_value or 10
+            stats.str_value = current_str + str_reward
+            
+        if end_reward > 0:
+            current_end = stats.end_value or 10
+            stats.end_value = current_end + end_reward
+            
+        if tech_reward > 0:
+            current_tech = stats.tech_value or 10
+            stats.tech_value = current_tech + tech_reward
+        
+        # Check for stat value milestones (every 150 points awards 1 skill point)
+        await self._check_stat_value_milestones(session, user, result)
+        
+        # Calculate and update aura
+        new_aura = await self._calculate_and_update_aura(session, user)
+        result.new_aura = new_aura
+        
+        return result
 
     async def _check_stat_value_milestones(self, session: AsyncSession, user: Ascendant, result: ProgressionResult) -> None:
         """Check if stat values have crossed milestone thresholds and award skill points."""
@@ -257,30 +280,52 @@ class ProgressionService(BaseService):
         result.aura_change_reason = f"{category.title()} progression"  # Set aura change reason
         
         try:
-            # Execute all progression logic in a single transaction
-            async def progression_transaction(session: AsyncSession):
-                # Fetch user with stats
-                user = await self._get_user_with_stats(session, user_id)
-                if not user:
-                    raise Exception(f"User with ID {user_id} not found")
+            # Check if we're already in a transaction
+            session = await self.get_session()
+            if session.in_transaction():
+                # Use existing transaction
+                return await self._add_xp_in_session(session, user_id, amount, category, result)
+            else:
+                # Execute all progression logic in a new transaction
+                async def progression_transaction(session: AsyncSession):
+                    return await self._add_xp_in_session(session, user_id, amount, category, result)
                 
-                # Store original aura for comparison
-                result.previous_aura = user.aura
-                
-                # Add XP and check for level-ups
-                await self._add_xp_to_category(session, user, amount, category, result)
-                
-                # Calculate and update aura
-                new_aura = await self._calculate_and_update_aura(session, user)
-                result.new_aura = new_aura
-                
-                return result
-            
-            return await self.execute_in_transaction(progression_transaction)
+                return await self.execute_in_transaction(progression_transaction)
             
         except Exception as e:
             self.handle_service_error(e, f"add_xp(user_id={user_id}, amount={amount}, category={category})")
             raise
+
+    async def _add_xp_in_session(self, session: AsyncSession, user_id: int, amount: int, category: str, result: ProgressionResult) -> ProgressionResult:
+        """
+        Add XP within an existing session/transaction.
+        
+        Args:
+            session: Database session to use
+            user_id: The user's database ID
+            amount: Amount of XP to add
+            category: XP category
+            result: ProgressionResult to populate
+            
+        Returns:
+            ProgressionResult: Complete progression update information
+        """
+        # Fetch user with stats
+        user = await self._get_user_with_stats(session, user_id)
+        if not user:
+            raise Exception(f"User with ID {user_id} not found")
+        
+        # Store original aura for comparison
+        result.previous_aura = user.aura
+        
+        # Add XP and check for level-ups
+        await self._add_xp_to_category(session, user, amount, category, result)
+        
+        # Calculate and update aura
+        new_aura = await self._calculate_and_update_aura(session, user)
+        result.new_aura = new_aura
+        
+        return result
     
     async def _get_user_with_stats(self, session: AsyncSession, user_id: int) -> Optional[Ascendant]:
         """Fetch user with their stats relationship loaded."""
