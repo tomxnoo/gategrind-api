@@ -7,7 +7,7 @@ in the awakening system and other performance-critical operations.
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, asdict
 import asyncio
@@ -75,14 +75,14 @@ class CacheService:
                 return None
             
             # Check if expired
-            if entry.expires_at and datetime.utcnow() > entry.expires_at:
+            if entry.expires_at and datetime.now(timezone.utc) > entry.expires_at:
                 del self._cache[key]
                 self.misses += 1
                 return None
             
             # Update access metadata
             entry.access_count += 1
-            entry.last_accessed = datetime.utcnow()
+            entry.last_accessed = datetime.now(timezone.utc)
             self.hits += 1
             
             return entry.value
@@ -104,13 +104,13 @@ class CacheService:
         async with self._lock:
             # Calculate expiration
             ttl = ttl or self.default_ttl
-            expires_at = datetime.utcnow() + timedelta(seconds=ttl) if ttl > 0 else None
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl) if ttl > 0 else None
             
             # Create cache entry
             entry = CacheEntry(
                 key=key,
                 value=value,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
                 expires_at=expires_at
             )
             
@@ -172,7 +172,7 @@ class CacheService:
             Number of entries removed
         """
         async with self._lock:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             expired_keys = []
             
             for key, entry in self._cache.items():

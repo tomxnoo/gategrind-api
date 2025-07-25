@@ -394,9 +394,9 @@ class AwakeningService:
             List of session history data
         """
         try:
+            # Query sessions with quests
             query = select(AwakeningSession).options(
-                selectinload(AwakeningSession.quests),
-                selectinload(AwakeningSession.rewards)
+                selectinload(AwakeningSession.quests)
             ).where(
                 AwakeningSession.user_id == user_id
             ).order_by(
@@ -406,12 +406,20 @@ class AwakeningService:
             result = await self.db_session.execute(query)
             sessions = await greenlet_spawn(lambda: result.scalars().all())
             
-            history = []
+            # For each session, explicitly query for rewards
+            formatted_sessions = []
             for session in sessions:
-                session_data = self._format_session_for_api(session)
-                history.append(session_data)
+                # Explicitly query for rewards
+                rewards_query = select(AwakeningReward).where(AwakeningReward.session_id == session.id)
+                rewards_result = await self.db_session.execute(rewards_query)
+                rewards = rewards_result.scalars().all()
+                
+                # Manually attach rewards to session for formatting
+                session.rewards = rewards
+                
+                formatted_sessions.append(self._format_session_for_api(session))
             
-            return history
+            return formatted_sessions
             
         except Exception as e:
             logger.error(f"Error getting awakening history for user {user_id}: {str(e)}")

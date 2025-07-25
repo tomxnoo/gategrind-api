@@ -109,10 +109,6 @@ class QuestGenerationService:
                     logger.error(f"No available movements found for user {user_id}")
                     raise ValueError("No available movements for quest generation")
             
-            logger.info(f"Found {len(available_movements)} available movements")
-            if available_movements:
-                logger.info(f"Sample movements: {[m['name'] for m in available_movements[:3]]}")
-            
             # Determine quest count based on readiness level, but cap it by available movements
             desired_quest_count = self._get_quest_count_for_readiness(readiness_level)
             quest_count = min(desired_quest_count, len(available_movements))
@@ -120,18 +116,12 @@ class QuestGenerationService:
             if quest_count < desired_quest_count:
                 logger.warning(f"Reducing quest count from {desired_quest_count} to {quest_count} due to limited available movements")
             
-            logger.info(f"Quest count for readiness level {readiness_level}: {quest_count} (desired: {desired_quest_count})")
-            
             # Generate quests
             quests = []
             used_movements = set()
             used_quest_types = set(excluded_quest_types or [])
             
-            logger.info(f"Starting quest generation loop for {quest_count} quests")
-            
             for i in range(quest_count):
-                logger.info(f"Generating quest {i+1}/{quest_count}")
-                
                 quest = await self._generate_single_quest(
                     user_data=user_data,
                     available_movements=available_movements,
@@ -143,13 +133,11 @@ class QuestGenerationService:
                 
                 if quest:
                     quests.append(quest)
-                    logger.info(f"Created quest: {quest.get('target_movement', 'Unknown')} - Type: {quest.get('quest_type', 'Unknown')}")
                     if quest.get('target_movement_id'):
                         used_movements.add(quest['target_movement_id'])
                     if quest.get('quest_type'):
                         used_quest_types.add(quest['quest_type'])
                 else:
-                    logger.warning(f"Failed to generate quest {i+1} - no more available movements or quest types")
                     # Break early if we can't generate more quests
                     break
             
@@ -294,13 +282,18 @@ class QuestGenerationService:
     ) -> Optional[Dict[str, Any]]:
         """Generate a single quest based on user data and constraints"""
         try:
+            logger.info(f"Generating quest {quest_index + 1}: used_movements={used_movements}, used_quest_types={used_quest_types}")
+            
             # Filter available movements
             available_movements = [
                 m for m in available_movements 
                 if m['id'] not in used_movements
             ]
             
+            logger.info(f"Available movements after filtering: {len(available_movements)}")
+            
             if not available_movements:
+                logger.warning("No available movements left for quest generation")
                 return None
             
             # Select quest type
@@ -309,10 +302,14 @@ class QuestGenerationService:
                 if qt not in used_quest_types
             ]
             
+            logger.info(f"Available quest types before fallback: {available_quest_types}")
+            
             if not available_quest_types:
                 available_quest_types = self.QUEST_TYPES
+                logger.info(f"Using fallback quest types: {available_quest_types}")
             
             quest_type = random.choice(available_quest_types)
+            logger.info(f"Selected quest type: {quest_type}")
             
             # Select movement
             movement = self._select_movement_for_quest(
@@ -320,7 +317,10 @@ class QuestGenerationService:
             )
             
             if not movement:
+                logger.warning("No suitable movement found for quest")
                 return None
+            
+            logger.info(f"Selected movement: {movement['name']} (ID: {movement['id']})")
             
             # Generate quest parameters
             difficulty_config = self.DIFFICULTY_TIERS[tier_level]
@@ -353,6 +353,7 @@ class QuestGenerationService:
                 quest_data['target_reps'] = max(int(base_reps * difficulty_config['multiplier']), 5)
                 quest_data['target_time'] = max(int(base_time * difficulty_config['multiplier']), 10)
             
+            logger.info(f"Generated quest data: {quest_data}")
             return quest_data
             
         except Exception as e:
