@@ -9,6 +9,7 @@ from datetime import datetime
 # Schemas for SkillTreeNode
 class SkillTreeNodeBase(BaseModel):
     """Base schema for SkillTreeNode"""
+    node_id: str = Field(description="String-based identifier for the node (e.g., 'UPPER_DYNAMIC_L2')")
     category_id: str = Field(description="Foreign key to MovementCategory")
     level: int = Field(description="Progression level within the category (1-5)")
     name: str = Field(description="Display name for this progression level")
@@ -24,6 +25,7 @@ class SkillTreeNodeCreate(SkillTreeNodeBase):
 
 class SkillTreeNodeUpdate(BaseModel):
     """Schema for updating a SkillTreeNode (all fields optional)"""
+    node_id: Optional[str] = Field(None, description="String-based identifier for the node")
     category_id: Optional[str] = Field(None, description="Foreign key to MovementCategory")
     level: Optional[int] = Field(None, description="Progression level within the category (1-5)")
     name: Optional[str] = Field(None, description="Display name for this progression level")

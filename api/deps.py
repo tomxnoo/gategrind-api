@@ -9,6 +9,11 @@ from api.models.user import UserProfile, UserStats
 from core.redis_cache import RedisCache
 from core.database.db import get_user_profile_from_db, get_unified_user_data, create_user_profile
 
+# Development mode helpers
+def is_development_mode() -> bool:
+    """Check if we're running in development mode"""
+    return os.getenv("DEVELOPMENT_MODE", "false").lower() == "true"
+
 # JWT Configuration
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
@@ -206,8 +211,3 @@ async def get_optional_user(request: Request, db_pool: asyncpg.Pool = Depends(re
         return await get_current_user(request, db_pool)
     except HTTPException:
         return None
-
-# Development mode helpers
-def is_development_mode() -> bool:
-    """Check if we're running in development mode"""
-    return os.getenv("DEVELOPMENT_MODE", "false").lower() == "true"

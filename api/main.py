@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import asyncpg
 import os
@@ -101,6 +102,14 @@ app.include_router(awakening.router, prefix="/api/awakening", tags=["Awakening"]
 
 # Include V2 API router
 app.include_router(api_v2_router)
+
+# Mount static files for admin interface
+static_path = os.path.join(project_root, "app", "static")
+if os.path.exists(static_path):
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
+    print(f"[OK] Static files mounted from {static_path}")
+else:
+    print(f"[WARN] Static directory not found: {static_path}")
 
 # Root endpoint
 @app.get("/")

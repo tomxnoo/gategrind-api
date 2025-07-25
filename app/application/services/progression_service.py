@@ -9,13 +9,15 @@ This service manages all business logic related to user progression including:
 - Aura calculation and updates
 """
 import math
-from typing import Dict, Any, Optional, Tuple, List
-from sqlalchemy import select, update
+from typing import Dict, Any, Optional, List
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.application.services.base_service import BaseService
-from app.infrastructure.database.models.v2 import Ascendant, AscendantStats, UserSkillProgress
+from app.infrastructure.database.models.v2 import Ascendant, AscendantStats, UserSkillProgress, SkillTreeNode
+from app.application.game_data.skill_tree_config import get_node_by_id
 from core.config import get_settings
 
 
@@ -36,10 +38,14 @@ class ProgressionResult:
         self.stat_rewards_awarded: Dict[str, int] = {}  # NEW: Direct stat rewards (Approach A)
         self.new_aura: int = 0
         self.previous_aura: int = 0
+        # New fields for skill unlocking
+        self.skill_points_deducted: Optional[Dict[str, int]] = None
+        self.unlock_message: Optional[str] = None
+        self.node_name: Optional[str] = None
         
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API responses."""
-        return {
+        result = {
             "user_id": self.user_id,
             "xp_added": self.xp_added,
             "category": self.category,
@@ -53,6 +59,16 @@ class ProgressionResult:
                 "difference": self.new_aura - self.previous_aura
             }
         }
+        
+        # Add skill unlocking fields if present
+        if self.skill_points_deducted is not None:
+            result["skill_points_deducted"] = self.skill_points_deducted
+        if self.unlock_message is not None:
+            result["unlock_message"] = self.unlock_message
+        if self.node_name is not None:
+            result["node_name"] = self.node_name
+            
+        return result
 
 
 class ProgressionService(BaseService):
@@ -429,6 +445,461 @@ class ProgressionService(BaseService):
             
             self.logger.info(f"User {user.id} achieved {len(milestones_achieved)} {category} milestones: {milestones_achieved}, awarded {milestone_points} stat points")
     
+    def _check_stat_milestones(self, old_xp: int, new_xp: int) -> List[int]:
+        """
+        Check for milestone achievements between old and new XP values.
+        
+        Args:
+            old_xp: Previous XP amount
+            new_xp: New XP amount after addition
+            
+        Returns:
+            List[int]: List of milestone thresholds that were crossed
+        """
+        milestones_achieved = []
+        
+        # Calculate the first milestone after old_xp
+        first_milestone = ((old_xp // self.milestone_interval) + 1) * self.milestone_interval
+        
+        # Find all milestones between old_xp and new_xp
+        current_milestone = first_milestone
+        while current_milestone <= new_xp:
+            milestones_achieved.append(current_milestone)
+            current_milestone += self.milestone_interval
+        
+        return milestones_achieved
+    
+    def _calculate_level_from_xp(self, total_xp: float) -> int:
+        """
+        Calculate level based on total XP using the formula: 100 * (level ^ 1.5).
+        
+        This function finds the highest level where the required XP is <= total_xp.
+        
+        Args:
+            total_xp: Total experience points
+            
+        Returns:
+            int: The level corresponding to the XP amount
+        """
+        if total_xp < 0:
+            return 1
+        
+        # Start from level 1 and find the highest achievable level
+        level = 1
+        while True:
+            required_xp = self._calculate_xp_for_level(level + 1)
+            if total_xp < required_xp:
+                break
+            level += 1
+            
+            # Safety check to prevent infinite loops
+            if level > 1000:  # Reasonable max level
+                break
+        
+        return level
+    
+    def _calculate_xp_for_level(self, level: int) -> float:
+        """
+        Calculate the total XP required to reach a specific level.
+        
+        Uses the formula: 100 * (level ^ 1.5) for each level and sums them up.
+        
+        Args:
+            level: Target level
+            
+        Returns:
+            float: Total XP required to reach that level
+        """
+        if level <= 1:
+            return 0
+        
+        total_xp = 0
+        for l in range(2, level + 1):
+            total_xp += 100 * (l ** 1.5)
+        
+        return total_xp
+    
+    async def _calculate_and_update_aura(self, session: AsyncSession, user: Ascendant) -> int:
+        """
+        Calculate and update the user's Aura score.
+        
+        Aura calculation formula:
+        - Base aura = user.level * 10
+        - Stat bonus = (str_level + end_level + tech_level) * 5
+        - Skill bonus = unlocked_skills_count * 15
+        - Achievement bonus = calculated separately (placeholder for now)
+        
+        Args:
+            session: Database session
+            user: User object with stats loaded
+            
+        Returns:
+            int: New aura value
+        """
+        # Base aura from main level
+        base_aura = user.level * 10
+        
+        # Stat bonus from individual stat levels
+        stat_bonus = 0
+        if user.stats:
+            stat_bonus = (
+                (user.stats.str_level or 1) * 5 +
+                (user.stats.end_level or 1) * 5 +
+                (user.stats.tech_level or 1) * 5
+            )
+        
+        # Skill bonus from unlocked skill tree nodes
+        skill_bonus = await self._calculate_skill_bonus(session, user.id)
+        
+        # Achievement bonus (placeholder for future implementation)
+        achievement_bonus = 0
+        
+        # Calculate total aura
+        new_aura = base_aura + stat_bonus + skill_bonus + achievement_bonus
+        
+        # Update user's aura
+        user.aura = new_aura
+        
+        self.logger.info(f"Updated aura for user {user.id}: base={base_aura}, "
+                        f"stat={stat_bonus}, skill={skill_bonus}, total={new_aura}")
+        
+        return new_aura
+    
+    async def _calculate_skill_bonus(self, session: AsyncSession, user_id: int) -> int:
+        """Calculate aura bonus from unlocked skills."""
+        try:
+            # Count unlocked skill tree nodes
+            stmt = select(UserSkillProgress).where(UserSkillProgress.ascendant_id == user_id)
+            result = await session.execute(stmt)
+            unlocked_skills = result.scalars().all()
+            
+            return len(unlocked_skills) * 15
+            
+        except Exception as e:
+            self.logger.warning(f"Error calculating skill bonus for user {user_id}: {e}")
+            return 0
+    
+    async def calculate_level_progress(self, user_id: int, category: str = 'global') -> Dict[str, Any]:
+        """
+        Calculate level progress information for a user in a specific category.
+        
+        Args:
+            user_id: User's database ID
+            category: Category to check ('global', 'strength', 'endurance', 'technique')
+            
+        Returns:
+            Dict containing current level, XP, next level XP requirement, and progress percentage
+        """
+        if category not in self.VALID_CATEGORIES:
+            raise ValueError(f"Invalid category '{category}'. Must be one of: {self.VALID_CATEGORIES}")
+        
+        try:
+            session = await self.get_session()
+            user = await self._get_user_with_stats(session, user_id)
+            
+            if not user:
+                raise Exception(f"User with ID {user_id} not found")
+            
+            if category == 'global':
+                current_level = user.level or 1
+                current_xp = user.global_xp or 0
+            else:
+                if not user.stats:
+                    # Return default values if no stats exist
+                    return {
+                        'current_level': 1,
+                        'current_xp': 0,
+                        'next_level_xp_required': 100 * (2 ** 1.5),
+                        'progress_percentage': 0.0,
+                        'xp_to_next_level': 100 * (2 ** 1.5)
+                    }
+                
+                stat_mapping = {
+                    'strength': ('str_level', 'str_xp'),
+                    'endurance': ('end_level', 'end_xp'),
+                    'technique': ('tech_level', 'tech_xp')
+                }
+                
+                level_field, xp_field = stat_mapping[category]
+                current_level = getattr(user.stats, level_field) or 1
+                current_xp = getattr(user.stats, xp_field) or 0
+            
+            # Calculate next level requirements
+            next_level_total_xp = self._calculate_xp_for_level(current_level + 1)
+            current_level_total_xp = self._calculate_xp_for_level(current_level)
+            xp_needed_for_next = next_level_total_xp - current_level_total_xp
+            xp_progress_in_level = current_xp - current_level_total_xp
+            
+            progress_percentage = (xp_progress_in_level / xp_needed_for_next) * 100 if xp_needed_for_next > 0 else 100
+            xp_to_next_level = max(0, xp_needed_for_next - xp_progress_in_level)
+            
+            return {
+                'current_level': current_level,
+                'current_xp': current_xp,
+                'next_level_xp_required': xp_needed_for_next,
+                'progress_percentage': round(progress_percentage, 2),
+                'xp_to_next_level': round(xp_to_next_level, 2)
+            }
+            
+        except Exception as e:
+            self.handle_service_error(e, f"calculate_level_progress(user_id={user_id}, category={category})")
+            raise
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """
+        Perform a health check for the ProgressionService.
+        
+        Returns:
+            Dict[str, Any]: Health check results
+        """
+        try:
+            session = await self.get_session()
+            
+            # Test basic database connectivity by counting users
+            stmt = select(Ascendant)
+            result = await session.execute(stmt)
+            users = result.scalars().all()
+            
+            return {
+                "service": "ProgressionService",
+                "status": "healthy",
+                "database_connection": "ok",
+                "users_count": len(users),
+                "timestamp": None  # Will be set by the API layer
+            }
+            
+        except Exception as e:
+            self.handle_service_error(e, "health_check")
+            return {
+                "service": "ProgressionService",
+                "status": "unhealthy",
+                "error": str(e),
+                "timestamp": None
+            }
+
+    async def unlock_skill(self, user_id: int, node_id: str) -> ProgressionResult:
+        """
+        Unlock a skill tree node for a user.
+        
+        This method:
+        1. Validates the node exists and user meets requirements
+        2. Deducts the required skill points
+        3. Creates the UserSkillProgress record
+        4. Updates user's aura
+        
+        Args:
+            user_id: User's database ID
+            node_id: ID of the skill tree node to unlock
+            
+        Returns:
+            ProgressionResult with unlock information
+            
+        Raises:
+            ValueError: If node doesn't exist or requirements not met
+            Exception: If user not found or database error occurs
+        """
+        # Get node configuration
+        node_config = get_node_by_id(node_id)
+        if not node_config:
+            raise ValueError(f"Skill tree node '{node_id}' not found")
+        
+        result = ProgressionResult()
+        result.user_id = user_id
+        result.category = "skill_unlock"
+        
+        try:
+            async def unlock_transaction(session: AsyncSession):
+                # Fetch user with stats and skill progress
+                user = await self._get_user_with_skill_progress(session, user_id)
+                if not user:
+                    raise Exception(f"User with ID {user_id} not found")
+                
+                # Check if already unlocked
+                existing_progress = await self._check_existing_skill_progress(session, user_id, node_id)
+                if existing_progress:
+                    raise ValueError(f"Skill tree node '{node_id}' is already unlocked")
+                
+                # Validate requirements
+                await self._validate_skill_requirements(session, user, node_config)
+                
+                # Store original aura for comparison
+                result.previous_aura = user.aura
+                
+                # Deduct skill points
+                self._deduct_skill_points(user, node_config, result)
+                
+                # Create skill progress record
+                await self._create_skill_progress(session, user_id, node_id)
+                
+                # Calculate and update aura
+                new_aura = await self._calculate_and_update_aura(session, user)
+                result.new_aura = new_aura
+                
+                # Set success message
+                result.unlock_message = node_config.unlock_message
+                result.node_name = node_config.name
+                
+                return result
+            
+            return await self.execute_in_transaction(unlock_transaction)
+            
+        except Exception as e:
+            self.handle_service_error(e, f"unlock_skill(user_id={user_id}, node_id={node_id})")
+            raise
+
+    async def _get_user_with_skill_progress(self, session: AsyncSession, user_id: int) -> Optional[Ascendant]:
+        """Fetch user with their stats and skill progress relationships loaded."""
+        stmt = (
+            select(Ascendant)
+            .options(
+                selectinload(Ascendant.stats),
+                selectinload(Ascendant.skill_progress)
+            )
+            .where(Ascendant.id == user_id)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def _check_existing_skill_progress(self, session: AsyncSession, user_id: int, node_id: str) -> Optional[UserSkillProgress]:
+        """Check if user has already unlocked this skill node."""
+        # First get the SkillTreeNode database record
+        node_stmt = select(SkillTreeNode).where(SkillTreeNode.node_id == node_id)
+        node_result = await session.execute(node_stmt)
+        node_record = node_result.scalar_one_or_none()
+        
+        if not node_record:
+            return None
+            
+        # Check for existing progress
+        progress_stmt = (
+            select(UserSkillProgress)
+            .where(
+                UserSkillProgress.ascendant_id == user_id,
+                UserSkillProgress.node_id == node_record.id
+            )
+        )
+        progress_result = await session.execute(progress_stmt)
+        return progress_result.scalar_one_or_none()
+
+    async def _validate_skill_requirements(self, session: AsyncSession, user: Ascendant, node_config) -> None:
+        """Validate that user meets all requirements for unlocking the skill node."""
+        requirements = node_config.requirements
+        
+        # Check ascendant level requirement
+        if user.level < requirements.min_ascendant_level:
+            raise ValueError(
+                f"Ascendant level {requirements.min_ascendant_level} required, "
+                f"current level: {user.level}"
+            )
+        
+        # Check stat requirements (these are checked but not deducted)
+        if user.stats:
+            current_str = user.stats.str_value or 10
+            current_end = user.stats.end_value or 10
+            current_tech = user.stats.tech_value or 10
+            
+            if current_str < requirements.str_points:
+                raise ValueError(
+                    f"Strength stat {requirements.str_points} required, "
+                    f"current: {current_str}"
+                )
+            if current_end < requirements.end_points:
+                raise ValueError(
+                    f"Endurance stat {requirements.end_points} required, "
+                    f"current: {current_end}"
+                )
+            if current_tech < requirements.tech_points:
+                raise ValueError(
+                    f"Technique stat {requirements.tech_points} required, "
+                    f"current: {current_tech}"
+                )
+        else:
+            # No stats record means default values (10 each)
+            if requirements.str_points > 10 or requirements.end_points > 10 or requirements.tech_points > 10:
+                raise ValueError("Insufficient stat values to unlock this skill")
+        
+        # Check skill point requirements (these will be deducted)
+        if user.strength_points < requirements.strength_skill_points:
+            raise ValueError(
+                f"Strength skill points {requirements.strength_skill_points} required, "
+                f"available: {user.strength_points}"
+            )
+        if user.endurance_points < requirements.endurance_skill_points:
+            raise ValueError(
+                f"Endurance skill points {requirements.endurance_skill_points} required, "
+                f"available: {user.endurance_points}"
+            )
+        if user.technique_points < requirements.technique_skill_points:
+            raise ValueError(
+                f"Technique skill points {requirements.technique_skill_points} required, "
+                f"available: {user.technique_points}"
+            )
+        
+        # Check prerequisite nodes
+        if requirements.prerequisite_nodes:
+            await self._validate_prerequisite_nodes(session, user.id, requirements.prerequisite_nodes)
+
+    async def _validate_prerequisite_nodes(self, session: AsyncSession, user_id: int, prerequisite_node_ids: List[str]) -> None:
+        """Validate that all prerequisite nodes are unlocked."""
+        for prereq_node_id in prerequisite_node_ids:
+            # Get the database record for the prerequisite node
+            node_stmt = select(SkillTreeNode).where(SkillTreeNode.node_id == prereq_node_id)
+            node_result = await session.execute(node_stmt)
+            node_record = node_result.scalar_one_or_none()
+            
+            if not node_record:
+                raise ValueError(f"Prerequisite node '{prereq_node_id}' not found in database")
+            
+            # Check if user has unlocked this prerequisite
+            progress_stmt = (
+                select(UserSkillProgress)
+                .where(
+                    UserSkillProgress.ascendant_id == user_id,
+                    UserSkillProgress.node_id == node_record.id
+                )
+            )
+            progress_result = await session.execute(progress_stmt)
+            progress_record = progress_result.scalar_one_or_none()
+            
+            if not progress_record:
+                raise ValueError(f"Prerequisite skill '{prereq_node_id}' must be unlocked first")
+
+    def _deduct_skill_points(self, user: Ascendant, node_config, result: ProgressionResult) -> None:
+        """Deduct the required skill points from the user."""
+        requirements = node_config.requirements
+        
+        # Deduct skill points
+        user.strength_points -= requirements.strength_skill_points
+        user.endurance_points -= requirements.endurance_skill_points
+        user.technique_points -= requirements.technique_skill_points
+        
+        # Record the deductions in the result
+        result.skill_points_deducted = {
+            'strength_skill_points': requirements.strength_skill_points,
+            'endurance_skill_points': requirements.endurance_skill_points,
+            'technique_skill_points': requirements.technique_skill_points,
+            'total': (requirements.strength_skill_points + 
+                     requirements.endurance_skill_points + 
+                     requirements.technique_skill_points)
+        }
+
+    async def _create_skill_progress(self, session: AsyncSession, user_id: int, node_id: str) -> None:
+        """Create a UserSkillProgress record for the unlocked skill."""
+        # Get the SkillTreeNode database record
+        node_stmt = select(SkillTreeNode).where(SkillTreeNode.node_id == node_id)
+        node_result = await session.execute(node_stmt)
+        node_record = node_result.scalar_one_or_none()
+        
+        if not node_record:
+            raise ValueError(f"Skill tree node '{node_id}' not found in database")
+        
+        # Create the progress record
+        skill_progress = UserSkillProgress(
+            ascendant_id=user_id,
+            node_id=node_record.id
+        )
+        session.add(skill_progress)
+
     def _check_stat_milestones(self, old_xp: int, new_xp: int) -> List[int]:
         """
         Check for milestone achievements between old and new XP values.

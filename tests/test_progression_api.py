@@ -88,7 +88,7 @@ class TestProgressionAPI:
         mock_progression_service.add_xp.return_value = sample_progression_result
         
         # Make request
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 1,
             "amount": 100,
             "category": "global"
@@ -111,7 +111,7 @@ class TestProgressionAPI:
     
     def test_add_xp_validation_error_invalid_category(self, client):
         """Test XP addition with invalid category."""
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 1,
             "amount": 100,
             "category": "invalid_category"
@@ -122,7 +122,7 @@ class TestProgressionAPI:
     
     def test_add_xp_validation_error_negative_amount(self, client):
         """Test XP addition with negative amount."""
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 1,
             "amount": -50,
             "category": "global"
@@ -133,7 +133,7 @@ class TestProgressionAPI:
     
     def test_add_xp_validation_error_zero_user_id(self, client):
         """Test XP addition with zero user ID."""
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 0,
             "amount": 100,
             "category": "global"
@@ -146,7 +146,7 @@ class TestProgressionAPI:
         """Test XP addition when user is not found."""
         mock_progression_service.add_xp.side_effect = Exception("User with ID 999 not found")
         
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 999,
             "amount": 100,
             "category": "global"
@@ -161,7 +161,7 @@ class TestProgressionAPI:
         """Test XP addition with service error."""
         mock_progression_service.add_xp.side_effect = Exception("Database connection failed")
         
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 1,
             "amount": 100,
             "category": "global"
@@ -176,7 +176,7 @@ class TestProgressionAPI:
         """Test successful level progress retrieval via POST."""
         mock_progression_service.calculate_level_progress.return_value = sample_level_progress
         
-        response = client.post("/v2/progression/level-progress", json={
+        response = client.post("/progression/level-progress", json={
             "user_id": 1,
             "category": "global"
         })
@@ -199,7 +199,7 @@ class TestProgressionAPI:
         """Test successful level progress retrieval via GET."""
         mock_progression_service.calculate_level_progress.return_value = sample_level_progress
         
-        response = client.get("/v2/progression/level-progress/1?category=strength")
+        response = client.get("/progression/level-progress/1?category=strength")
         
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -217,7 +217,7 @@ class TestProgressionAPI:
         """Test level progress retrieval with default category."""
         mock_progression_service.calculate_level_progress.return_value = sample_level_progress
         
-        response = client.get("/v2/progression/level-progress/1")
+        response = client.get("/progression/level-progress/1")
         
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -226,7 +226,7 @@ class TestProgressionAPI:
     
     def test_get_level_progress_invalid_category(self, client):
         """Test level progress with invalid category."""
-        response = client.get("/v2/progression/level-progress/1?category=invalid")
+        response = client.get("/progression/level-progress/1?category=invalid")
         
         # Should return validation error
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -237,7 +237,7 @@ class TestProgressionAPI:
         """Test level progress when user is not found."""
         mock_progression_service.calculate_level_progress.side_effect = Exception("User with ID 999 not found")
         
-        response = client.post("/v2/progression/level-progress", json={
+        response = client.post("/progression/level-progress", json={
             "user_id": 999,
             "category": "global"
         })
@@ -249,7 +249,7 @@ class TestProgressionAPI:
         """Test successful health check."""
         mock_progression_service.health_check.return_value = sample_health_data
         
-        response = client.get("/v2/progression/health")
+        response = client.get("/progression/health")
         
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -264,7 +264,7 @@ class TestProgressionAPI:
         """Test health check failure."""
         mock_progression_service.health_check.side_effect = Exception("Database connection failed")
         
-        response = client.get("/v2/progression/health")
+        response = client.get("/progression/health")
         
         # Should still return 200 but with unhealthy status
         assert response.status_code == status.HTTP_200_OK
@@ -275,7 +275,7 @@ class TestProgressionAPI:
     
     def test_get_valid_categories(self, client):
         """Test getting valid categories."""
-        response = client.get("/v2/progression/categories")
+        response = client.get("/progression/categories")
         
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -292,7 +292,7 @@ class TestProgressionAPI:
         # Mock the private method
         mock_progression_service._calculate_xp_for_level.side_effect = lambda level: 100 * (level ** 1.5) if level > 1 else 0
         
-        response = client.get("/v2/progression/xp-formula/5")
+        response = client.get("/progression/xp-formula/5")
         
         # Verify response
         assert response.status_code == status.HTTP_200_OK
@@ -305,7 +305,7 @@ class TestProgressionAPI:
     
     def test_get_xp_formula_info_invalid_level_low(self, client):
         """Test XP formula with invalid low level."""
-        response = client.get("/v2/progression/xp-formula/0")
+        response = client.get("/progression/xp-formula/0")
         
         # Should return validation error
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -314,7 +314,7 @@ class TestProgressionAPI:
     
     def test_get_xp_formula_info_invalid_level_high(self, client):
         """Test XP formula with invalid high level."""
-        response = client.get("/v2/progression/xp-formula/1001")
+        response = client.get("/progression/xp-formula/1001")
         
         # Should return validation error
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -335,7 +335,7 @@ class TestProgressionAPI:
         
         mock_progression_service.add_xp.return_value = result
         
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 1,
             "amount": 50,
             "category": "strength"
@@ -360,7 +360,7 @@ class TestProgressionAPI:
         
         mock_progression_service.add_xp.return_value = result
         
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 1,
             "amount": 100,
             "category": "global"
@@ -374,7 +374,7 @@ class TestProgressionAPI:
     def test_missing_required_fields(self, client):
         """Test API with missing required fields."""
         # Missing amount field
-        response = client.post("/v2/progression/add-xp", json={
+        response = client.post("/progression/add-xp", json={
             "user_id": 1,
             "category": "global"
         })
@@ -385,7 +385,7 @@ class TestProgressionAPI:
     def test_invalid_json_format(self, client):
         """Test API with invalid JSON format."""
         response = client.post(
-            "/v2/progression/add-xp",
+            "/progression/add-xp",
             content="invalid json",
             headers={"Content-Type": "application/json"}
         )

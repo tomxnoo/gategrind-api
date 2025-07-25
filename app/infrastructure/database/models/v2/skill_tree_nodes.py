@@ -30,6 +30,7 @@ class SkillTreeNode(BaseModel):
     __tablename__ = 'skill_tree_nodes'
     
     # Core identification
+    node_id = Column(String(50), unique=True, nullable=False, index=True)  # String-based identifier from config
     category_id = Column(String(50), ForeignKey('movement_categories.id'), nullable=False)
     level = Column(Integer, nullable=False)
     name = Column(String(100), nullable=False)

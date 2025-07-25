@@ -10,7 +10,7 @@ import random
 from datetime import datetime, date
 import asyncio
 
-from .exercise_library import (
+from ..game_data.exercise_library import (
     EXERCISE_LIBRARY, MovementCategory, QuestTier, CoreStat,
     get_exercise_by_difficulty, get_user_appropriate_exercise,
     calculate_quest_reps, calculate_quest_duration, get_stat_rewards,

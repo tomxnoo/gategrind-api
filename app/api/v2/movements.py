@@ -18,7 +18,7 @@ from api.schemas.v2.movement_schemas import MovementCategoryResponse
 logger = logging.getLogger(__name__)
 
 # Create router
-router = APIRouter(prefix="/v2/movements", tags=["Movements V2"])
+router = APIRouter(prefix="/movements", tags=["Movements V2"])
 
 
 async def get_movement_service() -> MovementService:

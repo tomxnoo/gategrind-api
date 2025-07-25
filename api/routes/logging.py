@@ -286,7 +286,7 @@ async def get_available_movements(
     # Production mode: get from exercise library
     try:
         # Import exercise library
-        from core.game_data.exercise_library import EXERCISE_LIBRARY
+        from app.application.game_data.exercise_library import EXERCISE_LIBRARY
         
         movements = []
         for category in EXERCISE_LIBRARY.values():

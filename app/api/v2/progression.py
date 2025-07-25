@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.application.services.progression_service import ProgressionService, ProgressionResult
 from app.infrastructure.database.session import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
+from api.dependencies.auth import get_current_user_id
 
 
 # Configure logging
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(
-    prefix="/v2/progression",
+    prefix="/progression",
     tags=["progression"],
     responses={
         404: {"description": "User not found"},
@@ -404,3 +405,94 @@ async def get_xp_formula_info(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while calculating XP requirements"
         )
+
+
+class UnlockSkillRequest(BaseModel):
+    """Request model for unlocking a skill tree node."""
+    node_id: str = Field(..., description="ID of the skill tree node to unlock", min_length=1)
+
+
+class UnlockSkillResponse(BaseModel):
+    """Response model for skill unlock operations."""
+    success: bool = Field(..., description="Whether the unlock was successful")
+    message: str = Field(..., description="Human-readable message")
+    data: Dict[str, Any] = Field(..., description="Unlock result data")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@router.post("/unlock-skill", response_model=UnlockSkillResponse, status_code=status.HTTP_200_OK)
+async def unlock_skill(
+    request: UnlockSkillRequest,
+    user_id: int = Depends(get_current_user_id),
+    progression_service: ProgressionService = Depends(get_progression_service)
+) -> UnlockSkillResponse:
+    """
+    Unlock a skill tree node for a user.
+    
+    This endpoint handles skill unlocking and automatically processes:
+    - Requirement validation (stats, skill points, prerequisites, level)
+    - Skill point deduction
+    - UserSkillProgress record creation
+    - Aura updates
+    - Transaction management
+    
+    Args:
+        request: Skill unlock request containing user_id and node_id
+        progression_service: Injected ProgressionService instance
+        
+    Returns:
+        UnlockSkillResponse: Complete skill unlock information
+        
+    Raises:
+        HTTPException: 400 for validation/requirement errors, 404 for user/node not found, 500 for server errors
+    """
+    try:
+        logger.info(f"Unlocking skill node {request.node_id} for user {user_id}")
+        
+        # Unlock skill and get progression result
+        result = await progression_service.unlock_skill(
+            user_id=user_id,
+            node_id=request.node_id
+        )
+        
+        # Format response message
+        message_parts = [f"Successfully unlocked skill: {result.node_name}"]
+        
+        if result.skill_points_deducted:
+            total_deducted = result.skill_points_deducted.get('total', 0)
+            if total_deducted > 0:
+                message_parts.append(f"Deducted {total_deducted} skill points")
+        
+        aura_change = result.new_aura - result.previous_aura
+        if aura_change != 0:
+            message_parts.append(f"Aura increased by {aura_change}")
+        
+        message = ". ".join(message_parts)
+        
+        logger.info(f"Successfully unlocked skill for user {user_id}: {message}")
+        
+        return UnlockSkillResponse(
+            success=True,
+            message=message,
+            data=result.to_dict()
+        )
+        
+    except ValueError as e:
+        logger.warning(f"Validation error in unlock_skill: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        if "not found" in str(e).lower():
+            logger.warning(f"User or node not found in unlock_skill: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e)
+            )
+        else:
+            logger.error(f"Unexpected error in unlock_skill: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unexpected error occurred while unlocking skill"
+            )

@@ -17,6 +17,7 @@ class Ascendant(BaseModel):
     - username: Current Discord username
     - level: Main Ascendant Level (progression milestone)
     - global_xp: Total XP earned across all activities
+    - skill_points: Shadow Essence - universal mystical currency (earned from dungeons)
     - strength_points: Points available to spend on STR skill tree nodes
     - endurance_points: Points available to spend on END skill tree nodes  
     - technique_points: Points available to spend on TECH skill tree nodes
@@ -36,6 +37,7 @@ class Ascendant(BaseModel):
     aura = Column(Integer, default=0, nullable=False, index=True)
     
     # Skill tree currency - points earned from leveling and milestones
+    skill_points = Column(Integer, default=0, nullable=False)  # Shadow Essence - earned from dungeons
     strength_points = Column(Integer, default=0, nullable=False)
     endurance_points = Column(Integer, default=0, nullable=False)
     technique_points = Column(Integer, default=0, nullable=False)
@@ -69,7 +71,7 @@ class Ascendant(BaseModel):
     @property
     def total_skill_points(self) -> int:
         """Calculate total skill points available across all trees"""
-        return self.strength_points + self.endurance_points + self.technique_points
+        return self.skill_points + self.strength_points + self.endurance_points + self.technique_points
     
     @property
     def aura_level(self) -> int:

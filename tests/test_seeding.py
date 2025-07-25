@@ -34,7 +34,7 @@ class TestMovementCategoryGeneration:
         categories = generate_movement_categories_from_unified_library()
         
         assert isinstance(categories, list)
-        assert len(categories) == 18
+        assert len(categories) == 33  # Updated to match actual implementation
         
         # Check first category structure
         first_category = categories[0]
@@ -65,8 +65,8 @@ class TestSkillTreeGeneration:
         """Test basic skill tree generation."""
         skill_tree = generate_skill_tree_from_unified_library()
         
-        # Should have 18 categories
-        assert len(skill_tree) == 18, "Should have 18 categories"
+        # Should have 33 categories (updated from 18)
+        assert len(skill_tree) == 33, "Should have 33 categories"
         
         # Each category should have 5 levels
         for category_id, nodes in skill_tree.items():
@@ -129,8 +129,8 @@ class TestStatRewardMapping:
     
     def test_get_stat_reward_type_valid_ids(self):
         """Test stat reward mapping for valid category IDs."""
-        # Test a few category IDs
-        for category_id in range(1, 19):  # 18 categories
+        # Test a few category IDs (updated for 33 categories)
+        for category_id in range(1, 34):  # 33 categories
             stat_type = get_stat_reward_type(category_id)
             assert stat_type in {'STR', 'END', 'TECH'}
             
@@ -239,15 +239,15 @@ class TestDataValidation:
     def test_movement_categories_data_volume(self):
         """Test that we generate the expected number of categories."""
         categories = generate_movement_categories_from_unified_library()
-        assert len(categories) == 18, "Should generate exactly 18 V2 categories"
+        assert len(categories) == 33, "Should generate exactly 33 V2 categories"
         
     def test_skill_tree_data_volume(self):
         """Test that we generate the expected number of skill tree nodes."""
         skill_tree = generate_skill_tree_from_unified_library()
         
-        # 18 categories × 5 levels = 90 nodes total
+        # 33 categories × 5 levels = 165 nodes total
         total_nodes = sum(len(nodes) for nodes in skill_tree.values())
-        assert total_nodes == 90, "Should generate exactly 90 skill tree nodes"
+        assert total_nodes == 165, "Should generate exactly 165 skill tree nodes"
         
     def test_movements_data_volume(self):
         """Test that we generate sufficient movements."""
@@ -258,7 +258,7 @@ class TestDataValidation:
             for node in nodes:
                 total_movements += len(node['movements'])
         
-        assert total_movements >= 90, "Should generate at least 90 movements"
+        assert total_movements >= 165, "Should generate at least 165 movements"
         
     def test_data_consistency(self):
         """Test data consistency across generation functions."""

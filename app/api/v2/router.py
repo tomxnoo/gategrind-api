@@ -6,21 +6,23 @@ all v2 endpoints. It provides a centralized way to manage API versioning
 and endpoint organization.
 """
 from fastapi import APIRouter
+from .movements import router as movements_router
+from .progression import router as progression_router
+from .events import router as events_router
+from .incursions import router as incursions_router
 
-from app.api.v2.movements import router as movements_router
-from app.api.v2.progression import router as progression_router
-from app.api.v2.events import router as events_router
-from app.api.v2.incursions import router as incursions_router
+# Import admin router
+from .admin.skill_requirements import router as admin_skill_requirements_router
 
+# Create the main v2 router
+api_v2_router = APIRouter(prefix="/api/v2")
 
-# Create the main v2 API router
-api_v2_router = APIRouter(prefix="/api")
-
-# Include all v2 routers
+# Include all sub-routers
 api_v2_router.include_router(movements_router)
 api_v2_router.include_router(progression_router)
 api_v2_router.include_router(events_router)
 api_v2_router.include_router(incursions_router)
+api_v2_router.include_router(admin_skill_requirements_router)
 
 # Export for easy import
 __all__ = ["api_v2_router"]

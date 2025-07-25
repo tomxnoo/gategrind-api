@@ -210,9 +210,11 @@ gategrind-api/
 
 ### Environment Configuration (`app/core/config.py`)
 ```python
-from pydantic import BaseSettings
+from pydantic import BaseSettings, ConfigDict
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(env_file=".env")
+    
     # Database
     database_url: str
     database_pool_size: int = 10
@@ -233,9 +235,6 @@ class Settings(BaseSettings):
     # Feature flags
     enable_async_dungeons: bool = True
     enable_daily_login_rewards: bool = True
-    
-    class Config:
-        env_file = ".env"
 ```
 
 ### Development vs Production

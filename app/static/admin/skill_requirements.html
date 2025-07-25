@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GateGrind V2 - Skill Requirements Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .admin-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: #fff;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            border-bottom-color: #4CAF50;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .tab:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: rgba(255,255,255,0.6);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #1976D2;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+            transform: translateY(-2px);
+        }
+
+        .node-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .node-item {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .node-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .node-item.selected {
+            background: rgba(76, 175, 80, 0.3);
+        }
+
+        .node-item h4 {
+            margin-bottom: 5px;
+            color: #4CAF50;
+        }
+
+        .node-item p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .validation-results {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .validation-error {
+            color: #f44336;
+            margin-bottom: 5px;
+        }
+
+        .validation-warning {
+            color: #ff9800;
+            margin-bottom: 5px;
+        }
+
+        .validation-info {
+            color: #2196F3;
+            margin-bottom: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.1rem;
+        }
+
+        .success-message {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+            color: #4CAF50;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            color: #f44336;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .list-input {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .help-text {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 GateGrind V2</h1>
+            <p>Skill Requirements Administration Panel</p>
+        </div>
+
+        <div class="admin-panel">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('view')">View Requirements</button>
+                <button class="tab" onclick="switchTab('edit')">Edit Requirements</button>
+                <button class="tab" onclick="switchTab('validate')">Validate</button>
+                <button class="tab" onclick="switchTab('bulk')">Bulk Operations</button>
+            </div>
+
+            <!-- View Requirements Tab -->
+            <div id="view-tab" class="tab-content active">
+                <h3>Skill Node Requirements</h3>
+                <button class="btn btn-secondary" onclick="loadAllRequirements()">Refresh List</button>
+                <button class="btn btn-danger" onclick="clearCache()">Clear Cache</button>
+                
+                <div id="node-list" class="node-list">
+                    <div class="loading">Click "Refresh List" to load skill nodes</div>
+                </div>
+            </div>
+
+            <!-- Edit Requirements Tab -->
+            <div id="edit-tab" class="tab-content">
+                <h3>Edit Skill Node Requirements</h3>
+                
+                <div class="form-group">
+                    <label for="node-id">Node ID:</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="node-id-dropdown" onchange="selectFromEditDropdown()" style="flex: 1; padding: 10px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(0,0,0,0.3); color: white;">
+                            <option value="">Select a node ID...</option>
+                        </select>
+                        <span style="color: rgba(255,255,255,0.5);">or</span>
+                        <input type="text" id="node-id" placeholder="Enter skill node ID" style="flex: 1;">
+                        <button class="btn btn-secondary" onclick="loadNodeRequirements()">Load Current</button>
+                    </div>
+                </div>
+
+                <form id="requirements-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="str-points">Strength Points:</label>
+                            <input type="number" id="str-points" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="end-points">Endurance Points:</label>
+                            <input type="number" id="end-points" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="tech-points">Technique Points:</label>
+                            <input type="number" id="tech-points" min="0" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                        <label for="skill-points">Shadow Essence:</label>
+                        <input type="number" id="skill-points" min="0" value="0">
+                    </div>
+                        <div class="form-group">
+                            <label for="strength-skill-points">Strength Skill Points:</label>
+                            <input type="number" id="strength-skill-points" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="endurance-skill-points">Endurance Skill Points:</label>
+                            <input type="number" id="endurance-skill-points" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="technique-skill-points">Technique Skill Points:</label>
+                            <input type="number" id="technique-skill-points" min="0" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="min-ascendant-level">Minimum Ascendant Level:</label>
+                            <input type="number" id="min-ascendant-level" min="1" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="min-aura-score">Minimum Aura Score:</label>
+                            <input type="number" id="min-aura-score" min="0" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="prerequisite-nodes">Prerequisite Nodes:</label>
+                        <textarea id="prerequisite-nodes" class="list-input" placeholder="Enter node IDs, one per line"></textarea>
+                        <div class="help-text">Enter prerequisite node IDs, one per line</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="required-quests">Required Quests:</label>
+                        <textarea id="required-quests" class="list-input" placeholder="Enter quest IDs, one per line"></textarea>
+                        <div class="help-text">Enter required quest IDs, one per line</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="required-achievements">Required Achievements:</label>
+                        <textarea id="required-achievements" class="list-input" placeholder="Enter achievement IDs, one per line"></textarea>
+                        <div class="help-text">Enter required achievement IDs, one per line</div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="updateRequirements()">Update Requirements</button>
+                    <button type="button" class="btn btn-secondary" onclick="validateRequirements()">Validate Only</button>
+                </form>
+
+                <div id="edit-results"></div>
+            </div>
+
+            <!-- Validate Tab -->
+            <div id="validate-tab" class="tab-content">
+                <h3>Validate Requirements</h3>
+                <p>Use this tab to validate requirements without making changes.</p>
+                
+                <div class="form-group">
+                    <label for="validate-node-id">Node ID:</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="validate-node-id-dropdown" onchange="selectFromValidateDropdown()" style="flex: 1; padding: 10px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(0,0,0,0.3); color: white;">
+                            <option value="">Select a node ID...</option>
+                        </select>
+                        <span style="color: rgba(255,255,255,0.5);">or</span>
+                        <input type="text" id="validate-node-id" placeholder="Enter skill node ID" style="flex: 1;">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="validateSpecificNode()">Validate Node</button>
+                
+                <div id="validation-results"></div>
+            </div>
+
+            <!-- Bulk Operations Tab -->
+            <div id="bulk-tab" class="tab-content">
+                <h3>Bulk Operations</h3>
+                
+                <div class="form-group">
+                    <label for="bulk-json">Bulk Update JSON:</label>
+                    <textarea id="bulk-json" rows="15" placeholder="Enter JSON for bulk updates..."></textarea>
+                    <div class="help-text">
+                        Format: {"node_id": {"str_points": 10, "end_points": 5, ...}, ...}
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="bulkUpdate()">Execute Bulk Update</button>
+                <button class="btn btn-secondary" onclick="generateBulkTemplate()">Generate Template</button>
+                
+                <div id="bulk-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v2/admin/skill-requirements';
+        let currentNodes = [];
+
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            
+            // Add active class to selected tab
+            event.target.classList.add('active');
+        }
+
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    // Handle different error response formats
+                    let errorMessage = 'API call failed';
+                    
+                    if (typeof result === 'string') {
+                        errorMessage = result;
+                    } else if (result.detail) {
+                        errorMessage = result.detail;
+                    } else if (result.message) {
+                        errorMessage = result.message;
+                    } else if (result.error) {
+                        errorMessage = result.error;
+                    } else {
+                        // If it's an object, try to stringify it properly
+                        errorMessage = JSON.stringify(result, null, 2);
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('API call error:', error);
+                throw error;
+            }
+        }
+
+        async function loadAllRequirements() {
+            const nodeList = document.getElementById('node-list');
+            nodeList.innerHTML = '<div class="loading">Loading skill nodes...</div>';
+            
+            try {
+                const response = await apiCall('/nodes');
+                const nodes = response || [];
+                
+                currentNodes = nodes;
+                
+                if (nodes.length === 0) {
+                    nodeList.innerHTML = '<div class="loading">No skill nodes found</div>';
+                    return;
+                }
+                
+                nodeList.innerHTML = nodes.map(node => `
+                    <div class="node-item" onclick="selectNode('${node.node_id}')">
+                        <h4>${node.node_id}</h4>
+                        <p>STR: ${node.requirements.str_points || 0}, END: ${node.requirements.end_points || 0}, TECH: ${node.requirements.tech_points || 0}</p>
+                        <p>Level: ${node.requirements.min_ascendant_level || 1}, Aura: ${node.requirements.min_aura_score || 0}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                nodeList.innerHTML = `<div class="error-message">Error loading nodes: ${error.message}</div>`;
+            }
+        }
+
+        function selectNode(nodeId) {
+            // Remove previous selection
+            document.querySelectorAll('.node-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Add selection to clicked item
+            event.target.closest('.node-item').classList.add('selected');
+            
+            // Load node data into edit form
+            document.getElementById('node-id').value = nodeId;
+            loadNodeRequirements();
+            
+            // Switch to edit tab
+            switchTab('edit');
+            document.querySelector('.tab:nth-child(2)').classList.add('active');
+        }
+
+        async function loadNodeRequirements() {
+            const nodeId = document.getElementById('node-id').value.trim();
+            if (!nodeId) {
+                alert('Please enter a node ID');
+                return;
+            }
+            
+            try {
+                const response = await apiCall(`/nodes/${nodeId}`);
+                const req = response.requirements;
+                
+                // Populate form fields with correct field mappings
+                document.getElementById('str-points').value = req.str_points || 0;
+                document.getElementById('end-points').value = req.end_points || 0;
+                document.getElementById('tech-points').value = req.tech_points || 0;
+                document.getElementById('skill-points').value = req.skill_points || 0;
+                document.getElementById('strength-skill-points').value = req.strength_skill_points || 0;
+                document.getElementById('endurance-skill-points').value = req.endurance_skill_points || 0;
+                document.getElementById('technique-skill-points').value = req.technique_skill_points || 0;
+                document.getElementById('min-ascendant-level').value = req.min_ascendant_level || 1;
+                document.getElementById('min-aura-score').value = req.min_aura_score || 0;
+                document.getElementById('prerequisite-nodes').value = (req.prerequisite_nodes || []).join('\n');
+                document.getElementById('required-quests').value = (req.required_quests || []).join('\n');
+                document.getElementById('required-achievements').value = (req.required_achievements || []).join('\n');
+                
+                document.getElementById('edit-results').innerHTML = 
+                    '<div class="success-message">Requirements loaded successfully</div>';
+            } catch (error) {
+                document.getElementById('edit-results').innerHTML = 
+                    `<div class="error-message">Error loading requirements: ${error.message}</div>`;
+            }
+        }
+
+        function getFormData() {
+            return {
+                str_points: parseInt(document.getElementById('str-points').value) || 0,
+                end_points: parseInt(document.getElementById('end-points').value) || 0,
+                tech_points: parseInt(document.getElementById('tech-points').value) || 0,
+                skill_points: parseInt(document.getElementById('skill-points').value) || 0,
+                strength_skill_points: parseInt(document.getElementById('strength-skill-points').value) || 0,
+                endurance_skill_points: parseInt(document.getElementById('endurance-skill-points').value) || 0,
+                technique_skill_points: parseInt(document.getElementById('technique-skill-points').value) || 0,
+                min_ascendant_level: parseInt(document.getElementById('min-ascendant-level').value) || 1,
+                min_aura_score: parseInt(document.getElementById('min-aura-score').value) || 0,
+                prerequisite_nodes: document.getElementById('prerequisite-nodes').value.split('\n').filter(s => s.trim()),
+                required_quests: document.getElementById('required-quests').value.split('\n').filter(s => s.trim()),
+                required_achievements: document.getElementById('required-achievements').value.split('\n').filter(s => s.trim())
+            };
+        }
+
+        async function updateRequirements() {
+            const nodeId = document.getElementById('node-id').value.trim();
+            if (!nodeId) {
+                alert('Please enter a node ID');
+                return;
+            }
+            
+            try {
+                const data = getFormData();
+                await apiCall(`/nodes/${nodeId}`, 'PUT', data);
+                
+                document.getElementById('edit-results').innerHTML = 
+                    '<div class="success-message">Requirements updated successfully</div>';
+            } catch (error) {
+                document.getElementById('edit-results').innerHTML = 
+                    `<div class="error-message">Error updating requirements: ${error.message}</div>`;
+            }
+        }
+
+        async function validateRequirements() {
+            const nodeId = document.getElementById('node-id').value.trim();
+            if (!nodeId) {
+                alert('Please enter a node ID');
+                return;
+            }
+            
+            try {
+                const data = getFormData();
+                const results = await apiCall(`/validate/${nodeId}`, 'POST', data);
+                
+                displayValidationResults(results, 'edit-results');
+            } catch (error) {
+                document.getElementById('edit-results').innerHTML = 
+                    `<div class="error-message">Error validating requirements: ${error.message}</div>`;
+            }
+        }
+
+        async function validateSpecificNode() {
+            const nodeId = document.getElementById('validate-node-id').value.trim();
+            if (!nodeId) {
+                alert('Please enter a node ID');
+                return;
+            }
+            
+            try {
+                // First load the node's current requirements
+                const response = await apiCall(`/nodes/${nodeId}`);
+                const results = await apiCall(`/validate/${nodeId}`, 'POST', response.requirements);
+                
+                displayValidationResults(results, 'validation-results');
+            } catch (error) {
+                document.getElementById('validation-results').innerHTML = 
+                    `<div class="error-message">Error validating node: ${error.message}</div>`;
+            }
+        }
+
+        function displayValidationResults(results, containerId) {
+            const container = document.getElementById(containerId);
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="success-message">All validations passed!</div>';
+                return;
+            }
+            
+            const html = `
+                <div class="validation-results">
+                    <h4>Validation Results:</h4>
+                    ${results.map(result => `
+                        <div class="validation-${result.severity}">
+                            <strong>${result.field}:</strong> ${result.message}
+                            ${result.suggestion ? `<br><em>Suggestion: ${result.suggestion}</em>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        async function bulkUpdate() {
+            const jsonText = document.getElementById('bulk-json').value.trim();
+            if (!jsonText) {
+                alert('Please enter JSON data for bulk update');
+                return;
+            }
+            
+            try {
+                const updates = JSON.parse(jsonText);
+                const result = await apiCall('/bulk-update', 'POST', { updates });
+                
+                const html = `
+                    <div class="validation-results">
+                        <h4>Bulk Update Results:</h4>
+                        <div class="success-message">
+                            <strong>Successful Updates (${result.successful_updates.length}):</strong>
+                            ${result.successful_updates.join(', ') || 'None'}
+                        </div>
+                        ${Object.keys(result.failed_updates).length > 0 ? `
+                            <div class="error-message">
+                                <strong>Failed Updates:</strong>
+                                ${Object.entries(result.failed_updates).map(([nodeId, error]) => 
+                                    `<br>${nodeId}: ${error}`
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                        ${Object.keys(result.validation_warnings).length > 0 ? `
+                            <div class="validation-results">
+                                <strong>Warnings:</strong>
+                                ${Object.entries(result.validation_warnings).map(([nodeId, warnings]) => 
+                                    `<br><strong>${nodeId}:</strong> ${warnings.map(w => w.message).join(', ')}`
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                document.getElementById('bulk-results').innerHTML = html;
+            } catch (error) {
+                document.getElementById('bulk-results').innerHTML = 
+                    `<div class="error-message">Error in bulk update: ${error.message}</div>`;
+            }
+        }
+
+        function generateBulkTemplate() {
+            const template = {
+                "example_node_1": {
+                    "str_points": 10,
+                    "end_points": 5,
+                    "tech_points": 8,
+                    "skill_points": 15,
+                    "strength_skill_points": 3,
+                    "endurance_skill_points": 2,
+                    "technique_skill_points": 4,
+                    "min_ascendant_level": 5,
+                    "min_aura_score": 100,
+                    "prerequisite_nodes": ["prerequisite_node_1"],
+                    "required_quests": ["quest_1", "quest_2"],
+                    "required_achievements": ["achievement_1"]
+                },
+                "example_node_2": {
+                    "str_points": 15,
+                    "end_points": 10,
+                    "tech_points": 12,
+                    "skill_points": 25,
+                    "strength_skill_points": 5,
+                    "endurance_skill_points": 3,
+                    "technique_skill_points": 6,
+                    "min_ascendant_level": 8,
+                    "min_aura_score": 200,
+                    "prerequisite_nodes": ["prerequisite_node_2", "prerequisite_node_3"],
+                    "required_quests": [],
+                    "required_achievements": []
+                }
+            };
+            
+            document.getElementById('bulk-json').value = JSON.stringify(template, null, 2);
+        }
+
+        async function clearCache() {
+            try {
+                await apiCall('/cache', 'DELETE');
+                alert('Cache cleared successfully');
+            } catch (error) {
+                alert(`Error clearing cache: ${error.message}`);
+            }
+        }
+
+        // Dropdown functions for node ID selection
+        async function populateNodeDropdowns() {
+            try {
+                const response = await apiCall('/nodes');
+                const nodes = response || [];
+                
+                // Extract node IDs from the array
+                const nodeIds = nodes.map(node => node.node_id);
+                
+                const editDropdown = document.getElementById('node-id-dropdown');
+                const validateDropdown = document.getElementById('validate-node-id-dropdown');
+                
+                // Clear existing options (except the first placeholder)
+                editDropdown.innerHTML = '<option value="">Select a node ID...</option>';
+                validateDropdown.innerHTML = '<option value="">Select a node ID...</option>';
+                
+                // Add node IDs to both dropdowns
+                nodeIds.forEach(nodeId => {
+                    const editOption = document.createElement('option');
+                    editOption.value = nodeId;
+                    editOption.textContent = nodeId;
+                    editDropdown.appendChild(editOption);
+                    
+                    const validateOption = document.createElement('option');
+                    validateOption.value = nodeId;
+                    validateOption.textContent = nodeId;
+                    validateDropdown.appendChild(validateOption);
+                });
+            } catch (error) {
+                console.error('Error populating dropdowns:', error);
+            }
+        }
+
+        function selectFromEditDropdown() {
+            const dropdown = document.getElementById('node-id-dropdown');
+            const textInput = document.getElementById('node-id');
+            
+            if (dropdown.value) {
+                textInput.value = dropdown.value;
+            }
+        }
+
+        function selectFromValidateDropdown() {
+            const dropdown = document.getElementById('validate-node-id-dropdown');
+            const textInput = document.getElementById('validate-node-id');
+            
+            if (dropdown.value) {
+                textInput.value = dropdown.value;
+            }
+        }
+
+        // Load initial data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAllRequirements();
+            populateNodeDropdowns();
+        });
+    </script>
+</body>
+</html>

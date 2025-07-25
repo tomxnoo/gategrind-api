@@ -1,0 +1,236 @@
+{
+  "mobility_flow_1": {
+    "end_points": 0,
+    "endurance_skill_points": 0,
+    "min_ascendant_level": 1,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 0,
+    "str_points": 0,
+    "strength_skill_points": 0,
+    "tech_points": 0,
+    "technique_skill_points": 0
+  },
+  "mobility_flow_2": {
+    "end_points": 500,
+    "endurance_skill_points": 1,
+    "min_ascendant_level": 3,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "mobility_flow_1"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 3,
+    "str_points": 250,
+    "strength_skill_points": 0,
+    "tech_points": 500,
+    "technique_skill_points": 2
+  },
+  "mobility_flow_3": {
+    "end_points": 1000,
+    "endurance_skill_points": 3,
+    "min_ascendant_level": 6,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "mobility_flow_2"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 8,
+    "str_points": 500,
+    "strength_skill_points": 1,
+    "tech_points": 1000,
+    "technique_skill_points": 4
+  },
+  "mobility_flow_4": {
+    "end_points": 1500,
+    "endurance_skill_points": 5,
+    "min_ascendant_level": 9,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "mobility_flow_3"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 15,
+    "str_points": 750,
+    "strength_skill_points": 2,
+    "tech_points": 1500,
+    "technique_skill_points": 8
+  },
+  "mobility_flow_5": {
+    "end_points": 2000,
+    "endurance_skill_points": 8,
+    "min_ascendant_level": 12,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "mobility_flow_4"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 25,
+    "str_points": 1000,
+    "strength_skill_points": 3,
+    "tech_points": 2000,
+    "technique_skill_points": 14
+  },
+  "pull_vertical_1": {
+    "end_points": 0,
+    "endurance_skill_points": 0,
+    "min_ascendant_level": 1,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 0,
+    "str_points": 0,
+    "strength_skill_points": 0,
+    "tech_points": 0,
+    "technique_skill_points": 0
+  },
+  "pull_vertical_2": {
+    "end_points": 250,
+    "endurance_skill_points": 1,
+    "min_ascendant_level": 4,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "pull_vertical_1"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 3,
+    "str_points": 500,
+    "strength_skill_points": 3,
+    "tech_points": 250,
+    "technique_skill_points": 0
+  },
+  "pull_vertical_3": {
+    "end_points": 500,
+    "endurance_skill_points": 2,
+    "min_ascendant_level": 7,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "pull_vertical_2"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 8,
+    "str_points": 1000,
+    "strength_skill_points": 5,
+    "tech_points": 500,
+    "technique_skill_points": 1
+  },
+  "pull_vertical_4": {
+    "end_points": 750,
+    "endurance_skill_points": 3,
+    "min_ascendant_level": 10,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "pull_vertical_3"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 15,
+    "str_points": 1500,
+    "strength_skill_points": 10,
+    "tech_points": 750,
+    "technique_skill_points": 2
+  },
+  "pull_vertical_5": {
+    "end_points": 1000,
+    "endurance_skill_points": 4,
+    "min_ascendant_level": 13,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "pull_vertical_4"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 25,
+    "str_points": 2000,
+    "strength_skill_points": 18,
+    "tech_points": 1000,
+    "technique_skill_points": 3
+  },
+  "upper_dynamic_1": {
+    "end_points": 0,
+    "endurance_skill_points": 0,
+    "min_ascendant_level": 1,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 0,
+    "str_points": 0,
+    "strength_skill_points": 0,
+    "tech_points": 0,
+    "technique_skill_points": 0
+  },
+  "upper_dynamic_2": {
+    "end_points": 250,
+    "endurance_skill_points": 0,
+    "min_ascendant_level": 4,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "upper_dynamic_1"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 3,
+    "str_points": 500,
+    "strength_skill_points": 2,
+    "tech_points": 250,
+    "technique_skill_points": 1
+  },
+  "upper_dynamic_3": {
+    "end_points": 500,
+    "endurance_skill_points": 1,
+    "min_ascendant_level": 7,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "upper_dynamic_2"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 8,
+    "str_points": 1000,
+    "strength_skill_points": 5,
+    "tech_points": 500,
+    "technique_skill_points": 2
+  },
+  "upper_dynamic_4": {
+    "end_points": 750,
+    "endurance_skill_points": 2,
+    "min_ascendant_level": 10,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "upper_dynamic_3"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 15,
+    "str_points": 1500,
+    "strength_skill_points": 10,
+    "tech_points": 750,
+    "technique_skill_points": 3
+  },
+  "upper_dynamic_5": {
+    "end_points": 1000,
+    "endurance_skill_points": 3,
+    "min_ascendant_level": 13,
+    "min_aura_score": 0,
+    "prerequisite_nodes": [
+      "upper_dynamic_4"
+    ],
+    "required_achievements": [],
+    "required_quests": [],
+    "skill_points": 25,
+    "str_points": 2000,
+    "strength_skill_points": 18,
+    "tech_points": 1000,
+    "technique_skill_points": 4
+  }
+}

@@ -10,7 +10,7 @@ This module provides:
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.application.services.incursion_service import IncursionService
 from app.application.services.incursion_scheduler import IncursionScheduler, SpawnCooldownConfig
@@ -36,6 +36,8 @@ class IncursionCreateRequest(BaseModel):
 
 class IncursionResponse(BaseModel):
     """Response model for incursion data."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     incursion_id: str
     title: str
@@ -56,9 +58,6 @@ class IncursionResponse(BaseModel):
     is_completed: bool
     participant_count: int
     metadata: Dict[str, Any]
-
-    class Config:
-        from_attributes = True
 
 
 class ParticipantContributionRequest(BaseModel):
@@ -97,7 +96,7 @@ class ForceSpawnRequest(BaseModel):
 
 
 # Router setup
-router = APIRouter(prefix="/api/v2/incursions", tags=["incursions"])
+router = APIRouter(prefix="/incursions", tags=["incursions"])
 
 # Global scheduler instance (will be initialized by the application)
 _scheduler: Optional[IncursionScheduler] = None

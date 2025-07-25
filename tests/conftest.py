@@ -79,6 +79,7 @@ def sample_movement_category_data():
 def sample_skill_tree_node_data(sample_movement_category_data):
     """Sample data for creating a SkillTreeNode."""
     return {
+        "node_id": "PULL_VERTICAL_1",
         "category_id": sample_movement_category_data["id"],
         "level": 1,
         "name": "Foundation",
