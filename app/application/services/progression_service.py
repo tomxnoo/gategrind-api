@@ -38,6 +38,7 @@ class ProgressionResult:
         self.stat_rewards_awarded: Dict[str, int] = {}  # NEW: Direct stat rewards (Approach A)
         self.new_aura: int = 0
         self.previous_aura: int = 0
+        self.aura_change_reason: str = ""  # NEW: Track why aura changed
         # New fields for skill unlocking
         self.skill_points_deducted: Optional[Dict[str, int]] = None
         self.unlock_message: Optional[str] = None
@@ -53,10 +54,11 @@ class ProgressionResult:
             "stat_points_awarded": self.stat_points_awarded,
             "milestone_rewards": self.milestone_rewards,
             "stat_rewards_awarded": self.stat_rewards_awarded,  # NEW: Direct stat rewards
-            "aura_change": {
-                "previous": self.previous_aura,
-                "new": self.new_aura,
-                "difference": self.new_aura - self.previous_aura
+            "aura_update": {  # Updated to match Story 4.2 format
+                "previous_aura": self.previous_aura,
+                "new_aura": self.new_aura,
+                "change": self.new_aura - self.previous_aura,
+                "reason": self.aura_change_reason
             }
         }
         
@@ -123,6 +125,7 @@ class ProgressionService(BaseService):
             'end_reward': end_reward,
             'tech_reward': tech_reward
         }
+        result.aura_change_reason = "Stat rewards"  # Set aura change reason
         
         try:
             # Execute all progression logic in a single transaction
@@ -251,6 +254,7 @@ class ProgressionService(BaseService):
         result.user_id = user_id
         result.xp_added = amount
         result.category = category
+        result.aura_change_reason = f"{category.title()} progression"  # Set aura change reason
         
         try:
             # Execute all progression logic in a single transaction
@@ -523,11 +527,8 @@ class ProgressionService(BaseService):
         """
         Calculate and update the user's Aura score.
         
-        Aura calculation formula:
-        - Base aura = user.level * 10
-        - Stat bonus = (str_level + end_level + tech_level) * 5
-        - Skill bonus = unlocked_skills_count * 15
-        - Achievement bonus = calculated separately (placeholder for now)
+        Aura calculation formula (Story 4.1):
+        (Level * 100) + (STR*10 + END*10 + TECH*5) + (Nodes Unlocked * 25)
         
         Args:
             session: Database session
@@ -536,26 +537,26 @@ class ProgressionService(BaseService):
         Returns:
             int: New aura value
         """
-        # Base aura from main level
-        base_aura = user.level * 10
+        # Base aura from main level: Level * 100
+        base_aura = (user.level or 1) * 100
         
-        # Stat bonus from individual stat levels
+        # Stat bonus: STR*10 + END*10 + TECH*5
         stat_bonus = 0
         if user.stats:
             stat_bonus = (
-                (user.stats.str_level or 1) * 5 +
-                (user.stats.end_level or 1) * 5 +
-                (user.stats.tech_level or 1) * 5
+                (user.stats.str_level or 1) * 10 +  # STR * 10
+                (user.stats.end_level or 1) * 10 +  # END * 10
+                (user.stats.tech_level or 1) * 5    # TECH * 5
             )
+        else:
+            # Default stat levels are 1 if no stats record exists
+            stat_bonus = 1 * 10 + 1 * 10 + 1 * 5  # 25
         
-        # Skill bonus from unlocked skill tree nodes
+        # Skill bonus from unlocked skill tree nodes: Nodes Unlocked * 25
         skill_bonus = await self._calculate_skill_bonus(session, user.id)
         
-        # Achievement bonus (placeholder for future implementation)
-        achievement_bonus = 0
-        
-        # Calculate total aura
-        new_aura = base_aura + stat_bonus + skill_bonus + achievement_bonus
+        # Calculate total aura using the exact formula from Story 4.1
+        new_aura = base_aura + stat_bonus + skill_bonus
         
         # Update user's aura
         user.aura = new_aura
@@ -566,14 +567,15 @@ class ProgressionService(BaseService):
         return new_aura
     
     async def _calculate_skill_bonus(self, session: AsyncSession, user_id: int) -> int:
-        """Calculate aura bonus from unlocked skills."""
+        """Calculate aura bonus from unlocked skills: Nodes Unlocked * 25."""
         try:
             # Count unlocked skill tree nodes
             stmt = select(UserSkillProgress).where(UserSkillProgress.ascendant_id == user_id)
             result = await session.execute(stmt)
             unlocked_skills = result.scalars().all()
             
-            return len(unlocked_skills) * 15
+            # Story 4.1 formula: Nodes Unlocked * 25
+            return len(unlocked_skills) * 25
             
         except Exception as e:
             self.logger.warning(f"Error calculating skill bonus for user {user_id}: {e}")
@@ -706,6 +708,7 @@ class ProgressionService(BaseService):
         result = ProgressionResult()
         result.user_id = user_id
         result.category = "skill_unlock"
+        result.aura_change_reason = "Skill tree progression"  # Set aura change reason
         
         try:
             async def unlock_transaction(session: AsyncSession):
@@ -974,61 +977,15 @@ class ProgressionService(BaseService):
         
         return total_xp
     
-    async def _calculate_and_update_aura(self, session: AsyncSession, user: Ascendant) -> int:
-        """
-        Calculate and update the user's Aura score.
-        
-        Aura calculation formula:
-        - Base aura = user.level * 10
-        - Stat bonus = (str_level + end_level + tech_level) * 5
-        - Skill bonus = unlocked_skills_count * 15
-        - Achievement bonus = calculated separately (placeholder for now)
-        
-        Args:
-            session: Database session
-            user: User object with stats loaded
-            
-        Returns:
-            int: New aura value
-        """
-        # Base aura from main level
-        base_aura = user.level * 10
-        
-        # Stat bonus from individual stat levels
-        stat_bonus = 0
-        if user.stats:
-            stat_bonus = (
-                (user.stats.str_level or 1) * 5 +
-                (user.stats.end_level or 1) * 5 +
-                (user.stats.tech_level or 1) * 5
-            )
-        
-        # Skill bonus from unlocked skill tree nodes
-        skill_bonus = await self._calculate_skill_bonus(session, user.id)
-        
-        # Achievement bonus (placeholder for future implementation)
-        achievement_bonus = 0
-        
-        # Calculate total aura
-        new_aura = base_aura + stat_bonus + skill_bonus + achievement_bonus
-        
-        # Update user's aura
-        user.aura = new_aura
-        
-        self.logger.info(f"Updated aura for user {user.id}: base={base_aura}, "
-                        f"stat={stat_bonus}, skill={skill_bonus}, total={new_aura}")
-        
-        return new_aura
-    
     async def _calculate_skill_bonus(self, session: AsyncSession, user_id: int) -> int:
-        """Calculate aura bonus from unlocked skills."""
+        """Calculate aura bonus from unlocked skills: Nodes Unlocked * 25."""
         try:
             # Count unlocked skill tree nodes
             stmt = select(UserSkillProgress).where(UserSkillProgress.ascendant_id == user_id)
             result = await session.execute(stmt)
             unlocked_skills = result.scalars().all()
             
-            return len(unlocked_skills) * 15
+            return len(unlocked_skills) * 25
             
         except Exception as e:
             self.logger.warning(f"Error calculating skill bonus for user {user_id}: {e}")

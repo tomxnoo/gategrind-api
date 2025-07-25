@@ -44,7 +44,7 @@ class TestProgressionService:
             username="testuser",
             level=5,
             global_xp=1000,
-            aura=65,  # Correct calculated aura for user with default stats: (5*10) + (1+1+1)*5 = 50 + 15 = 65
+            aura=525,  # Correct calculated aura for user with default stats: (5*100) + (1*10+1*10+1*5) + (0*25) = 500 + 25 + 0 = 525
             strength_points=10,
             endurance_points=10,
             technique_points=10,
@@ -201,7 +201,7 @@ class TestProgressionService:
     
     @pytest.mark.asyncio
     async def test_aura_calculation(self, progression_service, mock_session, user_with_stats):
-        """Test aura calculation and update."""
+        """Test aura calculation and update using Story 4.1 formula."""
         # Mock skill progress query
         mock_skill_result = MagicMock()
         mock_skill_result.scalars.return_value.all.return_value = [
@@ -213,12 +213,13 @@ class TestProgressionService:
         # Calculate aura
         new_aura = await progression_service._calculate_and_update_aura(mock_session, user_with_stats)
         
-        # Verify calculation
-        # Base: level 5 * 10 = 50
-        # Stats: (3 + 2 + 4) * 5 = 45
-        # Skills: 2 * 15 = 30
-        # Total: 50 + 45 + 30 = 125
-        expected_aura = 125
+        # Verify calculation using Story 4.1 formula:
+        # (Level * 100) + (STR*10 + END*10 + TECH*5) + (Nodes Unlocked * 25)
+        # Base: level 5 * 100 = 500
+        # Stats: (3*10 + 2*10 + 4*5) = 30 + 20 + 20 = 70
+        # Skills: 2 * 25 = 50
+        # Total: 500 + 70 + 50 = 620
+        expected_aura = 620
         assert new_aura == expected_aura
         assert user_with_stats.aura == expected_aura
     
@@ -462,7 +463,7 @@ class TestMilestoneProgression:
             username="testuser",
             level=5,
             global_xp=1000,
-            aura=65,  # Correct calculated aura for user with default stats: (5*10) + (1+1+1)*5 = 50 + 15 = 65
+            aura=525,  # Correct calculated aura: (5*100) + (1*10+1*10+1*5) + (0*25) = 500 + 25 + 0 = 525
             strength_points=10,
             endurance_points=10,
             technique_points=10,

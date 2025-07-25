@@ -57,7 +57,7 @@ def sample_ascendant_data():
         "username": "test_user",
         "level": 5,
         "global_xp": 1000,
-        "aura": 50,
+        "aura": 525,  # Correct calculated aura: (5*100) + (1*10+1*10+1*5) + (0*25) = 500 + 25 + 0 = 525
         "strength_points": 3,
         "endurance_points": 2,
         "technique_points": 1,

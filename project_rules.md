@@ -1,3 +1,5 @@
+project_rules.md
+
 # Project Rules & Guidelines
 
 ## Version Control

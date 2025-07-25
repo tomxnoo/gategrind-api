@@ -43,6 +43,14 @@ async def get_progression_service() -> ProgressionService:
 
 
 # Request/Response Models
+class AuraUpdateInfo(BaseModel):
+    """Model for aura update information in API responses."""
+    previous_aura: float = Field(..., description="Previous aura value")
+    new_aura: float = Field(..., description="New aura value after update")
+    change: float = Field(..., description="Change in aura value")
+    reason: str = Field(..., description="Reason for aura change")
+
+
 class AddXPRequest(BaseModel):
     """Request model for adding XP to a user."""
     user_id: int = Field(..., description="User's database ID", gt=0)
