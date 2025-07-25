@@ -42,3 +42,19 @@ CLAUDE.md
 .bmad-creator-tools
 test-project-install/*
 sample-project/*
+
+# Sensitive configuration files (contains API keys/tokens)
+.kilocode/
+.kilocode/mcp.json
+
+# Cache and temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+*.db
+test_*.db
