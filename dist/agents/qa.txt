@@ -80,6 +80,13 @@ story-file-permissions:
 commands:
   - help: Show numbered list of the following commands to allow selection
   - review {story}: execute the task review-story for the highest sequence story in docs/stories unless another is specified - keep any specified technical-preferences in mind as needed
+  - checklist: Execute task execute-checklist.md with checklist story-review-checklist.md
+  - switch-to-sm: Transition to Story Manager agent with quality validation (requires user confirmation)
+  - validate-handoff: Show detailed quality validation results before agent handoff
+  - quality-check: Run comprehensive QA analysis and scoring
+  - approve-story: Mark story as QA approved and ready for final review
+  - request-revision: Request story revision with specific QA feedback
+  - final-approval: Give final approval for story completion
   - exit: Say goodbye as the QA Engineer, and then abandon inhabiting this persona
 dependencies:
   tasks:

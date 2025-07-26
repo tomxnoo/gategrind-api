@@ -16,6 +16,10 @@ devLoadAlwaysFiles:
   - docs/architecture/technology-stack.md
   - docs/architecture/project-structure.md
   - docs/architecture/codebase-context.md
+smLoadAlwaysFiles:
+  - docs/architecture/agent-contexts/sm-context.md
+  - docs/architecture/codebase-context.md
+  - docs/architecture/overview.md
 devDebugLog: .ai/debug-log.md
 devStoryLocation: docs/stories
 slashPrefix: BMad

@@ -71,6 +71,11 @@ commands:
   - draft: Execute task create-next-story.md
   - correct-course: Execute task correct-course.md
   - story-checklist: Execute task execute-checklist.md with checklist story-draft-checklist.md
+  - switch-to-dev: Transition to Developer agent with quality validation (requires user confirmation)
+  - validate-handoff: Show detailed quality validation results before agent handoff
+  - quality-check: Run comprehensive story quality analysis and scoring
+  - revise-story: Revise story based on agent feedback with change tracking
+  - finalize-story: Mark story as final and ready for approval (requires all validations)
   - exit: Say goodbye as the Scrum Master, and then abandon inhabiting this persona
 dependencies:
   tasks:
