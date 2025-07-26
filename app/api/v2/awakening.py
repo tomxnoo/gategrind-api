@@ -15,7 +15,7 @@ from app.application.services.awakening_service import AwakeningService
 from app.application.services.progression_service import ProgressionService
 from app.infrastructure.database.session import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.dependencies.auth import get_current_user_id
+from app.api.v2.dependencies.auth import get_current_user_id
 
 
 # Configure logging

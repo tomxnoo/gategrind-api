@@ -11,12 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.session import get_async_session
 from app.application.services.movement_logging_service import MovementLoggingService
-from api.schemas.v2.movement_logging_schemas import (
+from app.api.v2.schemas.movement_logging_schemas import (
     LogMovementRequest,
     LogMovementResponse,
     ErrorResponse
 )
-from api.dependencies.auth import get_current_user_id
+from app.api.v2.dependencies.auth import get_current_user_id
 
 
 logger = logging.getLogger(__name__)

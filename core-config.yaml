@@ -1,6 +1,6 @@
 markdownExploder: true
 prd:
-  prdFile: docs/prd.md
+  prdFile: docs/greenfield-prd.md
   prdVersion: v4
   prdSharded: true
   prdShardedLocation: docs/prd
@@ -12,10 +12,9 @@ architecture:
   architectureShardedLocation: docs/architecture
 customTechnicalDocuments: null
 devLoadAlwaysFiles:
-  - docs/architecture/overview.md
-  - docs/architecture/technology-stack.md
-  - docs/architecture/project-structure.md
-  - docs/architecture/codebase-context.md
+  - docs/architecture/coding-standards.md
+  - docs/architecture/tech-stack.md
+  - docs/architecture/unified-project-structure.md
 devDebugLog: .ai/debug-log.md
 devStoryLocation: docs/stories
 slashPrefix: BMad

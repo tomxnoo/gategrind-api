@@ -17,7 +17,7 @@ import logging
 from app.application.services.awakening_service import AwakeningService
 from app.application.services.awakening_admin_service import AwakeningAdminService
 from app.infrastructure.database.session import get_db
-from app.api.dependencies.auth import get_current_user
+from app.api.v2.dependencies.auth import get_current_user
 from app.api.dependencies.admin import require_admin
 from app.api.v2.schemas.awakening import (
     AwakeningActionRequest,

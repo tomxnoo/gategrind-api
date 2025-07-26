@@ -47,12 +47,14 @@ persona:
 commands:  
   - help: Show numbered list of the following commands to allow selection
   - draft: Execute task create-next-story.md
+  - multi: Execute automated multi-agent epic drafting workflow with @sm, @dev, @qa collaboration
   - correct-course: Execute task correct-course.md
   - story-checklist: Execute task execute-checklist.md with checklist story-draft-checklist.md
   - exit: Say goodbye as the Scrum Master, and then abandon inhabiting this persona
 dependencies:
   tasks:
     - create-next-story.md
+    - multi-agent-epic-workflow.md
     - execute-checklist.md
     - correct-course.md
   templates:

@@ -8,11 +8,20 @@ const configLoader = require("./config-loader");
 const { extractYamlFromAgent } = require("../../lib/yaml-utils");
 const BaseIdeSetup = require("./ide-base-setup");
 const resourceLocator = require("./resource-locator");
+const moduleManager = require("./module-manager");
 
 class IdeSetup extends BaseIdeSetup {
   constructor() {
     super();
     this.ideAgentConfig = null;
+    this._globModules = null;
+  }
+
+  async getGlobModules() {
+    if (!this._globModules) {
+      this._globModules = await moduleManager.getModules(['globSync']);
+    }
+    return this._globModules;
   }
 
   async loadIdeAgentConfig() {
@@ -305,8 +314,8 @@ class IdeSetup extends BaseIdeSetup {
     ];
     
     // Also check expansion pack directories
-    const glob = require("glob");
-    const expansionDirs = glob.sync(".*/agents", { cwd: installDir });
+    const { globSync } = await this.getGlobModules();
+    const expansionDirs = globSync(".*/agents", { cwd: installDir });
     for (const expDir of expansionDirs) {
       possiblePaths.push(path.join(installDir, expDir, `${agentId}.md`));
     }
@@ -321,7 +330,7 @@ class IdeSetup extends BaseIdeSetup {
   }
 
   async getAllAgentIds(installDir) {
-    const glob = require("glob");
+    const { globSync } = await this.getGlobModules();
     const allAgentIds = [];
     
     // Check core agents in .bmad-core or root
@@ -331,15 +340,15 @@ class IdeSetup extends BaseIdeSetup {
     }
     
     if (await fileManager.pathExists(agentsDir)) {
-      const agentFiles = glob.sync("*.md", { cwd: agentsDir });
+      const agentFiles = globSync("*.md", { cwd: agentsDir });
       allAgentIds.push(...agentFiles.map((file) => path.basename(file, ".md")));
     }
     
     // Also check for expansion pack agents in dot folders
-    const expansionDirs = glob.sync(".*/agents", { cwd: installDir });
+    const expansionDirs = globSync(".*/agents", { cwd: installDir });
     for (const expDir of expansionDirs) {
       const fullExpDir = path.join(installDir, expDir);
-      const expAgentFiles = glob.sync("*.md", { cwd: fullExpDir });
+      const expAgentFiles = globSync("*.md", { cwd: fullExpDir });
       allAgentIds.push(...expAgentFiles.map((file) => path.basename(file, ".md")));
     }
     
@@ -357,8 +366,8 @@ class IdeSetup extends BaseIdeSetup {
     }
     
     if (await fileManager.pathExists(agentsDir)) {
-      const glob = require("glob");
-      const agentFiles = glob.sync("*.md", { cwd: agentsDir });
+      const { globSync } = await this.getGlobModules();
+      const agentFiles = globSync("*.md", { cwd: agentsDir });
       allAgentIds.push(...agentFiles.map((file) => path.basename(file, ".md")));
     }
     
@@ -375,15 +384,16 @@ class IdeSetup extends BaseIdeSetup {
     }
     
     if (await fileManager.pathExists(tasksDir)) {
-      const glob = require("glob");
-      const taskFiles = glob.sync("*.md", { cwd: tasksDir });
+      const { globSync } = await this.getGlobModules();
+      const taskFiles = globSync("*.md", { cwd: tasksDir });
       allTaskIds.push(...taskFiles.map((file) => path.basename(file, ".md")));
     }
     
     // Check common tasks
     const commonTasksDir = path.join(installDir, "common", "tasks");
     if (await fileManager.pathExists(commonTasksDir)) {
-      const commonTaskFiles = glob.sync("*.md", { cwd: commonTasksDir });
+      const { globSync } = await this.getGlobModules();
+      const commonTaskFiles = globSync("*.md", { cwd: commonTasksDir });
       allTaskIds.push(...commonTaskFiles.map((file) => path.basename(file, ".md")));
     }
     
@@ -398,8 +408,8 @@ class IdeSetup extends BaseIdeSetup {
     ];
     
     // Also check expansion pack directories
-    const glob = require("glob");
-    const expansionDirs = glob.sync(".*/agents", { cwd: installDir });
+    const { globSync } = await this.getGlobModules();
+    const expansionDirs = globSync(".*/agents", { cwd: installDir });
     for (const expDir of expansionDirs) {
       possiblePaths.push(path.join(installDir, expDir, `${agentId}.md`));
     }
@@ -430,7 +440,7 @@ class IdeSetup extends BaseIdeSetup {
   }
 
   async getAllTaskIds(installDir) {
-    const glob = require("glob");
+    const { globSync } = await this.getGlobModules();
     const allTaskIds = [];
     
     // Check core tasks in .bmad-core or root
@@ -440,32 +450,32 @@ class IdeSetup extends BaseIdeSetup {
     }
     
     if (await fileManager.pathExists(tasksDir)) {
-      const taskFiles = glob.sync("*.md", { cwd: tasksDir });
+      const taskFiles = globSync("*.md", { cwd: tasksDir });
       allTaskIds.push(...taskFiles.map((file) => path.basename(file, ".md")));
     }
     
     // Check common tasks
     const commonTasksDir = path.join(installDir, "common", "tasks");
     if (await fileManager.pathExists(commonTasksDir)) {
-      const commonTaskFiles = glob.sync("*.md", { cwd: commonTasksDir });
+      const commonTaskFiles = globSync("*.md", { cwd: commonTasksDir });
       allTaskIds.push(...commonTaskFiles.map((file) => path.basename(file, ".md")));
     }
     
     // Also check for expansion pack tasks in dot folders
-    const expansionDirs = glob.sync(".*/tasks", { cwd: installDir });
+    const expansionDirs = globSync(".*/tasks", { cwd: installDir });
     for (const expDir of expansionDirs) {
       const fullExpDir = path.join(installDir, expDir);
-      const expTaskFiles = glob.sync("*.md", { cwd: fullExpDir });
+      const expTaskFiles = globSync("*.md", { cwd: fullExpDir });
       allTaskIds.push(...expTaskFiles.map((file) => path.basename(file, ".md")));
     }
     
     // Check expansion-packs folder tasks
     const expansionPacksDir = path.join(installDir, "expansion-packs");
     if (await fileManager.pathExists(expansionPacksDir)) {
-      const expPackDirs = glob.sync("*/tasks", { cwd: expansionPacksDir });
+      const expPackDirs = globSync("*/tasks", { cwd: expansionPacksDir });
       for (const expDir of expPackDirs) {
         const fullExpDir = path.join(expansionPacksDir, expDir);
-        const expTaskFiles = glob.sync("*.md", { cwd: fullExpDir });
+        const expTaskFiles = globSync("*.md", { cwd: fullExpDir });
         allTaskIds.push(...expTaskFiles.map((file) => path.basename(file, ".md")));
       }
     }
@@ -483,10 +493,10 @@ class IdeSetup extends BaseIdeSetup {
     ];
     
     // Also check expansion pack directories
-    const glob = require("glob");
+    const { globSync } = await this.getGlobModules();
     
     // Check dot folder expansion packs
-    const expansionDirs = glob.sync(".*/tasks", { cwd: installDir });
+    const expansionDirs = globSync(".*/tasks", { cwd: installDir });
     for (const expDir of expansionDirs) {
       possiblePaths.push(path.join(installDir, expDir, `${taskId}.md`));
     }
@@ -494,7 +504,7 @@ class IdeSetup extends BaseIdeSetup {
     // Check expansion-packs folder
     const expansionPacksDir = path.join(installDir, "expansion-packs");
     if (await fileManager.pathExists(expansionPacksDir)) {
-      const expPackDirs = glob.sync("*/tasks", { cwd: expansionPacksDir });
+      const expPackDirs = globSync("*/tasks", { cwd: expansionPacksDir });
       for (const expDir of expPackDirs) {
         possiblePaths.push(path.join(expansionPacksDir, expDir, `${taskId}.md`));
       }
@@ -536,8 +546,8 @@ class IdeSetup extends BaseIdeSetup {
     const expansionPacks = [];
     
     // Check for dot-prefixed expansion packs in install directory
-    const glob = require("glob");
-    const dotExpansions = glob.sync(".bmad-*", { cwd: installDir });
+    const { globSync } = await this.getGlobModules();
+    const dotExpansions = globSync(".bmad-*", { cwd: installDir });
     
     for (const dotExpansion of dotExpansions) {
       if (dotExpansion !== ".bmad-core") {
@@ -553,7 +563,7 @@ class IdeSetup extends BaseIdeSetup {
     // Check for expansion-packs directory style
     const expansionPacksDir = path.join(installDir, "expansion-packs");
     if (await fileManager.pathExists(expansionPacksDir)) {
-      const packDirs = glob.sync("*", { cwd: expansionPacksDir });
+      const packDirs = globSync("*", { cwd: expansionPacksDir });
       
       for (const packDir of packDirs) {
         const packPath = path.join(expansionPacksDir, packDir);
@@ -592,8 +602,8 @@ class IdeSetup extends BaseIdeSetup {
     }
     
     try {
-      const glob = require("glob");
-      const agentFiles = glob.sync("*.md", { cwd: agentsDir });
+      const { globSync } = await this.getGlobModules();
+      const agentFiles = globSync("*.md", { cwd: agentsDir });
       return agentFiles.map(file => path.basename(file, ".md"));
     } catch (error) {
       console.warn(`Failed to read expansion pack agents from ${packPath}: ${error.message}`);
@@ -608,8 +618,8 @@ class IdeSetup extends BaseIdeSetup {
     }
     
     try {
-      const glob = require("glob");
-      const taskFiles = glob.sync("*.md", { cwd: tasksDir });
+      const { globSync } = await this.getGlobModules();
+      const taskFiles = globSync("*.md", { cwd: tasksDir });
       return taskFiles.map(file => path.basename(file, ".md"));
     } catch (error) {
       console.warn(`Failed to read expansion pack tasks from ${packPath}: ${error.message}`);

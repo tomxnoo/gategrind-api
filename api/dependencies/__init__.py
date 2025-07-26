@@ -4,7 +4,6 @@ API dependencies package.
 This package contains dependency injection utilities for the API,
 including authentication, database sessions, and other common dependencies.
 """
-from .auth import get_current_user_id, get_current_user_profile
 
 # Import functions from the main deps module
 from ..deps import (
@@ -18,8 +17,6 @@ from ..deps import (
 )
 
 __all__ = [
-    "get_current_user_id",
-    "get_current_user_profile",
     "get_db_pool_optional",
     "require_db_pool", 
     "get_redis",

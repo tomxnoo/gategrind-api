@@ -1555,10 +1555,11 @@ class Installer {
 
   async detectExpansionPacks(installDir) {
     const expansionPacks = {};
-    const glob = require("glob");
+    const moduleManager = require('./module-manager');
+    const { globSync } = await moduleManager.getModules(['globSync']);
     
     // Find all dot folders that might be expansion packs
-    const dotFolders = glob.sync(".*", {
+    const dotFolders = globSync(".*", {
       cwd: installDir,
       ignore: [".git", ".git/**", ".bmad-core", ".bmad-core/**"],
     });
@@ -1681,12 +1682,13 @@ class Installer {
   }
 
   async cleanupLegacyYmlFiles(installDir, spinner) {
-    const glob = require('glob');
+    const moduleManager = require('./module-manager');
+    const { globSync } = await moduleManager.getModules(['globSync']);
     const fs = require('fs').promises;
     
     try {
       // Find all .yml files in the installation directory
-      const ymlFiles = glob.sync('**/*.yml', {
+      const ymlFiles = globSync('**/*.yml', {
         cwd: installDir,
         ignore: ['**/node_modules/**', '**/.git/**']
       });

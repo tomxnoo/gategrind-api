@@ -12,7 +12,7 @@ from fastapi import status, FastAPI
 from app.api.v2.progression import router as progression_router, get_progression_service
 from app.infrastructure.database.session import get_async_session
 from app.application.services.progression_service import ProgressionService, ProgressionResult
-from api.dependencies.auth import get_current_user_id
+from app.api.v2.dependencies.auth import get_current_user_id
 
 
 # Create a test app with just the progression router

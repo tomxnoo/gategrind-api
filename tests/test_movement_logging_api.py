@@ -12,7 +12,7 @@ import json
 
 from app.api.v2.events import router
 from app.application.services.movement_logging_service import MovementLogResult
-from api.schemas.v2.movement_logging_schemas import LogMovementRequest, LogMovementResponse
+from app.api.v2.schemas.movement_logging_schemas import LogMovementRequest, LogMovementResponse
 
 
 class TestMovementLoggingAPI:
@@ -25,7 +25,7 @@ class TestMovementLoggingAPI:
         from fastapi import FastAPI
         from unittest.mock import AsyncMock
         from app.infrastructure.database.session import get_async_session
-        from api.dependencies.auth import get_current_user_id
+        from app.api.v2.dependencies.auth import get_current_user_id
         
         # Set development mode for testing
         os.environ["DEVELOPMENT_MODE"] = "true"
@@ -66,7 +66,7 @@ class TestMovementLoggingAPI:
         return result
     
     @patch("app.api.v2.events.MovementLoggingService")
-    @patch("api.dependencies.auth.get_current_user_id")
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
     def test_log_movement_success(self, mock_get_user_id, mock_service_class, client, sample_log_result):
         """Test successful movement logging via API."""
         # Setup mocks
@@ -127,7 +127,7 @@ class TestMovementLoggingAPI:
         )
     
     @patch("app.api.v2.events.MovementLoggingService")
-    @patch("api.dependencies.auth.get_current_user_id")
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
     def test_log_movement_without_session_id(self, mock_get_user_id, mock_service_class, client, sample_log_result):
         """Test movement logging without session_id."""
         # Setup mocks
@@ -157,7 +157,7 @@ class TestMovementLoggingAPI:
             user_id=1, movement_id=1, reps=10, session_id=None
         )
     
-    @patch("api.dependencies.auth.get_current_user_id")
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
     def test_log_movement_invalid_request_data(self, mock_get_user_id, client):
         """Test movement logging with invalid request data."""
         # Setup mocks
@@ -181,7 +181,7 @@ class TestMovementLoggingAPI:
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     
     @patch("app.api.v2.events.MovementLoggingService")
-    @patch("api.dependencies.auth.get_current_user_id")
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
     def test_log_movement_service_error(self, mock_get_user_id, mock_service_class, client):
         """Test movement logging when service raises an error."""
         # Setup mocks
@@ -208,7 +208,7 @@ class TestMovementLoggingAPI:
         assert response_data["detail"]["detail"] == "Movement with ID 999 not found"
     
     @patch("app.api.v2.events.MovementLoggingService")
-    @patch("api.dependencies.auth.get_current_user_id")
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
     def test_log_movement_value_error(self, mock_get_user_id, mock_service_class, client):
         """Test movement logging when service raises a ValueError."""
         # Setup mocks

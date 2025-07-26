@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.application.services.movement_service import MovementService
-from api.schemas.v2.movement_schemas import MovementCategoryResponse
+from app.api.v2.schemas.movement_schemas import MovementCategoryResponse
 
 
 # Configure logging
