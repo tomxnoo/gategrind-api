@@ -985,6 +985,53 @@ class DungeonService(BaseService):
             self.handle_service_error(e, "get_daily_modifier")
             raise
 
+    async def get_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get dungeon leaderboard based on highest level completed and best completion times.
+        
+        Args:
+            limit: Maximum number of entries to return
+            
+        Returns:
+            List of leaderboard entries
+        """
+        try:
+            session = await self.get_session()
+            
+            # Query for top performers based on highest level and best time
+            result = await session.execute(
+                select(
+                    DungeonProgress.ascendant_id,
+                    DungeonProgress.highest_level_completed,
+                    DungeonProgress.best_completion_time,
+                    DungeonProgress.total_completions,
+                    Ascendant.username
+                )
+                .join(Ascendant, DungeonProgress.ascendant_id == Ascendant.id)
+                .order_by(
+                    DungeonProgress.highest_level_completed.desc(),
+                    DungeonProgress.best_completion_time.asc()
+                )
+                .limit(limit)
+            )
+            
+            leaderboard = []
+            for rank, row in enumerate(result.all(), 1):
+                leaderboard.append({
+                    'rank': rank,
+                    'ascendant_id': row.ascendant_id,
+                    'username': row.username,
+                    'highest_level': row.highest_level_completed,
+                    'best_time_seconds': row.best_completion_time,
+                    'total_completions': row.total_completions
+                })
+            
+            return leaderboard
+            
+        except Exception as e:
+            self.handle_service_error(e, f"get_leaderboard(limit={limit})")
+            raise
+
     async def health_check(self) -> Dict[str, Any]:
         """Perform a health check for the dungeon service."""
         try:

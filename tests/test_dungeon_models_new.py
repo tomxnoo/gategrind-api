@@ -92,24 +92,22 @@ class TestDungeonTrial:
         # Create trial
         trial = DungeonTrial(
             session_id=session.id,
+            trial_number=1,
+            trial_type='movement',
             movement_id=1,
-            movement_name='Push-ups',
-            target_type='reps',
-            target_value=20,
-            current_progress=0,
-            difficulty_multiplier=1.2
+            required_reps=20,
+            completed_reps=0
         )
         db_session.add(trial)
         await db_session.commit()
         
         assert trial.id is not None
         assert trial.session_id == session.id
+        assert trial.trial_number == 1
+        assert trial.trial_type == 'movement'
         assert trial.movement_id == 1
-        assert trial.movement_name == 'Push-ups'
-        assert trial.target_type == 'reps'
-        assert trial.target_value == 20
-        assert trial.current_progress == 0
-        assert trial.difficulty_multiplier == 1.2
+        assert trial.required_reps == 20
+        assert trial.completed_reps == 0
         assert trial.is_completed is False
         assert trial.created_at is not None
     
@@ -128,12 +126,11 @@ class TestDungeonTrial:
         # Create trial with specific values for calculation testing
         trial = DungeonTrial(
             session_id=session.id,
+            trial_number=1,
+            trial_type='movement',
             movement_id=2,
-            movement_name='Squats',
-            target_type='reps',
-            target_value=30,
-            current_progress=20,
-            difficulty_multiplier=1.5
+            required_reps=30,
+            completed_reps=20
         )
         db_session.add(trial)
         await db_session.commit()
@@ -145,7 +142,7 @@ class TestDungeonTrial:
         assert trial.is_successful is False
         
         # Complete the trial
-        trial.current_progress = 30
+        trial.completed_reps = 30
         trial.is_completed = True
         assert trial.is_successful is True
 

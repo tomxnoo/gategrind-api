@@ -18,6 +18,7 @@ from app.application.services.dungeon_service import (
     InsufficientRequirementsError,
     ActiveSessionExistsError
 )
+from app.api.v2.dependencies.auth import get_current_user_id
 from app.api.v2.schemas.dungeon_schemas import (
     DungeonEntryRequest,
     DungeonEntryResponse,
@@ -61,13 +62,15 @@ def get_dungeon_service() -> DungeonService:
 @router.post("/enter", response_model=DungeonEntryResponse)
 async def enter_dungeon(
     request: DungeonEntryRequest,
+    current_user_id: int = Depends(get_current_user_id),
     service: DungeonService = Depends(get_dungeon_service)
 ):
     """
     Enter a dungeon level.
     
     Args:
-        request: Dungeon entry request containing user_id and dungeon_level
+        request: Dungeon entry request containing dungeon_level
+        current_user_id: User ID extracted from authentication token
         
     Returns:
         DungeonEntryResponse: Session details and trials to complete
@@ -77,7 +80,7 @@ async def enter_dungeon(
     """
     try:
         response = await service.enter_dungeon(
-            ascendant_id=request.user_id,  # Map user_id to ascendant_id
+            ascendant_id=current_user_id,  # Use user ID from auth token
             dungeon_level=request.dungeon_level
         )
         return response
@@ -109,7 +112,7 @@ async def enter_dungeon(
         )
 
 
-@router.post("/complete-trial", response_model=TrialCompletionResponse)
+@router.post("/complete", response_model=TrialCompletionResponse)
 async def complete_trial(
     request: TrialCompletionRequest,
     service: DungeonService = Depends(get_dungeon_service)
@@ -145,16 +148,16 @@ async def complete_trial(
         )
 
 
-@router.get("/progress/{user_id}", response_model=DungeonProgressResponse)
+@router.get("/progress", response_model=DungeonProgressResponse)
 async def get_dungeon_progress(
-    user_id: int,
+    current_user_id: int = Depends(get_current_user_id),
     service: DungeonService = Depends(get_dungeon_service)
 ):
     """
-    Get dungeon progress for a user.
+    Get dungeon progress for the authenticated user.
     
     Args:
-        user_id: The user's ID
+        current_user_id: User ID extracted from authentication token
         
     Returns:
         DungeonProgressResponse: User's dungeon progress data
@@ -163,12 +166,12 @@ async def get_dungeon_progress(
         HTTPException: If user not found or error retrieving progress
     """
     try:
-        progress = await service.get_dungeon_progress(ascendant_id=user_id)
+        progress = await service.get_dungeon_progress(ascendant_id=current_user_id)
         
         if not progress:
             # Return empty progress instead of 404
             return DungeonProgressResponse(
-                ascendant_id=user_id,
+                ascendant_id=current_user_id,
                 highest_level_completed=0,
                 total_completions=0,
                 total_shadow_keys_spent=0
@@ -187,6 +190,112 @@ async def get_dungeon_progress(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve dungeon progress: {str(e)}"
+        )
+
+
+@router.get("/session", response_model=DungeonSessionResponse)
+async def get_active_session(
+    current_user_id: int = Depends(get_current_user_id),
+    service: DungeonService = Depends(get_dungeon_service)
+):
+    """
+    Get active dungeon session for the authenticated user.
+    
+    Args:
+        current_user_id: User ID extracted from authentication token
+        
+    Returns:
+        DungeonSessionResponse: Active session details
+        
+    Raises:
+        HTTPException: If no active session found
+    """
+    try:
+        session_data = await service.get_active_session(ascendant_id=current_user_id)
+        
+        if not session_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No active dungeon session found"
+            )
+        
+        # Convert to response model
+        return DungeonSessionResponse(
+            session_id=str(session_data['session_id']),
+            user_id=current_user_id,
+            dungeon_level=session_data['level'],
+            trials_completed=sum(1 for t in session_data['trials'] if t['is_completed']),
+            total_trials=len(session_data['trials']),
+            is_completed=session_data['status'] == 'completed',
+            created_at=session_data['created_at'].isoformat(),
+            expires_at=session_data['expires_at'].isoformat(),
+            daily_modifier=None  # Would need to fetch if needed
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get active session: {str(e)}"
+        )
+
+
+@router.post("/abandon")
+async def abandon_active_session(
+    current_user_id: int = Depends(get_current_user_id),
+    service: DungeonService = Depends(get_dungeon_service)
+):
+    """
+    Abandon the active dungeon session for the authenticated user.
+    
+    Args:
+        current_user_id: User ID extracted from authentication token
+        
+    Returns:
+        Dict with abandonment confirmation
+        
+    Raises:
+        HTTPException: If no active session found or abandonment fails
+    """
+    try:
+        result = await service.abandon_active_session(ascendant_id=current_user_id)
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to abandon session: {str(e)}"
+        )
+
+
+@router.get("/leaderboard")
+async def get_dungeon_leaderboard(
+    limit: int = 10,
+    service: DungeonService = Depends(get_dungeon_service)
+):
+    """
+    Get dungeon leaderboard.
+    
+    Args:
+        limit: Number of top entries to return
+        
+    Returns:
+        Dict containing leaderboard data
+    """
+    try:
+        leaderboard = await service.get_leaderboard(limit=limit)
+        return {"leaderboard": leaderboard}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get leaderboard: {str(e)}"
         )
 
 

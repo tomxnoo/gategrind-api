@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 import asyncpg  # <-- Import asyncpg
 
 # ---- FASTAPI IMPORT ----
-from api.main import app as fastapi_app
+from app.main import app as fastapi_app
 import uvicorn
 
 from core.redis_cache import RedisCache
@@ -108,6 +108,7 @@ class RealmBot(commands.AutoShardedBot):  # <-- Use AutoShardedBot
             # Import all panel classes to trigger their @register decorators
             from features.awakening.ui.awakening_panel import EnhancedAwakeningPanel
             from features.user.ui.profile_view import ProfilePanel
+            from features.user.ui.profile_v2_panel import ProfileV2Panel  # Add V2 Profile Panel
             from features.logging.ui.view import LogRepsPanel
             from features.buffs.ui.view import BuffsPanel
             from features.incursions.ui.incursion_panel import IncursionPanel

@@ -17,7 +17,7 @@ import logging
 from app.application.services.awakening_service import AwakeningService
 from app.application.services.awakening_admin_service import AwakeningAdminService
 from app.infrastructure.database.session import get_db
-from app.api.v2.dependencies.auth import get_current_user
+from app.api.v2.dependencies.auth import get_current_user_id
 from app.api.dependencies.admin import require_admin
 from app.api.v2.schemas.awakening import (
     AwakeningActionRequest,
@@ -41,7 +41,7 @@ router = APIRouter(prefix="/api/v2/awakening", tags=["awakening"])
 @router.post("/action", response_model=AwakeningActionResponse)
 async def create_awakening_session(
     request: AwakeningActionRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user_id: int = Depends(get_current_user_id),
     db = Depends(get_db)
 ) -> AwakeningActionResponse:
     """
@@ -94,7 +94,7 @@ async def create_awakening_session(
 async def complete_quest(
     quest_id: int,
     request: QuestCompletionRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user_id: int = Depends(get_current_user_id),
     db = Depends(get_db)
 ) -> QuestCompletionResponse:
     """
@@ -139,7 +139,7 @@ async def complete_quest(
 @router.get("/status/{user_id}", response_model=AwakeningStatusResponse)
 async def get_awakening_status(
     user_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user_id: int = Depends(get_current_user_id),
     db = Depends(get_db)
 ) -> AwakeningStatusResponse:
     """
@@ -174,7 +174,7 @@ async def get_awakening_status(
 @router.post("/reset/{user_id}", response_model=AwakeningResetResponse)
 async def reset_daily_session(
     user_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user_id: int = Depends(get_current_user_id),
     db = Depends(get_db)
 ) -> AwakeningResetResponse:
     """
@@ -217,7 +217,7 @@ async def get_awakening_history(
     user_id: int,
     limit: Optional[int] = 30,
     offset: Optional[int] = 0,
-    current_user: dict = Depends(get_current_user),
+    current_user_id: int = Depends(get_current_user_id),
     db = Depends(get_db)
 ) -> AwakeningHistoryResponse:
     """

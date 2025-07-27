@@ -1,172 +1,114 @@
-"""
-Profile API endpoints for V2.
+"""V2 Profiles API endpoints.
 
-This module provides REST API endpoints for user profile management including
-comprehensive profile data retrieval that combines ascendant stats, dungeon progress,
-skill tree progression, and quest information.
+This module provides endpoints for managing user profiles in the V2 API.
+It includes functionality for retrieving and updating user profile information.
 """
-from fastapi import APIRouter, HTTPException, Depends, status
-from typing import Dict, Any, List, Optional
-import logging
-from datetime import datetime, timezone
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 
-from app.infrastructure.database.session import get_async_session
-from app.api.v2.dependencies.auth import get_current_user_id
-from app.api.v2.schemas.profile_schemas import AscendantProfileResponse
-from app.api.v2.schemas.ascendant_schemas import AscendantStatsSchema
-from app.api.v2.schemas.skill_tree_schemas import UserSkillProgressResponse
-from app.api.v2.schemas.dungeon_schemas import DungeonKeyResponse, DungeonProgressResponse
-from app.api.v2.schemas.quest_schemas import QuestResponse
+from core.config import settings
+from app.api.v2.dependencies.auth import get_current_user_id, get_db_session_or_none
 from app.infrastructure.database.models.v2.ascendants import Ascendant
-from app.infrastructure.database.models.v2.stats import AscendantStats
-from app.infrastructure.database.models.v2.user_skill_progress import UserSkillProgress
+from app.api.v2.schemas.profile_schemas import AscendantProfileResponse
 
-# Configure logging
-logger = logging.getLogger(__name__)
-
-# Create router
-router = APIRouter(
-    prefix="/users",
-    tags=["profiles"],
-    responses={
-        404: {"description": "User not found"},
-        422: {"description": "Validation error"},
-        500: {"description": "Internal server error"}
-    }
-)
+router = APIRouter(prefix="/profiles", tags=["profiles"])
 
 
-async def get_user_profile_data(
-    user_id: int,
-    session: AsyncSession
-) -> Optional[AscendantProfileResponse]:
-    """
-    Fetch comprehensive user profile data from database.
-    
-    Args:
-        user_id: The user's database ID
-        session: Database session
-        
-    Returns:
-        AscendantProfileResponse: Complete profile data or None if user not found
-    """
-    try:
-        # Fetch user with all related data
-        stmt = (
-            select(Ascendant)
-            .options(
-                selectinload(Ascendant.stats),
-                selectinload(Ascendant.skill_progress),
-                # Add other relationships as needed
-            )
-            .where(Ascendant.id == user_id)
-        )
-        
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-        
-        if not user:
-            return None
-        
-        # Build stats schema
-        stats_data = AscendantStatsSchema(
-            level=user.stats.level if user.stats else 1,
-            xp=user.stats.xp if user.stats else 0,
-            xp_max=user.stats.xp_max if user.stats else 100,
-            str_level=user.stats.str_level if user.stats else 1,
-            str_xp=user.stats.str_xp if user.stats else 0,
-            end_level=user.stats.end_level if user.stats else 1,
-            end_xp=user.stats.end_xp if user.stats else 0,
-            tech_level=user.stats.tech_level if user.stats else 1,
-            tech_xp=user.stats.tech_xp if user.stats else 0,
-            aura=user.stats.aura if user.stats else 0,
-            shadow_keys=user.stats.shadow_keys if user.stats else 0,
-            awakening_streak=user.stats.awakening_streak if user.stats else 0
-        )
-        
-        # Build skill progress list
-        unlocked_skills = []
-        if user.skill_progress:
-            for skill in user.skill_progress:
-                unlocked_skills.append(UserSkillProgressResponse(
-                    node_id=skill.node_id,
-                    unlocked_at=skill.unlocked_at
-                ))
-        
-        # For now, return empty lists for dungeon and quest data
-        # These would be populated by calling appropriate services
-        dungeon_keys = []
-        active_quests = []
-        dungeon_progress = None
-        
-        # Build the complete profile response
-        profile = AscendantProfileResponse(
-            id=user.id,
-            discord_id=user.discord_id,
-            username=user.username,
-            display_name=user.display_name,
-            stats=stats_data,
-            dungeon_progress=dungeon_progress,
-            dungeon_keys=dungeon_keys,
-            unlocked_skills=unlocked_skills,
-            active_quests=active_quests,
-            created_at=user.created_at,
-            updated_at=user.updated_at
-        )
-        
-        return profile
-        
-    except Exception as e:
-        logger.error(f"Error fetching user profile data for user {user_id}: {e}")
-        raise
-
-
-@router.get("/me/profile", response_model=AscendantProfileResponse, status_code=status.HTTP_200_OK)
-async def get_current_user_profile(
+@router.get("/me", response_model=AscendantProfileResponse)
+async def get_my_profile(
     current_user_id: int = Depends(get_current_user_id),
-    session: AsyncSession = Depends(get_async_session)
+    db_session: Optional[AsyncSession] = Depends(get_db_session_or_none)
 ) -> AscendantProfileResponse:
     """
-    Get the current user's comprehensive profile.
+    Get the current user's profile.
     
-    This endpoint returns a complete profile including:
-    - Core ascendant information (ID, discord_id, username, display_name)
-    - Detailed stats breakdown (levels, XP, aura, shadow keys, awakening streak)
-    - Dungeon system data (progress, keys)
-    - Skill tree progression (unlocked skills)
-    - Quest system data (active quests)
-    - Timestamps (created_at, updated_at)
+    Returns comprehensive profile information including stats, progression,
+    and other relevant data for the authenticated user.
     
+    Args:
+        current_user_id: The authenticated user's ID
+        db_session: Database session (None in development mode)
+        
     Returns:
-        AscendantProfileResponse: Complete user profile data
+        AscendantProfileResponse: The user's profile data
         
     Raises:
-        HTTPException: 404 if user not found, 500 for server errors
+        HTTPException: If user not found or database error
     """
+    # In development mode, return mock data
+    if settings.DEV_MODE:
+        from app.api.v2.schemas.ascendant_schemas import AscendantStatsSchema
+        
+        return AscendantProfileResponse(
+            id=current_user_id,
+            discord_id="123456789012345678",
+            username="DevUser",
+            stats=AscendantStatsSchema(
+                str_level=10,
+                str_xp=2500.0,
+                end_level=8,
+                end_xp=1800.0,
+                tech_level=12,
+                tech_xp=3200.0
+            ),
+            dungeon_progress=None,
+            dungeon_keys=[],
+            unlocked_skills=[],
+            active_quests=[],
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+    
+    # Production mode - fetch from database
+    if db_session is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Database session not available"
+        )
+    
     try:
-        logger.info(f"Fetching profile for user {current_user_id}")
+        # Query the Ascendant model for the user's profile
+        result = await db_session.execute(
+            select(Ascendant).where(Ascendant.discord_id == str(current_user_id))
+        )
+        ascendant = result.scalar_one_or_none()
         
-        profile = await get_user_profile_data(current_user_id, session)
-        
-        if not profile:
-            logger.warning(f"User {current_user_id} not found")
+        if not ascendant:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User with ID {current_user_id} not found"
+                status_code=404,
+                detail="User profile not found"
             )
         
-        logger.info(f"Successfully fetched profile for user {current_user_id}")
-        return profile
+        # For now, return a simplified response based on the Ascendant model
+        # TODO: Implement full profile assembly with related data
+        from app.api.v2.schemas.ascendant_schemas import AscendantStatsSchema
         
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
-        raise
+        return AscendantProfileResponse(
+            id=ascendant.id,
+            discord_id=ascendant.discord_id,
+            username=ascendant.username,
+            stats=AscendantStatsSchema(
+                str_level=ascendant.stats.str_level if ascendant.stats else 1,
+                str_xp=ascendant.stats.str_xp if ascendant.stats else 0.0,
+                end_level=ascendant.stats.end_level if ascendant.stats else 1,
+                end_xp=ascendant.stats.end_xp if ascendant.stats else 0.0,
+                tech_level=ascendant.stats.tech_level if ascendant.stats else 1,
+                tech_xp=ascendant.stats.tech_xp if ascendant.stats else 0.0
+            ),
+            dungeon_progress=None,  # TODO: Implement dungeon progress retrieval
+            dungeon_keys=[],  # TODO: Implement dungeon keys retrieval
+            unlocked_skills=[],  # TODO: Implement skills retrieval
+            active_quests=[],  # TODO: Implement quests retrieval
+            created_at=ascendant.created_at,
+            updated_at=ascendant.updated_at
+        )
+        
     except Exception as e:
-        logger.error(f"Unexpected error fetching profile for user {current_user_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while fetching user profile"
+            status_code=500,
+            detail=f"Failed to retrieve profile: {str(e)}"
         )

@@ -43,7 +43,7 @@ class TestDungeonAPIEndpoints:
         """Create a test client."""
         from fastapi import FastAPI
         app = FastAPI()
-        app.include_router(router, prefix="/api/v2/dungeons")
+        app.include_router(router, prefix="/api/v2")
         return TestClient(app)
     
     @pytest.fixture
@@ -84,11 +84,11 @@ class TestDungeonAPIEndpoints:
             
             request_data = {
                 "ascendant_id": 1,
-                "shadow_keys_to_use": 3
+                "dungeon_level": 3
             }
             
             response = client.post(
-                "/api/v2/dungeons/enter/3",
+                "/api/v2/dungeons/enter",
                 json=request_data,
                 headers=auth_headers
             )
@@ -112,11 +112,11 @@ class TestDungeonAPIEndpoints:
                 
                 request_data = {
                     "ascendant_id": 1,
-                    "shadow_keys_to_use": 3
+                    "dungeon_level": 5
                 }
                 
                 response = client.post(
-                    "/api/v2/dungeons/enter/5",
+                    "/api/v2/dungeons/enter",
                     json=request_data,
                     headers=auth_headers
                 )
@@ -136,11 +136,11 @@ class TestDungeonAPIEndpoints:
                 
                 request_data = {
                     "ascendant_id": 1,
-                    "shadow_keys_to_use": 3
+                    "dungeon_level": 3
                 }
                 
                 response = client.post(
-                    "/api/v2/dungeons/enter/3",
+                    "/api/v2/dungeons/enter",
                     json=request_data,
                     headers=auth_headers
                 )
@@ -153,12 +153,12 @@ class TestDungeonAPIEndpoints:
         """Test dungeon entry with invalid request data."""
         # Missing required fields
         request_data = {
-            "shadow_keys_to_use": 3
+            "dungeon_level": 3
             # Missing ascendant_id
         }
         
         response = client.post(
-            "/api/v2/dungeons/enter/3",
+            "/api/v2/dungeons/enter",
             json=request_data,
             headers=auth_headers
         )

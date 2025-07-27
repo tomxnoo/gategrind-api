@@ -5,6 +5,7 @@ This module provides authentication utilities specifically for the v2 API,
 including user ID extraction and authentication validation.
 """
 import os
+from typing import Optional
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,12 +14,19 @@ from app.infrastructure.database.session import get_async_session
 
 def is_development_mode() -> bool:
     """Check if we're running in development mode"""
-    return os.getenv("DEVELOPMENT_MODE", "false").lower() == "true"
+    return os.getenv("DEV_MODE", "false").lower() == "true"
+
+
+def get_db_session_or_none():
+    """Get database session only if not in development mode"""
+    if is_development_mode():
+        return None
+    return get_async_session()
 
 
 async def get_current_user_id(
     request: Request,
-    db_session: AsyncSession = Depends(get_async_session)
+    db_session: AsyncSession = Depends(get_db_session_or_none)
 ) -> int:
     """
     Extract the current user's ID from authentication.
@@ -29,7 +37,7 @@ async def get_current_user_id(
     
     Args:
         request: FastAPI request object
-        db_session: Database session (for compatibility)
+        db_session: Database session (for compatibility, None in dev mode)
         
     Returns:
         int: The authenticated user's ID
@@ -87,7 +95,7 @@ async def get_current_user_id(
 
 async def get_current_user_profile(
     request: Request,
-    db_session: AsyncSession = Depends(get_async_session)
+    db_session: Optional[AsyncSession] = Depends(get_db_session_or_none)
 ):
     """
     Get the current user's full profile.
@@ -97,7 +105,7 @@ async def get_current_user_profile(
     
     Args:
         request: FastAPI request object
-        db_session: Database session
+        db_session: Database session (None in development mode)
         
     Returns:
         UserProfile: The authenticated user's profile

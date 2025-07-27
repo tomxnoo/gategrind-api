@@ -95,6 +95,7 @@ class TestDungeonMigrations:
             # Valid modifier
             valid_modifier = DailyModifier(
                 modifier_date=date.today(),
+                modifier_name='Strength Focus Day',
                 modifier_type='strength_focus',
                 description='Test modifier',
                 difficulty_multiplier=1.5,
@@ -106,6 +107,7 @@ class TestDungeonMigrations:
             # Test unique date constraint
             duplicate_modifier = DailyModifier(
                 modifier_date=date.today(),  # Same date
+                modifier_name='Endurance Boost Day',
                 modifier_type='endurance_boost',
                 description='Duplicate date modifier',
                 difficulty_multiplier=1.3,
@@ -131,6 +133,7 @@ class TestDungeonMigrations:
             # Create a daily modifier first
             modifier = DailyModifier(
                 modifier_date=date.today(),
+                modifier_name='Strength Focus Day',
                 modifier_type='strength_focus',
                 description='Test modifier',
                 difficulty_multiplier=1.5,
@@ -203,6 +206,7 @@ class TestDungeonMigrations:
             # Insert test data
             modifier = DailyModifier(
                 modifier_date=date.today(),
+                modifier_name='Pre-Migration Modifier',
                 modifier_type='strength_focus',
                 description='Pre-migration data',
                 difficulty_multiplier=1.5,
@@ -264,7 +268,7 @@ class TestDungeonMigrations:
             result = session.execute(text("""
                 SELECT COUNT(*) 
                 FROM dungeon_sessions 
-                WHERE ascendant_id = 5 AND status = 'active'
+                WHERE ascendant_id = 5 AND session_status = 'active'
             """))
             
             count = result.scalar()

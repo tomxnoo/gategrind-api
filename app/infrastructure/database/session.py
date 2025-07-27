@@ -80,6 +80,9 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     if is_test_environment():
         raise RuntimeError("Database sessions should be mocked in test environment")
     
+    if is_development_mode():
+        raise RuntimeError("Database sessions not available in development mode")
+    
     # Initialize database if not already done
     initialize_database()
     

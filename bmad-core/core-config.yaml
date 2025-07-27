@@ -12,39 +12,31 @@ architecture:
   architectureShardedLocation: docs/architecture
 customTechnicalDocuments: null
 devLoadAlwaysFiles:
-  # Core AI Documentation
-  - "docs/ai/ai-agent-instructions.md"
-  - "docs/ai/ai-agent-teams.md"
-  - "docs/ai/ai-context-management.md"
-  - "docs/ai/ai-development-workflow.md"
-  - "docs/ai/ai-handoff-protocol.md"
-  - "docs/ai/ai-quality-assurance.md"
-  - "docs/ai/ai-session-management.md"
-  - "docs/ai/ai-story-management.md"
-  - "docs/ai/ai-workspace-integration.md"
-  
-  # Enhanced Workflow Enforcement
-  - "bmad-core/utils/automated-workspace-context.md"
+  # Enhanced Workflow Enforcement (CRITICAL for protocol adherence)
+  - "bmad-core/agents/dev-enhanced.md"
   - "bmad-core/utils/agent-workflow-enforcement.md"
   - "bmad-core/checklists/sub-task-validation-checklist.md"
-  - "bmad-core/agents/dev-enhanced.md"
+  - "bmad-core/utils/automated-workspace-context.md"
   
   # Architecture Context
   - "docs/architecture/codebase-context.md"
   - "docs/architecture/technology-stack.md"
   - "docs/architecture/project-structure.md"
+  - "docs/architecture/agent-handoff-protocol.md"
+  - "docs/architecture/story-quality-validation.md"
+  - "docs/architecture/enhanced-workflow-commands.md"
   
-  # Workspace Context
-  - ".workspace/context/shared-context.md"
-  - ".workspace/handoffs/latest-to-dev.md"
-  - ".workspace/progress/current-sprint.json"
+  # Additional BMad Core Files
+  - "bmad-core/checklists/story-dod-checklist.md"
+  - "bmad-core/checklists/complex-story-implementation.md"
+  - "bmad-core/tasks/pre-implementation-validation.md"
 smLoadAlwaysFiles:
   - docs/architecture/agent-contexts/sm-context.md
   - docs/architecture/codebase-context.md
   - docs/prd/overview.md
-  - .ai/agent-handoff-protocol.md
-  - .ai/story-quality-validation.md
-  - .ai/enhanced-workflow-commands.md
-devDebugLog: .ai/debug-log.md
+  - docs/architecture/agent-handoff-protocol.md
+  - docs/architecture/story-quality-validation.md
+  - docs/architecture/enhanced-workflow-commands.md
+devDebugLog: bmad-core/debug-log.md
 devStoryLocation: docs/stories
 slashPrefix: BMad

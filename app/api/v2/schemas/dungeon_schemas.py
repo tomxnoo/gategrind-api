@@ -60,7 +60,6 @@ class DungeonProgressResponse(DungeonProgressBase):
 # Dungeon Entry and Trial Schemas
 class DungeonEntryRequest(BaseModel):
     """Schema for dungeon entry requests"""
-    ascendant_id: int = Field(..., gt=0, description="The ascendant entering the dungeon")
     dungeon_level: int = Field(..., ge=1, description="The dungeon level to enter (infinite progression)")
     
     @field_validator('dungeon_level')

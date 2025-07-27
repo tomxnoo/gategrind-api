@@ -4,12 +4,20 @@ import logging
 from typing import Optional, Any, Dict, List
 from datetime import datetime, timedelta
 
+# Import fakeredis for development
+try:
+    import fakeredis.aioredis
+    FAKEREDIS_AVAILABLE = True
+except ImportError:
+    FAKEREDIS_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class RedisCache:
     def __init__(self, url: str):
         self.url = url
         self.pool = None
+        self.use_fake_redis = FAKEREDIS_AVAILABLE
         
         # Cache key patterns for different data types
         self.CACHE_KEYS = {
@@ -40,11 +48,24 @@ class RedisCache:
         }
 
     async def connect(self):
-        self.pool = await aioredis.from_url(self.url, decode_responses=True)
+        if self.use_fake_redis:
+            # Use fakeredis for development (no Docker required)
+            self.pool = fakeredis.aioredis.FakeRedis(decode_responses=True)
+            logger.info("Connected to FakeRedis (development mode)")
+        else:
+            # Use real Redis in production
+            self.pool = await aioredis.from_url(self.url, decode_responses=True)
+            logger.info(f"Connected to Redis at {self.url}")
 
     async def close(self):
         if self.pool:
-            await self.pool.close()
+            if self.use_fake_redis:
+                # FakeRedis doesn't need explicit closing
+                self.pool = None
+                logger.info("FakeRedis connection closed")
+            else:
+                await self.pool.close()
+                logger.info("Redis connection closed")
 
     async def get(self, key: str):
         if not self.pool:

@@ -35,7 +35,7 @@ def get_registered_panels() -> list[Type]:
     Returns the list of panel classes in a specific order.
     """
     # Use the globally set order, or a default if not set.
-    order = _PANEL_ORDER or ["profile", "awakening", "log_reps", "quest_log", "buffs", "incursions"]
+    order = _PANEL_ORDER or ["profile", "profile_v2", "awakening", "log_reps", "quest_log", "buffs", "incursions"]
     
     ordered_panels = []
     

@@ -213,10 +213,10 @@ class TestDungeonSystemIntegration:
         trial = DungeonTrial(
             id=1,
             session_id=1,
-            movement_name='push_up',
-            target_type='reps',
-            target_value=20,
-            current_progress=0,
+            trial_number=1,
+            trial_type='reps',
+            required_reps=20,
+            completed_reps=0,
             is_completed=True  # Mark as completed for session completion logic
         )
         
@@ -250,7 +250,7 @@ class TestDungeonSystemIntegration:
                     
                     # Test trial completion
                     completion_data = {
-                        'reps': 25,  # More than target_value of 20
+                        'reps': 25,  # More than required_reps of 20
                         'completion_time': 300,  # 5 minutes
                         'accuracy': 95.5
                     }

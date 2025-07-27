@@ -68,8 +68,12 @@ def sample_session_data():
 class TestDungeonAPIEndpoints:
     """Test all dungeon API endpoints."""
     
-    def test_enter_dungeon_success(self, client, mock_auth_token, sample_ascendant_data):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_enter_dungeon_success(self, mock_get_user_id, client, mock_auth_token, sample_ascendant_data):
         """Test successful dungeon entry."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         with patch('app.application.services.dungeon_service.DungeonService.enter_dungeon') as mock_enter:
             mock_enter.return_value = {
                 "status": "success",
@@ -84,7 +88,7 @@ class TestDungeonAPIEndpoints:
             }
             
             response = client.post(
-                "/api/v2/dungeon/enter",
+                "/api/v2/dungeons/enter",
                 json={"dungeon_level": 5},
                 headers={"Authorization": mock_auth_token}
             )
@@ -96,24 +100,32 @@ class TestDungeonAPIEndpoints:
             assert data["dungeon_level"] == 5
             assert "trial_data" in data
     
-    def test_enter_dungeon_invalid_level(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_enter_dungeon_invalid_level(self, mock_get_user_id, client, mock_auth_token):
         """Test dungeon entry with invalid level."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         response = client.post(
-            "/api/v2/dungeon/enter",
+            "/api/v2/dungeons/enter",
             json={"dungeon_level": 0},  # Invalid level
             headers={"Authorization": mock_auth_token}
         )
         
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     
-    def test_enter_dungeon_insufficient_requirements(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_enter_dungeon_insufficient_requirements(self, mock_get_user_id, client, mock_auth_token):
         """Test dungeon entry with insufficient requirements."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         with patch('app.application.services.dungeon_service.DungeonService.enter_dungeon') as mock_enter:
             from app.application.services.dungeon_service import InsufficientRequirementsError
             mock_enter.side_effect = InsufficientRequirementsError("Insufficient aura")
             
             response = client.post(
-                "/api/v2/dungeon/enter",
+                "/api/v2/dungeons/enter",
                 json={"dungeon_level": 10},
                 headers={"Authorization": mock_auth_token}
             )
@@ -122,14 +134,18 @@ class TestDungeonAPIEndpoints:
             data = response.json()
             assert "Insufficient aura" in data["detail"]
     
-    def test_enter_dungeon_active_session_exists(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_enter_dungeon_active_session_exists(self, mock_get_user_id, client, mock_auth_token):
         """Test dungeon entry when active session already exists."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         with patch('app.application.services.dungeon_service.DungeonService.enter_dungeon') as mock_enter:
             from app.application.services.dungeon_service import ActiveSessionExistsError
             mock_enter.side_effect = ActiveSessionExistsError("Active session exists")
             
             response = client.post(
-                "/api/v2/dungeon/enter",
+                "/api/v2/dungeons/enter",
                 json={"dungeon_level": 5},
                 headers={"Authorization": mock_auth_token}
             )
@@ -138,8 +154,12 @@ class TestDungeonAPIEndpoints:
             data = response.json()
             assert "Active session exists" in data["detail"]
     
-    def test_get_active_session_success(self, client, mock_auth_token, sample_session_data):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_get_active_session_success(self, mock_get_user_id, client, mock_auth_token, sample_session_data):
         """Test getting active session successfully."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         with patch('app.application.services.dungeon_service.DungeonService.get_active_session') as mock_get:
             mock_session = MagicMock()
             mock_session.id = 1
@@ -150,7 +170,7 @@ class TestDungeonAPIEndpoints:
             mock_get.return_value = mock_session
             
             response = client.get(
-                "/api/v2/dungeon/session",
+                "/api/v2/dungeons/session",
                 headers={"Authorization": mock_auth_token}
             )
             
@@ -160,20 +180,28 @@ class TestDungeonAPIEndpoints:
             assert data["dungeon_level"] == 5
             assert data["status"] == "active"
     
-    def test_get_active_session_not_found(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_get_active_session_not_found(self, mock_get_user_id, client, mock_auth_token):
         """Test getting active session when none exists."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         with patch('app.application.services.dungeon_service.DungeonService.get_active_session') as mock_get:
             mock_get.return_value = None
             
             response = client.get(
-                "/api/v2/dungeon/session",
+                "/api/v2/dungeons/session",
                 headers={"Authorization": mock_auth_token}
             )
             
             assert response.status_code == status.HTTP_404_NOT_FOUND
     
-    def test_complete_trial_success(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_complete_trial_success(self, mock_get_user_id, client, mock_auth_token):
         """Test successful trial completion."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         with patch('app.application.services.dungeon_service.DungeonService.complete_trial') as mock_complete:
             mock_complete.return_value = {
                 "status": "completed",
@@ -192,7 +220,7 @@ class TestDungeonAPIEndpoints:
             }
             
             response = client.post(
-                "/api/v2/dungeon/complete",
+                "/api/v2/dungeons/complete",
                 json=completion_data,
                 headers={"Authorization": mock_auth_token}
             )
@@ -204,8 +232,12 @@ class TestDungeonAPIEndpoints:
             assert data["completion_time"] == 300
             assert data["accuracy"] == 95.5
     
-    def test_complete_trial_invalid_data(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_complete_trial_invalid_data(self, mock_get_user_id, client, mock_auth_token):
         """Test trial completion with invalid data."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         invalid_data = {
             "movements_completed": [],  # Empty movements
             "completion_time": -1,  # Invalid time
@@ -213,16 +245,20 @@ class TestDungeonAPIEndpoints:
         }
         
         response = client.post(
-            "/api/v2/dungeon/complete",
+            "/api/v2/dungeons/complete",
             json=invalid_data,
             headers={"Authorization": mock_auth_token}
         )
         
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     
-    def test_abandon_session_success(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_abandon_session_success(self, mock_get_user_id, client, mock_auth_token):
         """Test successful session abandonment."""
-        with patch('app.application.services.dungeon_service.DungeonService.abandon_session') as mock_abandon:
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
+        with patch('app.application.services.dungeon_service.DungeonService.abandon_active_session') as mock_abandon:
             mock_abandon.return_value = {
                 "status": "abandoned",
                 "session_id": 1,
@@ -230,7 +266,7 @@ class TestDungeonAPIEndpoints:
             }
             
             response = client.post(
-                "/api/v2/dungeon/abandon",
+                "/api/v2/dungeons/abandon",
                 headers={"Authorization": mock_auth_token}
             )
             
@@ -239,8 +275,12 @@ class TestDungeonAPIEndpoints:
             assert data["status"] == "abandoned"
             assert data["session_id"] == 1
     
-    def test_get_dungeon_progress_success(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_get_dungeon_progress_success(self, mock_get_user_id, client, mock_auth_token):
         """Test getting dungeon progress successfully."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         with patch('app.application.services.dungeon_service.DungeonService.get_dungeon_progress') as mock_progress:
             mock_progress.return_value = {
                 "current_level": 5,
@@ -258,7 +298,7 @@ class TestDungeonAPIEndpoints:
             }
             
             response = client.get(
-                "/api/v2/dungeon/progress",
+                "/api/v2/dungeons/progress",
                 headers={"Authorization": mock_auth_token}
             )
             
@@ -281,7 +321,7 @@ class TestDungeonAPIEndpoints:
             }
             
             response = client.get(
-                "/api/v2/dungeon/daily-modifier",
+                "/api/v2/dungeons/daily-modifier",
                 headers={"Authorization": mock_auth_token}
             )
             
@@ -295,54 +335,66 @@ class TestDungeonAPIEndpoints:
         """Test getting dungeon leaderboard successfully."""
         with patch('app.application.services.dungeon_service.DungeonService.get_leaderboard') as mock_leaderboard:
             mock_leaderboard.return_value = {
-                "daily": [
-                    {"username": "player1", "level": 10, "completions": 5, "total_time": 1200},
-                    {"username": "player2", "level": 9, "completions": 4, "total_time": 1350}
-                ],
-                "weekly": [
-                    {"username": "player1", "level": 10, "completions": 25, "total_time": 6000},
-                    {"username": "player3", "level": 8, "completions": 20, "total_time": 7200}
-                ],
-                "all_time": [
-                    {"username": "player1", "level": 10, "completions": 100, "total_time": 25000},
-                    {"username": "player4", "level": 10, "completions": 95, "total_time": 26000}
-                ]
+                "leaderboard": {
+                    "daily": [
+                        {"username": "player1", "level": 10, "completions": 5, "total_time": 1200},
+                        {"username": "player2", "level": 9, "completions": 4, "total_time": 1350}
+                    ],
+                    "weekly": [
+                        {"username": "player1", "level": 10, "completions": 25, "total_time": 6000},
+                        {"username": "player3", "level": 8, "completions": 20, "total_time": 7200}
+                    ],
+                    "all_time": [
+                        {"username": "player1", "level": 10, "completions": 100, "total_time": 25000},
+                        {"username": "player4", "level": 10, "completions": 95, "total_time": 26000}
+                    ]
+                }
             }
             
             response = client.get(
-                "/api/v2/dungeon/leaderboard",
+                "/api/v2/dungeons/leaderboard",
                 headers={"Authorization": mock_auth_token}
             )
             
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            assert "daily" in data
-            assert "weekly" in data
-            assert "all_time" in data
-            assert len(data["daily"]) == 2
+            assert "leaderboard" in data
+            assert "daily" in data["leaderboard"]
+            assert "weekly" in data["leaderboard"]
+            assert "all_time" in data["leaderboard"]
+            assert len(data["leaderboard"]["daily"]) == 2
     
-    def test_unauthorized_access(self, client):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_unauthorized_access(self, mock_get_user_id, client):
         """Test that endpoints require authentication."""
+        # Setup authentication mock to raise an exception for unauthorized access
+        from fastapi import HTTPException
+        mock_get_user_id.side_effect = HTTPException(status_code=401, detail="Unauthorized")
+        
         endpoints = [
-            ("/api/v2/dungeon/enter", "POST", {"dungeon_level": 5}),
-            ("/api/v2/dungeon/session", "GET", None),
-            ("/api/v2/dungeon/complete", "POST", {"movements_completed": []}),
-            ("/api/v2/dungeon/abandon", "POST", None),
-            ("/api/v2/dungeon/progress", "GET", None),
-            ("/api/v2/dungeon/daily-modifier", "GET", None),
-            ("/api/v2/dungeon/leaderboard", "GET", None)
+            ("/api/v2/dungeons/enter", "POST", {"dungeon_level": 5}),
+            ("/api/v2/dungeons/session", "GET", None),
+            ("/api/v2/dungeons/complete", "POST", {"movements_completed": []}),
+            ("/api/v2/dungeons/abandon", "POST", None),
+            ("/api/v2/dungeons/progress", "GET", None),
+            ("/api/v2/dungeons/daily-modifier", "GET", None),
+            ("/api/v2/dungeons/leaderboard", "GET", None)
         ]
         
         for endpoint, method, data in endpoints:
             if method == "GET":
-                response = client.get(endpoint)
+                response = client.get(endpoint, headers={"Authorization": "Bearer invalid_token"})
             else:
-                response = client.post(endpoint, json=data)
+                response = client.post(endpoint, json=data, headers={"Authorization": "Bearer invalid_token"})
             
             assert response.status_code == status.HTTP_401_UNAUTHORIZED
     
-    def test_rate_limiting(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_rate_limiting(self, mock_get_user_id, client, mock_auth_token):
         """Test rate limiting on API endpoints."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         # This would typically test actual rate limiting
         # For now, we'll test the structure
         
@@ -353,7 +405,7 @@ class TestDungeonAPIEndpoints:
             responses = []
             for _ in range(10):
                 response = client.post(
-                    "/api/v2/dungeon/enter",
+                    "/api/v2/dungeons/enter",
                     json={"dungeon_level": 1},
                     headers={"Authorization": mock_auth_token}
                 )
@@ -367,8 +419,12 @@ class TestDungeonAPIEndpoints:
 class TestDungeonAPIValidation:
     """Test input validation for dungeon API endpoints."""
     
-    def test_enter_dungeon_validation(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_enter_dungeon_validation(self, mock_get_user_id, client, mock_auth_token):
         """Test input validation for dungeon entry."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         invalid_inputs = [
             {},  # Missing dungeon_level
             {"dungeon_level": "invalid"},  # Wrong type
@@ -378,14 +434,18 @@ class TestDungeonAPIValidation:
         
         for invalid_input in invalid_inputs:
             response = client.post(
-                "/api/v2/dungeon/enter",
+                "/api/v2/dungeons/enter",
                 json=invalid_input,
                 headers={"Authorization": mock_auth_token}
             )
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     
-    def test_complete_trial_validation(self, client, mock_auth_token):
+    @patch("app.api.v2.dependencies.auth.get_current_user_id")
+    def test_complete_trial_validation(self, mock_get_user_id, client, mock_auth_token):
         """Test input validation for trial completion."""
+        # Setup authentication mock
+        mock_get_user_id.return_value = 1
+        
         invalid_inputs = [
             {},  # Missing required fields
             {"movements_completed": "invalid"},  # Wrong type
@@ -397,7 +457,7 @@ class TestDungeonAPIValidation:
         
         for invalid_input in invalid_inputs:
             response = client.post(
-                "/api/v2/dungeon/complete",
+                "/api/v2/dungeons/complete",
                 json=invalid_input,
                 headers={"Authorization": mock_auth_token}
             )
@@ -413,7 +473,7 @@ class TestDungeonAPIErrorHandling:
             mock_enter.side_effect = Exception("Database connection failed")
             
             response = client.post(
-                "/api/v2/dungeon/enter",
+                "/api/v2/dungeons/enter",
                 json={"dungeon_level": 5},
                 headers={"Authorization": mock_auth_token}
             )
@@ -426,7 +486,7 @@ class TestDungeonAPIErrorHandling:
             mock_health.return_value = False
             
             response = client.get(
-                "/api/v2/dungeon/health",
+                "/api/v2/dungeons/health",
                 headers={"Authorization": mock_auth_token}
             )
             
