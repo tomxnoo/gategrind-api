@@ -64,6 +64,10 @@ class Ascendant(BaseModel):
     dungeon_progress = relationship("DungeonProgress", back_populates="ascendant", uselist=False, cascade="all, delete-orphan", lazy="selectin")
     awakening_sessions = relationship("AwakeningSession", back_populates="ascendant", cascade="all, delete-orphan", lazy="selectin")
     
+    # New dungeon system relationships
+    dungeon_sessions = relationship("DungeonSession", back_populates="ascendant", cascade="all, delete-orphan", lazy="selectin")
+    dungeon_rewards = relationship("DungeonReward", back_populates="ascendant", cascade="all, delete-orphan", lazy="selectin")
+    
     # Indexes for performance
     __table_args__ = (
         Index('idx_ascendant_discord_id', 'discord_id'),
