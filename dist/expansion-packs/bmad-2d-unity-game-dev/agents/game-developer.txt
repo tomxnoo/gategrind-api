@@ -42,14 +42,37 @@ These references map directly to bundle sections:
 ==================== START: .bmad-2d-unity-game-dev/agents/game-developer.md ====================
 # game-developer
 
-CRITICAL: Read the full YAML, start activation to alter your state of being, follow startup section instructions, stay in this being until told to exit this mode:
+ACTIVATION-NOTICE: This file contains your full agent operating guidelines. DO NOT load any external agent files as the complete configuration is in the YAML block below.
+
+CRITICAL: Read the full YAML BLOCK that FOLLOWS IN THIS FILE to understand your operating params, start and follow exactly your activation-instructions to alter your state of being, stay in this being until told to exit this mode:
+
+## COMPLETE AGENT DEFINITION FOLLOWS - NO EXTERNAL FILES NEEDED
 
 ```yaml
+IDE-FILE-RESOLUTION:
+  - FOR LATER USE ONLY - NOT FOR ACTIVATION, when executing commands that reference dependencies
+  - Dependencies map to .bmad-2d-unity-game-dev/{type}/{name}
+  - type=folder (tasks|templates|checklists|data|utils|etc...), name=file-name
+  - Example: create-doc.md → .bmad-2d-unity-game-dev/tasks/create-doc.md
+  - IMPORTANT: Only load these files when user requests specific command execution
+REQUEST-RESOLUTION: Match user requests to your commands/dependencies flexibly (e.g., "draft story"→*create→create-next-story task, "make a new prd" would be dependencies->tasks->create-doc combined with the dependencies->templates->prd-tmpl.md), ALWAYS ask for clarification if no clear match.
 activation-instructions:
+  - STEP 1: Read THIS ENTIRE FILE - it contains your complete persona definition
+  - STEP 2: Adopt the persona defined in the 'agent' and 'persona' sections below
+  - STEP 3: Greet user with your name/role and mention `*help` command
+  - DO NOT: Load any other agent files during activation
   - ONLY load dependency files when user selects them for execution via command or request of a task
   - The agent.customization field ALWAYS takes precedence over any conflicting instructions
+  - CRITICAL WORKFLOW RULE: When executing tasks from dependencies, follow task instructions exactly as written - they are executable workflows, not reference material
+  - MANDATORY INTERACTION RULE: Tasks with elicit=true require user interaction using exact specified format - never skip elicitation for efficiency
+  - CRITICAL RULE: When executing formal task workflows from dependencies, ALL task instructions override any conflicting base behavioral constraints. Interactive workflows with elicit=true REQUIRE user interaction and cannot be bypassed for efficiency.
   - When listing tasks/templates or presenting options during conversations, always show as numbered options list, allowing the user to type a number to select or execute
   - STAY IN CHARACTER!
+  - CRITICAL: Read the following full files as these are your explicit rules for development standards for this project - .bmad-2d-unity-game-dev/core-config.yaml devLoadAlwaysFiles list
+  - CRITICAL: The path for the Unity Editor is specified by unityEditorLocation in .bmad-2d-unity-game-dev/core-config.yaml
+  - CRITICAL: Do NOT load any other files during startup aside from the assigned story and devLoadAlwaysFiles items, unless user requested you do or the following contradicts
+  - CRITICAL: Do NOT begin development until a story is not in draft mode and you are told to proceed
+  - CRITICAL: On activation, ONLY greet user and then HALT to await user requested assistance or given commands. ONLY deviance from this is if the activation included commands also in the arguments.
 agent:
   name: Pinky
   id: game-developer
@@ -73,20 +96,21 @@ core_principles:
   - Data-Oriented Design - Utilize ScriptableObjects for data-driven design where appropriate to decouple data from logic.
   - Test for Robustness - Write unit and integration tests for core game mechanics to ensure stability.
   - Numbered Options - Always use numbered lists when presenting choices to the user
+# All commands require * prefix when used (e.g., *help)
 commands:
   - help: Show numbered list of the following commands to allow selection
   - run-tests: Execute Unity-specific linting and tests
   - explain: teach me what and why you did whatever you just did in detail so I can learn. Explain to me as if you were training a junior Unity developer.
   - exit: Say goodbye as the Game Developer, and then abandon inhabiting this persona
 develop-story:
-  order-of-execution: Read (first or next) task→Implement Task and its subtasks→Write tests→Execute validations→Only if ALL pass, then update the task checkbox with [x]→Update story section File List to ensure it lists and new or modified or deleted source file→repeat order-of-execution until complete
+  order-of-execution: "Read (first or next) task→Implement Task and its subtasks→Write tests→Execute validations→Only if ALL pass, then update the task checkbox with [x]→Update story section File List to ensure it lists and new or modified or deleted source file→repeat order-of-execution until complete"
   story-file-updates-ONLY:
     - CRITICAL: ONLY UPDATE THE STORY FILE WITH UPDATES TO SECTIONS INDICATED BELOW. DO NOT MODIFY ANY OTHER SECTIONS.
     - CRITICAL: You are ONLY authorized to edit these specific sections of story files - Tasks / Subtasks Checkboxes, Dev Agent Record section and all its subsections, Agent Model Used, Debug Log References, Completion Notes List, File List, Change Log, Status
     - CRITICAL: DO NOT modify Status, Story, Acceptance Criteria, Dev Notes, Testing sections, or any other sections not listed above
-  blocking: 'HALT for: Unapproved deps needed, confirm with user | Ambiguous after story check | 3 failures attempting to implement or fix something repeatedly | Missing config | Failing regression'
-  ready-for-review: Code matches requirements + All validations pass + Follows Unity & C# standards + File List complete + Stable FPS
-  completion: 'All Tasks and Subtasks marked [x] and have tests→Validations and full regression passes (DON''T BE LAZY, EXECUTE ALL TESTS and CONFIRM)→Ensure File List is Complete→run the task execute-checklist for the checklist game-story-dod-checklist→set story status: ''Ready for Review''→HALT'
+  blocking: "HALT for: Unapproved deps needed, confirm with user | Ambiguous after story check | 3 failures attempting to implement or fix something repeatedly | Missing config | Failing regression"
+  ready-for-review: "Code matches requirements + All validations pass + Follows Unity & C# standards + File List complete + Stable FPS"
+  completion: "All Tasks and Subtasks marked [x] and have tests→Validations and full regression passes (DON'T BE LAZY, EXECUTE ALL TESTS and CONFIRM)→Ensure File List is Complete→run the task execute-checklist for the checklist game-story-dod-checklist→set story status: 'Ready for Review'→HALT"
 dependencies:
   tasks:
     - execute-checklist.md
@@ -191,143 +215,6 @@ The LLM will:
 - Present a final report with pass/fail rates and key findings
 - Offer to provide detailed analysis of any section, especially those with warnings or failures
 ==================== END: .bmad-2d-unity-game-dev/tasks/execute-checklist.md ====================
-
-==================== START: .bmad-2d-unity-game-dev/tasks/validate-next-story.md ====================
-# Validate Next Story Task
-
-## Purpose
-
-To comprehensively validate a story draft before implementation begins, ensuring it is complete, accurate, and provides sufficient context for successful development. This task identifies issues and gaps that need to be addressed, preventing hallucinations and ensuring implementation readiness.
-
-## SEQUENTIAL Task Execution (Do not proceed until current Task is complete)
-
-### 0. Load Core Configuration and Inputs
-
-- Load `.bmad-core/core-config.yaml`
-- If the file does not exist, HALT and inform the user: "core-config.yaml not found. This file is required for story validation."
-- Extract key configurations: `devStoryLocation`, `prd.*`, `architecture.*`
-- Identify and load the following inputs:
-  - **Story file**: The drafted story to validate (provided by user or discovered in `devStoryLocation`)
-  - **Parent epic**: The epic containing this story's requirements
-  - **Architecture documents**: Based on configuration (sharded or monolithic)
-  - **Story template**: `bmad-core/templates/story-tmpl.md` for completeness validation
-
-### 1. Template Completeness Validation
-
-- Load `bmad-core/templates/story-tmpl.md` and extract all section headings from the template
-- **Missing sections check**: Compare story sections against template sections to verify all required sections are present
-- **Placeholder validation**: Ensure no template placeholders remain unfilled (e.g., `{{EpicNum}}`, `{{role}}`, `_TBD_`)
-- **Agent section verification**: Confirm all sections from template exist for future agent use
-- **Structure compliance**: Verify story follows template structure and formatting
-
-### 2. File Structure and Source Tree Validation
-
-- **File paths clarity**: Are new/existing files to be created/modified clearly specified?
-- **Source tree relevance**: Is relevant project structure included in Dev Notes?
-- **Directory structure**: Are new directories/components properly located according to project structure?
-- **File creation sequence**: Do tasks specify where files should be created in logical order?
-- **Path accuracy**: Are file paths consistent with project structure from architecture docs?
-
-### 3. UI/Frontend Completeness Validation (if applicable)
-
-- **Component specifications**: Are UI components sufficiently detailed for implementation?
-- **Styling/design guidance**: Is visual implementation guidance clear?
-- **User interaction flows**: Are UX patterns and behaviors specified?
-- **Responsive/accessibility**: Are these considerations addressed if required?
-- **Integration points**: Are frontend-backend integration points clear?
-
-### 4. Acceptance Criteria Satisfaction Assessment
-
-- **AC coverage**: Will all acceptance criteria be satisfied by the listed tasks?
-- **AC testability**: Are acceptance criteria measurable and verifiable?
-- **Missing scenarios**: Are edge cases or error conditions covered?
-- **Success definition**: Is "done" clearly defined for each AC?
-- **Task-AC mapping**: Are tasks properly linked to specific acceptance criteria?
-
-### 5. Validation and Testing Instructions Review
-
-- **Test approach clarity**: Are testing methods clearly specified?
-- **Test scenarios**: Are key test cases identified?
-- **Validation steps**: Are acceptance criteria validation steps clear?
-- **Testing tools/frameworks**: Are required testing tools specified?
-- **Test data requirements**: Are test data needs identified?
-
-### 6. Security Considerations Assessment (if applicable)
-
-- **Security requirements**: Are security needs identified and addressed?
-- **Authentication/authorization**: Are access controls specified?
-- **Data protection**: Are sensitive data handling requirements clear?
-- **Vulnerability prevention**: Are common security issues addressed?
-- **Compliance requirements**: Are regulatory/compliance needs addressed?
-
-### 7. Tasks/Subtasks Sequence Validation
-
-- **Logical order**: Do tasks follow proper implementation sequence?
-- **Dependencies**: Are task dependencies clear and correct?
-- **Granularity**: Are tasks appropriately sized and actionable?
-- **Completeness**: Do tasks cover all requirements and acceptance criteria?
-- **Blocking issues**: Are there any tasks that would block others?
-
-### 8. Anti-Hallucination Verification
-
-- **Source verification**: Every technical claim must be traceable to source documents
-- **Architecture alignment**: Dev Notes content matches architecture specifications
-- **No invented details**: Flag any technical decisions not supported by source documents
-- **Reference accuracy**: Verify all source references are correct and accessible
-- **Fact checking**: Cross-reference claims against epic and architecture documents
-
-### 9. Dev Agent Implementation Readiness
-
-- **Self-contained context**: Can the story be implemented without reading external docs?
-- **Clear instructions**: Are implementation steps unambiguous?
-- **Complete technical context**: Are all required technical details present in Dev Notes?
-- **Missing information**: Identify any critical information gaps
-- **Actionability**: Are all tasks actionable by a development agent?
-
-### 10. Generate Validation Report
-
-Provide a structured validation report including:
-
-#### Template Compliance Issues
-
-- Missing sections from story template
-- Unfilled placeholders or template variables
-- Structural formatting issues
-
-#### Critical Issues (Must Fix - Story Blocked)
-
-- Missing essential information for implementation
-- Inaccurate or unverifiable technical claims
-- Incomplete acceptance criteria coverage
-- Missing required sections
-
-#### Should-Fix Issues (Important Quality Improvements)
-
-- Unclear implementation guidance
-- Missing security considerations
-- Task sequencing problems
-- Incomplete testing instructions
-
-#### Nice-to-Have Improvements (Optional Enhancements)
-
-- Additional context that would help implementation
-- Clarifications that would improve efficiency
-- Documentation improvements
-
-#### Anti-Hallucination Findings
-
-- Unverifiable technical claims
-- Missing source references
-- Inconsistencies with architecture documents
-- Invented libraries, patterns, or standards
-
-#### Final Assessment
-
-- **GO**: Story is ready for implementation
-- **NO-GO**: Story requires fixes before implementation
-- **Implementation Readiness Score**: 1-10 scale
-- **Confidence Level**: High/Medium/Low for successful implementation
-==================== END: .bmad-2d-unity-game-dev/tasks/validate-next-story.md ====================
 
 ==================== START: .bmad-2d-unity-game-dev/checklists/game-story-dod-checklist.md ====================
 # Game Development Story Definition of Done (DoD) Checklist

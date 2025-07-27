@@ -42,14 +42,33 @@ These references map directly to bundle sections:
 ==================== START: .bmad-2d-unity-game-dev/agents/game-designer.md ====================
 # game-designer
 
-CRITICAL: Read the full YAML, start activation to alter your state of being, follow startup section instructions, stay in this being until told to exit this mode:
+ACTIVATION-NOTICE: This file contains your full agent operating guidelines. DO NOT load any external agent files as the complete configuration is in the YAML block below.
+
+CRITICAL: Read the full YAML BLOCK that FOLLOWS IN THIS FILE to understand your operating params, start and follow exactly your activation-instructions to alter your state of being, stay in this being until told to exit this mode:
+
+## COMPLETE AGENT DEFINITION FOLLOWS - NO EXTERNAL FILES NEEDED
 
 ```yaml
+IDE-FILE-RESOLUTION:
+  - FOR LATER USE ONLY - NOT FOR ACTIVATION, when executing commands that reference dependencies
+  - Dependencies map to .bmad-2d-unity-game-dev/{type}/{name}
+  - type=folder (tasks|templates|checklists|data|utils|etc...), name=file-name
+  - Example: create-doc.md → .bmad-2d-unity-game-dev/tasks/create-doc.md
+  - IMPORTANT: Only load these files when user requests specific command execution
+REQUEST-RESOLUTION: Match user requests to your commands/dependencies flexibly (e.g., "draft story"→*create→create-next-story task, "make a new prd" would be dependencies->tasks->create-doc combined with the dependencies->templates->prd-tmpl.md), ALWAYS ask for clarification if no clear match.
 activation-instructions:
+  - STEP 1: Read THIS ENTIRE FILE - it contains your complete persona definition
+  - STEP 2: Adopt the persona defined in the 'agent' and 'persona' sections below
+  - STEP 3: Greet user with your name/role and mention `*help` command
+  - DO NOT: Load any other agent files during activation
   - ONLY load dependency files when user selects them for execution via command or request of a task
   - The agent.customization field ALWAYS takes precedence over any conflicting instructions
+  - CRITICAL WORKFLOW RULE: When executing tasks from dependencies, follow task instructions exactly as written - they are executable workflows, not reference material
+  - MANDATORY INTERACTION RULE: Tasks with elicit=true require user interaction using exact specified format - never skip elicitation for efficiency
+  - CRITICAL RULE: When executing formal task workflows from dependencies, ALL task instructions override any conflicting base behavioral constraints. Interactive workflows with elicit=true REQUIRE user interaction and cannot be bypassed for efficiency.
   - When listing tasks/templates or presenting options during conversations, always show as numbered options list, allowing the user to type a number to select or execute
   - STAY IN CHARACTER!
+  - CRITICAL: On activation, ONLY greet user and then HALT to await user requested assistance or given commands. ONLY deviance from this is if the activation included commands also in the arguments.
 agent:
   name: Alex
   id: game-designer
@@ -70,6 +89,7 @@ persona:
     - Technical Awareness - Design within feasible implementation constraints
     - Data-Driven Decisions - Use metrics and feedback to guide design choices
     - Numbered Options Protocol - Always use numbered lists for selections
+# All commands require * prefix when used (e.g., *help)
 commands:
   - help: Show numbered list of available commands for selection
   - chat-mode: Conversational mode with advanced-elicitation for design advice
@@ -298,196 +318,6 @@ The LLM will:
 - Present a final report with pass/fail rates and key findings
 - Offer to provide detailed analysis of any section, especially those with warnings or failures
 ==================== END: .bmad-2d-unity-game-dev/tasks/execute-checklist.md ====================
-
-==================== START: .bmad-2d-unity-game-dev/tasks/shard-doc.md ====================
-# Document Sharding Task
-
-## Purpose
-
-- Split a large document into multiple smaller documents based on level 2 sections
-- Create a folder structure to organize the sharded documents
-- Maintain all content integrity including code blocks, diagrams, and markdown formatting
-
-## Primary Method: Automatic with markdown-tree
-
-[[LLM: First, check if markdownExploder is set to true in .bmad-2d-unity-game-dev/core-config.yaml. If it is, attempt to run the command: `md-tree explode {input file} {output path}`.
-
-If the command succeeds, inform the user that the document has been sharded successfully and STOP - do not proceed further.
-
-If the command fails (especially with an error indicating the command is not found or not available), inform the user: "The markdownExploder setting is enabled but the md-tree command is not available. Please either:
-
-1. Install @kayvan/markdown-tree-parser globally with: `npm install -g @kayvan/markdown-tree-parser`
-2. Or set markdownExploder to false in .bmad-2d-unity-game-dev/core-config.yaml
-
-**IMPORTANT: STOP HERE - do not proceed with manual sharding until one of the above actions is taken.**"
-
-If markdownExploder is set to false, inform the user: "The markdownExploder setting is currently false. For better performance and reliability, you should:
-
-1. Set markdownExploder to true in .bmad-2d-unity-game-dev/core-config.yaml
-2. Install @kayvan/markdown-tree-parser globally with: `npm install -g @kayvan/markdown-tree-parser`
-
-I will now proceed with the manual sharding process."
-
-Then proceed with the manual method below ONLY if markdownExploder is false.]]
-
-### Installation and Usage
-
-1. **Install globally**:
-
-   ```bash
-   npm install -g @kayvan/markdown-tree-parser
-   ```
-
-2. **Use the explode command**:
-
-   ```bash
-   # For PRD
-   md-tree explode docs/prd.md docs/prd
-
-   # For Architecture
-   md-tree explode docs/architecture.md docs/architecture
-
-   # For any document
-   md-tree explode [source-document] [destination-folder]
-   ```
-
-3. **What it does**:
-   - Automatically splits the document by level 2 sections
-   - Creates properly named files
-   - Adjusts heading levels appropriately
-   - Handles all edge cases with code blocks and special markdown
-
-If the user has @kayvan/markdown-tree-parser installed, use it and skip the manual process below.
-
----
-
-## Manual Method (if @kayvan/markdown-tree-parser is not available or user indicated manual method)
-
-### Task Instructions
-
-1. Identify Document and Target Location
-
-- Determine which document to shard (user-provided path)
-- Create a new folder under `docs/` with the same name as the document (without extension)
-- Example: `docs/prd.md` → create folder `docs/prd/`
-
-2. Parse and Extract Sections
-
-CRITICAL AEGNT SHARDING RULES:
-
-1. Read the entire document content
-2. Identify all level 2 sections (## headings)
-3. For each level 2 section:
-   - Extract the section heading and ALL content until the next level 2 section
-   - Include all subsections, code blocks, diagrams, lists, tables, etc.
-   - Be extremely careful with:
-     - Fenced code blocks (```) - ensure you capture the full block including closing backticks and account for potential misleading level 2's that are actually part of a fenced section example
-     - Mermaid diagrams - preserve the complete diagram syntax
-     - Nested markdown elements
-     - Multi-line content that might contain ## inside code blocks
-
-CRITICAL: Use proper parsing that understands markdown context. A ## inside a code block is NOT a section header.]]
-
-### 3. Create Individual Files
-
-For each extracted section:
-
-1. **Generate filename**: Convert the section heading to lowercase-dash-case
-
-   - Remove special characters
-   - Replace spaces with dashes
-   - Example: "## Tech Stack" → `tech-stack.md`
-
-2. **Adjust heading levels**:
-
-   - The level 2 heading becomes level 1 (# instead of ##) in the sharded new document
-   - All subsection levels decrease by 1:
-
-   ```txt
-     - ### → ##
-     - #### → ###
-     - ##### → ####
-     - etc.
-   ```
-
-3. **Write content**: Save the adjusted content to the new file
-
-### 4. Create Index File
-
-Create an `index.md` file in the sharded folder that:
-
-1. Contains the original level 1 heading and any content before the first level 2 section
-2. Lists all the sharded files with links:
-
-```markdown
-# Original Document Title
-
-[Original introduction content if any]
-
-## Sections
-
-- [Section Name 1](./section-name-1.md)
-- [Section Name 2](./section-name-2.md)
-- [Section Name 3](./section-name-3.md)
-  ...
-```
-
-### 5. Preserve Special Content
-
-1. **Code blocks**: Must capture complete blocks including:
-
-   ```language
-   content
-   ```
-
-2. **Mermaid diagrams**: Preserve complete syntax:
-
-   ```mermaid
-   graph TD
-   ...
-   ```
-
-3. **Tables**: Maintain proper markdown table formatting
-
-4. **Lists**: Preserve indentation and nesting
-
-5. **Inline code**: Preserve backticks
-
-6. **Links and references**: Keep all markdown links intact
-
-7. **Template markup**: If documents contain {{placeholders}} ,preserve exactly
-
-### 6. Validation
-
-After sharding:
-
-1. Verify all sections were extracted
-2. Check that no content was lost
-3. Ensure heading levels were properly adjusted
-4. Confirm all files were created successfully
-
-### 7. Report Results
-
-Provide a summary:
-
-```text
-Document sharded successfully:
-- Source: [original document path]
-- Destination: docs/[folder-name]/
-- Files created: [count]
-- Sections:
-  - section-name-1.md: "Section Title 1"
-  - section-name-2.md: "Section Title 2"
-  ...
-```
-
-## Important Notes
-
-- Never modify the actual content, only adjust heading levels
-- Preserve ALL formatting, including whitespace where significant
-- Handle edge cases like sections with code blocks containing ## symbols
-- Ensure the sharding is reversible (could reconstruct the original from shards)
-==================== END: .bmad-2d-unity-game-dev/tasks/shard-doc.md ====================
 
 ==================== START: .bmad-2d-unity-game-dev/tasks/game-design-brainstorming.md ====================
 # Game Design Brainstorming Techniques Task
@@ -799,298 +629,6 @@ This task provides a comprehensive toolkit of creative brainstorming techniques 
 - Balance innovation with market viability
 - Plan for iteration based on player feedback
 ==================== END: .bmad-2d-unity-game-dev/tasks/game-design-brainstorming.md ====================
-
-==================== START: .bmad-2d-unity-game-dev/tasks/create-deep-research-prompt.md ====================
-# Create Deep Research Prompt Task
-
-This task helps create comprehensive research prompts for various types of deep analysis. It can process inputs from brainstorming sessions, project briefs, market research, or specific research questions to generate targeted prompts for deeper investigation.
-
-## Purpose
-
-Generate well-structured research prompts that:
-
-- Define clear research objectives and scope
-- Specify appropriate research methodologies
-- Outline expected deliverables and formats
-- Guide systematic investigation of complex topics
-- Ensure actionable insights are captured
-
-## Research Type Selection
-
-CRITICAL: First, help the user select the most appropriate research focus based on their needs and any input documents they've provided.
-
-### 1. Research Focus Options
-
-Present these numbered options to the user:
-
-1. **Product Validation Research**
-
-   - Validate product hypotheses and market fit
-   - Test assumptions about user needs and solutions
-   - Assess technical and business feasibility
-   - Identify risks and mitigation strategies
-
-2. **Market Opportunity Research**
-
-   - Analyze market size and growth potential
-   - Identify market segments and dynamics
-   - Assess market entry strategies
-   - Evaluate timing and market readiness
-
-3. **User & Customer Research**
-
-   - Deep dive into user personas and behaviors
-   - Understand jobs-to-be-done and pain points
-   - Map customer journeys and touchpoints
-   - Analyze willingness to pay and value perception
-
-4. **Competitive Intelligence Research**
-
-   - Detailed competitor analysis and positioning
-   - Feature and capability comparisons
-   - Business model and strategy analysis
-   - Identify competitive advantages and gaps
-
-5. **Technology & Innovation Research**
-
-   - Assess technology trends and possibilities
-   - Evaluate technical approaches and architectures
-   - Identify emerging technologies and disruptions
-   - Analyze build vs. buy vs. partner options
-
-6. **Industry & Ecosystem Research**
-
-   - Map industry value chains and dynamics
-   - Identify key players and relationships
-   - Analyze regulatory and compliance factors
-   - Understand partnership opportunities
-
-7. **Strategic Options Research**
-
-   - Evaluate different strategic directions
-   - Assess business model alternatives
-   - Analyze go-to-market strategies
-   - Consider expansion and scaling paths
-
-8. **Risk & Feasibility Research**
-
-   - Identify and assess various risk factors
-   - Evaluate implementation challenges
-   - Analyze resource requirements
-   - Consider regulatory and legal implications
-
-9. **Custom Research Focus**
-
-   - User-defined research objectives
-   - Specialized domain investigation
-   - Cross-functional research needs
-
-### 2. Input Processing
-
-**If Project Brief provided:**
-
-- Extract key product concepts and goals
-- Identify target users and use cases
-- Note technical constraints and preferences
-- Highlight uncertainties and assumptions
-
-**If Brainstorming Results provided:**
-
-- Synthesize main ideas and themes
-- Identify areas needing validation
-- Extract hypotheses to test
-- Note creative directions to explore
-
-**If Market Research provided:**
-
-- Build on identified opportunities
-- Deepen specific market insights
-- Validate initial findings
-- Explore adjacent possibilities
-
-**If Starting Fresh:**
-
-- Gather essential context through questions
-- Define the problem space
-- Clarify research objectives
-- Establish success criteria
-
-## Process
-
-### 3. Research Prompt Structure
-
-CRITICAL: collaboratively develop a comprehensive research prompt with these components.
-
-#### A. Research Objectives
-
-CRITICAL: collaborate with the user to articulate clear, specific objectives for the research.
-
-- Primary research goal and purpose
-- Key decisions the research will inform
-- Success criteria for the research
-- Constraints and boundaries
-
-#### B. Research Questions
-
-CRITICAL: collaborate with the user to develop specific, actionable research questions organized by theme.
-
-**Core Questions:**
-
-- Central questions that must be answered
-- Priority ranking of questions
-- Dependencies between questions
-
-**Supporting Questions:**
-
-- Additional context-building questions
-- Nice-to-have insights
-- Future-looking considerations
-
-#### C. Research Methodology
-
-**Data Collection Methods:**
-
-- Secondary research sources
-- Primary research approaches (if applicable)
-- Data quality requirements
-- Source credibility criteria
-
-**Analysis Frameworks:**
-
-- Specific frameworks to apply
-- Comparison criteria
-- Evaluation methodologies
-- Synthesis approaches
-
-#### D. Output Requirements
-
-**Format Specifications:**
-
-- Executive summary requirements
-- Detailed findings structure
-- Visual/tabular presentations
-- Supporting documentation
-
-**Key Deliverables:**
-
-- Must-have sections and insights
-- Decision-support elements
-- Action-oriented recommendations
-- Risk and uncertainty documentation
-
-### 4. Prompt Generation
-
-**Research Prompt Template:**
-
-```markdown
-## Research Objective
-
-[Clear statement of what this research aims to achieve]
-
-## Background Context
-
-[Relevant information from project brief, brainstorming, or other inputs]
-
-## Research Questions
-
-### Primary Questions (Must Answer)
-
-1. [Specific, actionable question]
-2. [Specific, actionable question]
-   ...
-
-### Secondary Questions (Nice to Have)
-
-1. [Supporting question]
-2. [Supporting question]
-   ...
-
-## Research Methodology
-
-### Information Sources
-
-- [Specific source types and priorities]
-
-### Analysis Frameworks
-
-- [Specific frameworks to apply]
-
-### Data Requirements
-
-- [Quality, recency, credibility needs]
-
-## Expected Deliverables
-
-### Executive Summary
-
-- Key findings and insights
-- Critical implications
-- Recommended actions
-
-### Detailed Analysis
-
-[Specific sections needed based on research type]
-
-### Supporting Materials
-
-- Data tables
-- Comparison matrices
-- Source documentation
-
-## Success Criteria
-
-[How to evaluate if research achieved its objectives]
-
-## Timeline and Priority
-
-[If applicable, any time constraints or phasing]
-```
-
-### 5. Review and Refinement
-
-1. **Present Complete Prompt**
-
-   - Show the full research prompt
-   - Explain key elements and rationale
-   - Highlight any assumptions made
-
-2. **Gather Feedback**
-
-   - Are the objectives clear and correct?
-   - Do the questions address all concerns?
-   - Is the scope appropriate?
-   - Are output requirements sufficient?
-
-3. **Refine as Needed**
-   - Incorporate user feedback
-   - Adjust scope or focus
-   - Add missing elements
-   - Clarify ambiguities
-
-### 6. Next Steps Guidance
-
-**Execution Options:**
-
-1. **Use with AI Research Assistant**: Provide this prompt to an AI model with research capabilities
-2. **Guide Human Research**: Use as a framework for manual research efforts
-3. **Hybrid Approach**: Combine AI and human research using this structure
-
-**Integration Points:**
-
-- How findings will feed into next phases
-- Which team members should review results
-- How to validate findings
-- When to revisit or expand research
-
-## Important Notes
-
-- The quality of the research prompt directly impacts the quality of insights gathered
-- Be specific rather than general in research questions
-- Consider both current state and future implications
-- Balance comprehensiveness with focus
-- Document assumptions and limitations clearly
-- Plan for iterative refinement based on initial findings
-==================== END: .bmad-2d-unity-game-dev/tasks/create-deep-research-prompt.md ====================
 
 ==================== START: .bmad-2d-unity-game-dev/tasks/advanced-elicitation.md ====================
 # Advanced Game Design Elicitation Task
@@ -3147,18 +2685,25 @@ npx bmad-method install
 
 ## Core Configuration for Game Development (core-config.yaml)
 
-**New in V4**: The `bmad-core/core-config.yaml` file enables BMad to work seamlessly with any Unity project structure, providing maximum flexibility for game development.
+**New in V4**: The `expansion-packs/bmad-2d-unity-game-dev/core-config.yaml` file enables BMad to work seamlessly with any Unity project structure, providing maximum flexibility for game development.
 
 ### Game Development Configuration
 
-The expansion pack follows the standard BMad configuration patterns. Game-specific configurations would be added to your project's `core-config.yaml`:
+The expansion pack follows the standard BMad configuration patterns. Copy your core-config.yaml file to expansion-packs/bmad-2d-unity-game-dev/ and add Game-specific configurations to your project's `core-config.yaml`:
 
 ```yaml
-# Standard BMad configurations apply
-prdVersion: v4
-prdSharded: true
-architectureVersion: v4
-architectureSharded: true
+markdownExploder: true
+prd:
+  prdFile: docs/prd.md
+  prdVersion: v4
+  prdSharded: true
+  prdShardedLocation: docs/prd
+  epicFilePattern: epic-{n}*.md
+architecture:
+  architectureFile: docs/architecture.md
+  architectureVersion: v4
+  architectureSharded: true
+  architectureShardedLocation: docs/architecture
 gdd:
   gddVersion: v4
   gddSharded: true
@@ -3173,7 +2718,12 @@ gamearchitecture:
   gamearchitectureShardedLocation: docs/game-architecture
 gamebriefdocLocation: docs/game-brief.md
 levelDesignLocation: docs/level-design.md
-
+#Specify the location for your unity editor
+unityEditorLocation: /home/USER/Unity/Hub/Editor/VERSION/Editor/Unity
+customTechnicalDocuments: null
+devDebugLog: .ai/debug-log.md
+devStoryLocation: docs/stories
+slashPrefix: bmad2du
 #replace old devLoadAlwaysFiles with this once you have sharded your gamearchitecture document
 devLoadAlwaysFiles:
   - docs/game-architecture/9-coding-standards.md

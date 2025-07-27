@@ -21,6 +21,15 @@ devLoadAlwaysFiles:
   - .ai/agent-handoff-protocol.md
   - .ai/story-quality-validation.md
   - .ai/enhanced-workflow-commands.md
+  # Enhanced Development Files for Complex Story Implementation
+  - .bmad-core/tasks/pre-implementation-validation.md
+  - .bmad-core/tasks/zero-defect-implementation.md
+  - .bmad-core/tasks/enhanced-development-strategy.md
+  - .bmad-core/tasks/execute-checklist.md
+  - .bmad-core/tasks/validate-next-story.md
+  - .bmad-core/checklists/complex-story-implementation.md
+  - .bmad-core/checklists/story-dod-checklist.md
+  - .bmad-core/data/technical-preferences.md
 smLoadAlwaysFiles:
   - docs/architecture/agent-contexts/sm-context.md
   - docs/architecture/codebase-context.md

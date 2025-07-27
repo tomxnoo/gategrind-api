@@ -4,7 +4,7 @@ from datetime import date, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
-from api.main import app
+from app.main import app
 from app.application.services.awakening_service import AwakeningService
 from app.application.services.progression_service import ProgressionService
 from app.api.v2.awakening import get_awakening_service

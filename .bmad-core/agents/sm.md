@@ -55,7 +55,7 @@ commands:
 dependencies:
   tasks:
     - create-next-story.md
-    - multi-agent-epic-workflow.md
+    - multi-agent-orchestrator.md
     - execute-checklist.md
     - correct-course.md
   templates:

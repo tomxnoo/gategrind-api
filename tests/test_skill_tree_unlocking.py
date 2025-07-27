@@ -198,16 +198,16 @@ class TestSkillTreeUnlocking:
         with patch('app.application.services.progression_service.get_node_by_id', return_value=sample_skill_node):
             mock_results = [
                 Mock(scalar_one_or_none=Mock(return_value=sample_user)),  # _get_user_with_skill_progress
-                Mock(scalar_one_or_none=Mock(return_value=sample_db_skill_node)),  # _check_existing_skill_progress (node lookup)
-                Mock(scalar_one_or_none=Mock(return_value=None)),  # _check_existing_skill_progress (no existing progress)
+                Mock(scalar_one_or_none=Mock(return_value=sample_db_skill_node)),  # node lookup
+                Mock(scalar_one_or_none=Mock(return_value=None)),  # no existing progress
             ]
             mock_session.execute.side_effect = mock_results
-            
+
             async def mock_transaction(func):
                 return await func(mock_session)
-            
+
             progression_service.execute_in_transaction = mock_transaction
-            
+
             with pytest.raises(ValueError, match="Ascendant level 5 required, current level: 2"):
                 await progression_service.unlock_skill(user_id=1, node_id="UPPER_DYNAMIC_L2")
 
@@ -220,16 +220,16 @@ class TestSkillTreeUnlocking:
         with patch('app.application.services.progression_service.get_node_by_id', return_value=sample_skill_node):
             mock_results = [
                 Mock(scalar_one_or_none=Mock(return_value=sample_user)),  # _get_user_with_skill_progress
-                Mock(scalar_one_or_none=Mock(return_value=sample_db_skill_node)),  # _check_existing_skill_progress (node lookup)
-                Mock(scalar_one_or_none=Mock(return_value=None)),  # _check_existing_skill_progress (no existing progress)
+                Mock(scalar_one_or_none=Mock(return_value=sample_db_skill_node)),  # node lookup
+                Mock(scalar_one_or_none=Mock(return_value=None)),  # no existing progress
             ]
             mock_session.execute.side_effect = mock_results
-            
+
             async def mock_transaction(func):
                 return await func(mock_session)
-            
+
             progression_service.execute_in_transaction = mock_transaction
-            
+
             with pytest.raises(ValueError, match="Strength stat 50 required, current: 25"):
                 await progression_service.unlock_skill(user_id=1, node_id="UPPER_DYNAMIC_L2")
 

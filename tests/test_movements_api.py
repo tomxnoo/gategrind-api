@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch, MagicMock
 import json
 
-from api.main import app
+from app.main import app
 from app.application.services.movement_service import MovementService
 from app.api.v2.movements import get_movement_service
 
