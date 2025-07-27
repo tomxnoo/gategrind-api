@@ -86,10 +86,19 @@ class DungeonService(BaseService):
         Raises:
             DungeonLevelLockedError: If level is locked
             InsufficientRequirementsError: If requirements not met
+            ActiveSessionExistsError: If user already has an active session
         """
         try:
             # Always costs 1 Shadow Key regardless of level
             shadow_key_cost = 1
+            
+            # Check for existing active session
+            active_session = await self.get_active_session(ascendant_id)
+            if active_session:
+                raise ActiveSessionExistsError(
+                    f"Active dungeon session already exists (ID: {active_session.id}). "
+                    f"Complete or abandon it before entering a new dungeon."
+                )
             
             # Validate entry requirements
             await self.validate_entry_requirements(ascendant_id, dungeon_level)
@@ -182,20 +191,36 @@ class DungeonService(BaseService):
             self.handle_service_error(e, f"validate_entry_requirements(ascendant_id={ascendant_id}, level={dungeon_level})")
             raise
     
-    async def calculate_aura_requirement(self, level: int) -> int:
-        """Calculate aura requirement using cache service."""
-        cache_service = await self.get_cache_service()
-        return cache_service.get_cached_aura_requirement(level)
+    def calculate_aura_requirement(self, level: int) -> int:
+        """Calculate aura requirement with exponential scaling."""
+        # Base aura requirement of 100, scaling by 1.5x per level
+        return int(100 * (1.5 ** (level - 1)))
     
-    async def calculate_stat_requirements(self, level: int) -> dict:
-        """Calculate stat requirements using cache service."""
-        cache_service = await self.get_cache_service()
-        return cache_service.get_cached_stat_requirements(level)
+    def calculate_stat_requirements(self, level: int) -> dict:
+        """Calculate STR/END/TECH requirements with progressive scaling."""
+        # Base requirement of 10 for each stat, scaling by 1.5x per level
+        base_req = int(10 * (1.5 ** (level - 1)))
+        
+        return {
+            'strength': base_req,
+            'endurance': base_req,
+            'technique': base_req
+        }
     
-    async def calculate_skill_tree_requirements(self, level: int) -> int:
-        """Calculate required Movement skill tree nodes using cache service."""
-        cache_service = await self.get_cache_service()
-        return cache_service.get_cached_skill_tree_requirements(level)
+    def calculate_skill_tree_requirements(self, level: int) -> int:
+        """Calculate required Movement skill tree nodes."""
+        # No requirement for level 1
+        if level <= 1:
+            return 0
+        elif level <= 4:
+            # Early levels: level - 1
+            return level - 1
+        elif level <= 10:
+            # Mid levels: 5 + (level - 5) * 2
+            return 5 + (level - 5) * 2
+        else:
+            # High levels: 15 + (level - 10) * 3
+            return 15 + (level - 10) * 3
     
     async def get_shadow_keys(self, ascendant_id: int) -> int:
         """Get the number of shadow keys for an ascendant."""
@@ -317,6 +342,8 @@ class DungeonService(BaseService):
             List of trial dictionaries
         """
         try:
+            session = await self.get_session()
+            
             # Base number of trials with scaling
             base_trials = 3
             additional_trials = min(2, dungeon_level // 5)  # +1 trial every 5 levels, max 5 total
@@ -324,19 +351,60 @@ class DungeonService(BaseService):
             
             # Generate trials with increasing difficulty
             trials = []
-            quest_service = await self.get_quest_generation_service()
+            
+            # Import models for querying
+            from app.infrastructure.database.models.v2.movements import Movement
+            from app.infrastructure.database.models.v2.skill_tree_nodes import SkillTreeNode
             
             for i in range(total_trials):
                 trial_difficulty = self.calculate_trial_difficulty(dungeon_level, i)
+                movement_category = self._get_movement_category_for_trial(i)
+                
+                # Get a random movement from the category
+                movement_query = await session.execute(
+                    select(Movement)
+                    .join(SkillTreeNode, Movement.node_id == SkillTreeNode.id)
+                    .where(SkillTreeNode.category_id == movement_category)
+                    .order_by(func.random())
+                    .limit(1)
+                )
+                movement = movement_query.scalar_one_or_none()
+                
+                if not movement:
+                    # Fallback to any movement if category not found
+                    movement_query = await session.execute(
+                        select(Movement)
+                        .order_by(func.random())
+                        .limit(1)
+                    )
+                    movement = movement_query.scalar_one_or_none()
+                
+                # Calculate target value based on movement type and difficulty
+                target_type = 'reps'  # Default
+                base_value = 20  # Base reps
+                
+                if movement:
+                    # Scale based on dungeon level and trial difficulty
+                    # Higher levels require more reps
+                    level_scaling = 1 + (dungeon_level - 1) * 0.1  # 10% more per level
+                    base_value = int(base_value * level_scaling * trial_difficulty)
+                
+                # Apply difficulty scaling
+                target_value = self._calculate_target_value_enhanced(
+                    dungeon_level, trial_difficulty, base_value, daily_modifier
+                )
                 
                 # Create trial data structure
                 trial = {
                     'trial_number': i + 1,
-                    'trial_type': 'movement_based',
-                    'movement_category': self._get_movement_category_for_trial(i),
-                    'target_value': self._calculate_target_value(dungeon_level, trial_difficulty),
-                    'difficulty_modifier': trial_difficulty,
-                    'daily_modifier': daily_modifier.to_dict() if daily_modifier else None
+                    'trial_type': 'movement',
+                    'movement_id': movement.id if movement else None,
+                    'movement_name': movement.name if movement else f'{movement_category} Movement',
+                    'movement_category': movement_category,
+                    'target_type': target_type,
+                    'target_value': target_value,
+                    'difficulty_multiplier': trial_difficulty,
+                    'daily_modifier_applied': daily_modifier.modifier_type if daily_modifier else None
                 }
                 
                 trials.append(trial)
@@ -364,6 +432,36 @@ class DungeonService(BaseService):
         level_multiplier = 1 + (level * 0.2)
         difficulty_multiplier = 1 + difficulty
         return int(base_reps * level_multiplier * difficulty_multiplier)
+    
+    def _calculate_target_value_enhanced(self, level: int, difficulty: float, base_value: int, 
+                                       daily_modifier: Optional[DailyModifier] = None) -> int:
+        """
+        Enhanced target value calculation with daily modifier support.
+        
+        Args:
+            level: Dungeon level
+            difficulty: Trial difficulty multiplier
+            base_value: Base target value for the movement
+            daily_modifier: Optional daily modifier
+            
+        Returns:
+            int: Calculated target value
+        """
+        # Apply exponential scaling for infinite progression
+        level_multiplier = 1.2 ** (level - 1)  # 1.2x per level
+        
+        # Apply difficulty multiplier
+        total_multiplier = level_multiplier * (1 + difficulty)
+        
+        # Apply daily modifier if present
+        if daily_modifier and daily_modifier.difficulty_multiplier:
+            total_multiplier *= float(daily_modifier.difficulty_multiplier)
+        
+        # Calculate final value
+        target_value = int(base_value * total_multiplier)
+        
+        # Ensure reasonable bounds
+        return max(5, min(target_value, 1000))  # Min 5, max 1000
     
     async def create_session(self, ascendant_id: int, dungeon_level: int, trials: List[Dict[str, Any]], shadow_keys_spent: int) -> DungeonSession:
         """
@@ -506,12 +604,22 @@ class DungeonService(BaseService):
                 dungeon_session.status = 'completed'
                 dungeon_session.completed_at = datetime.now(timezone.utc)
                 
+                # Calculate completion time
+                completion_time_seconds = None
+                if dungeon_session.created_at:
+                    time_delta = dungeon_session.completed_at - dungeon_session.created_at
+                    completion_time_seconds = int(time_delta.total_seconds())
+                
                 # Calculate and distribute rewards
                 rewards = await self.calculate_rewards(dungeon_session)
                 await self.distribute_rewards(dungeon_session.ascendant_id, rewards, dungeon_session.id)
                 
-                # Update dungeon progress
-                await self.update_dungeon_progress(dungeon_session.ascendant_id, dungeon_session.dungeon_level)
+                # Update dungeon progress with completion time
+                await self.update_dungeon_progress(
+                    dungeon_session.ascendant_id, 
+                    dungeon_session.dungeon_level,
+                    completion_time_seconds
+                )
             else:
                 rewards = []
             
@@ -577,15 +685,27 @@ class DungeonService(BaseService):
         try:
             session = await self.get_session()
             
+            shadow_essence_total = 0
+            
             for reward in rewards:
                 reward_record = DungeonReward(
                     session_id=session_id,
                     ascendant_id=ascendant_id,
                     reward_type=reward['type'],
-                    amount=reward['amount'],
+                    amount=reward.get('amount', 0),
                     applied_at=datetime.now(timezone.utc)
                 )
                 session.add(reward_record)
+                
+                # Track shadow essence for progress update
+                if reward['type'] == 'shadow_essence':
+                    shadow_essence_total += reward.get('amount', 0)
+            
+            # Update progress with shadow essence earned
+            if shadow_essence_total > 0:
+                progress = await self.get_dungeon_progress(ascendant_id)
+                if progress:
+                    progress.total_shadow_essence_earned = (progress.total_shadow_essence_earned or 0) + shadow_essence_total
             
             await session.commit()
             self.logger.info(f"Distributed {len(rewards)} rewards to ascendant {ascendant_id}")
@@ -594,8 +714,16 @@ class DungeonService(BaseService):
             self.handle_service_error(e, f"distribute_rewards(ascendant_id={ascendant_id})")
             raise
     
-    async def update_dungeon_progress(self, ascendant_id: int, completed_level: int) -> None:
-        """Update dungeon progress for an ascendant."""
+    async def update_dungeon_progress(self, ascendant_id: int, completed_level: int, 
+                                    completion_time_seconds: Optional[int] = None) -> None:
+        """
+        Update dungeon progress for an ascendant.
+        
+        Args:
+            ascendant_id: The ascendant ID
+            completed_level: The level that was completed
+            completion_time_seconds: Time taken to complete in seconds
+        """
         try:
             session = await self.get_session()
             
@@ -604,12 +732,28 @@ class DungeonService(BaseService):
             if not progress:
                 progress = DungeonProgress(
                     ascendant_id=ascendant_id,
-                    highest_level_completed=completed_level
+                    highest_level_completed=completed_level,
+                    total_completions=1,
+                    total_shadow_keys_spent=1,
+                    last_completion_date=datetime.now(timezone.utc)
                 )
+                if completion_time_seconds:
+                    progress.best_completion_time = completion_time_seconds
                 session.add(progress)
             else:
+                # Update highest level
                 if completed_level > progress.highest_level_completed:
                     progress.highest_level_completed = completed_level
+                
+                # Update counters
+                progress.total_completions = (progress.total_completions or 0) + 1
+                progress.total_shadow_keys_spent = (progress.total_shadow_keys_spent or 0) + 1
+                progress.last_completion_date = datetime.now(timezone.utc)
+                
+                # Update best time if better
+                if completion_time_seconds:
+                    if progress.best_completion_time is None or completion_time_seconds < progress.best_completion_time:
+                        progress.best_completion_time = completion_time_seconds
             
             await session.commit()
             self.logger.info(f"Updated dungeon progress for ascendant {ascendant_id} to level {completed_level}")
@@ -664,6 +808,182 @@ class DungeonService(BaseService):
                 "error": str(e),
                 "status": "failed"
             }
+
+    async def recover_session(self, ascendant_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Recover an active dungeon session for session recovery.
+        
+        Args:
+            ascendant_id: The ascendant to recover session for
+            
+        Returns:
+            Dict containing session info if found, None otherwise
+        """
+        try:
+            active_session = await self.get_active_session(ascendant_id)
+            if not active_session:
+                return None
+            
+            # Get trials for the session
+            session = await self.get_session()
+            trials_result = await session.execute(
+                select(DungeonTrial)
+                .where(DungeonTrial.session_id == active_session.id)
+                .order_by(DungeonTrial.trial_number)
+            )
+            trials = trials_result.scalars().all()
+            
+            # Convert trials to dict format
+            trials_data = []
+            for trial in trials:
+                trials_data.append({
+                    'trial_id': trial.id,
+                    'trial_number': trial.trial_number,
+                    'trial_type': trial.trial_type,
+                    'movement_id': trial.movement_id,
+                    'movement_name': f"Movement {trial.trial_number}",  # Would need to join with movements table
+                    'target_type': 'reps',
+                    'target_value': trial.required_reps,
+                    'current_progress': trial.completed_reps,
+                    'is_completed': trial.is_completed,
+                    'trial_status': trial.trial_status
+                })
+            
+            return {
+                'session_id': active_session.id,
+                'level': active_session.dungeon_level,
+                'trials': trials_data,
+                'status': active_session.status,
+                'expires_at': active_session.expires_at,
+                'created_at': active_session.created_at,
+                'progress_percentage': active_session.progress_percentage
+            }
+            
+        except Exception as e:
+            self.handle_service_error(e, f"recover_session(ascendant_id={ascendant_id})")
+            raise
+    
+    async def abandon_session(self, session_id: int, ascendant_id: int) -> Dict[str, Any]:
+        """
+        Abandon an active dungeon session.
+        
+        Args:
+            session_id: The session to abandon
+            ascendant_id: The ascendant abandoning (for verification)
+            
+        Returns:
+            Dict with abandonment confirmation
+        """
+        try:
+            session = await self.get_session()
+            
+            # Get and verify session ownership
+            dungeon_session = await session.get(DungeonSession, session_id)
+            if not dungeon_session:
+                raise ValueError(f"Session {session_id} not found")
+            
+            if dungeon_session.ascendant_id != ascendant_id:
+                raise ValueError("Unauthorized: Session does not belong to this user")
+            
+            if dungeon_session.status != 'active':
+                raise ValueError(f"Cannot abandon session with status: {dungeon_session.status}")
+            
+            # Update session status
+            dungeon_session.status = 'abandoned'
+            dungeon_session.completed_at = datetime.now(timezone.utc)
+            
+            await session.commit()
+            
+            self.logger.info(f"Session {session_id} abandoned by ascendant {ascendant_id}")
+            
+            return {
+                'success': True,
+                'session_id': session_id,
+                'message': 'Dungeon session abandoned successfully',
+                'shadow_keys_refunded': 0  # No refund per business rules
+            }
+            
+        except Exception as e:
+            self.handle_service_error(e, f"abandon_session(session_id={session_id}, ascendant_id={ascendant_id})")
+            raise
+    
+    async def get_session_details(self, session_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed information about a dungeon session.
+        
+        Args:
+            session_id: The session to get details for
+            
+        Returns:
+            Dict containing session details or None if not found
+        """
+        try:
+            session = await self.get_session()
+            
+            # Get session with trials
+            result = await session.execute(
+                select(DungeonSession)
+                .options(selectinload(DungeonSession.trials))
+                .where(DungeonSession.id == session_id)
+            )
+            dungeon_session = result.scalar_one_or_none()
+            
+            if not dungeon_session:
+                return None
+            
+            # Build response
+            trials_data = []
+            for trial in dungeon_session.trials:
+                trials_data.append({
+                    'trial_id': trial.id,
+                    'trial_number': trial.trial_number,
+                    'trial_type': trial.trial_type,
+                    'required_reps': trial.required_reps,
+                    'completed_reps': trial.completed_reps,
+                    'is_completed': trial.is_completed,
+                    'trial_status': trial.trial_status,
+                    'completed_at': trial.completed_at.isoformat() if trial.completed_at else None
+                })
+            
+            return {
+                'session_id': dungeon_session.id,
+                'ascendant_id': dungeon_session.ascendant_id,
+                'dungeon_level': dungeon_session.dungeon_level,
+                'status': dungeon_session.status,
+                'shadow_keys_spent': dungeon_session.shadow_keys_spent,
+                'trials': trials_data,
+                'created_at': dungeon_session.created_at.isoformat(),
+                'expires_at': dungeon_session.expires_at.isoformat(),
+                'completed_at': dungeon_session.completed_at.isoformat() if dungeon_session.completed_at else None,
+                'progress_percentage': dungeon_session.progress_percentage
+            }
+            
+        except Exception as e:
+            self.handle_service_error(e, f"get_session_details(session_id={session_id})")
+            raise
+    
+    async def get_daily_modifier(self) -> Optional[Dict[str, Any]]:
+        """
+        Get the current daily modifier.
+        
+        Returns:
+            Dict containing daily modifier info or None if not active
+        """
+        try:
+            # Try cache first
+            cache_service = await self.get_cache_service()
+            daily_modifier = await cache_service.get_cached_daily_modifier()
+            
+            if daily_modifier:
+                return daily_modifier.to_dict()
+            
+            # Fallback to direct query if cache miss
+            modifier = await self.get_active_daily_modifier()
+            return modifier.to_dict() if modifier else None
+            
+        except Exception as e:
+            self.handle_service_error(e, "get_daily_modifier")
+            raise
 
     async def health_check(self) -> Dict[str, Any]:
         """Perform a health check for the dungeon service."""

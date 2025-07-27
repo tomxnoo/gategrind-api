@@ -79,27 +79,27 @@ class TestDungeonAPIEndpoints:
         
         # Mock dependency injection
         with patch("app.api.v2.dungeons.get_dungeon_service", return_value=mock_dungeon_service):
-            with patch("app.api.v2.dungeons.get_current_user") as mock_user:
-                mock_user.return_value = MagicMock(id=1, username="test_user")
-                
-                request_data = {
-                    "ascendant_id": 1,
-                    "shadow_keys_to_use": 3
-                }
-                
-                response = client.post(
-                    "/api/v2/dungeons/enter/3",
-                    json=request_data,
-                    headers=auth_headers
-                )
-                
-                assert response.status_code == status.HTTP_200_OK
-                data = response.json()
-                assert data["success"] == True
-                assert data["session_id"] == "session_123"
-                assert data["dungeon_level"] == 3
-                assert len(data["trials"]) == 1
-                assert data["trials"][0]["trial_type"] == "movement_based"
+            # Note: The dungeons.py endpoints don't use authentication directly
+            # They accept user_id as a parameter in the request body
+            
+            request_data = {
+                "ascendant_id": 1,
+                "shadow_keys_to_use": 3
+            }
+            
+            response = client.post(
+                "/api/v2/dungeons/enter/3",
+                json=request_data,
+                headers=auth_headers
+            )
+            
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["success"] == True
+            assert data["session_id"] == "session_123"
+            assert data["dungeon_level"] == 3
+            assert len(data["trials"]) == 1
+            assert data["trials"][0]["trial_type"] == "movement_based"
     
     async def test_enter_dungeon_level_locked(self, client, mock_dungeon_service, auth_headers):
         """Test dungeon entry with locked level."""
@@ -107,8 +107,8 @@ class TestDungeonAPIEndpoints:
         mock_dungeon_service.enter_dungeon.side_effect = DungeonLevelLockedError("Level 5 is locked")
         
         with patch("app.api.v2.dungeons.get_dungeon_service", return_value=mock_dungeon_service):
-            with patch("app.api.v2.dungeons.get_current_user") as mock_user:
-                mock_user.return_value = MagicMock(id=1, username="test_user")
+            # Note: The dungeons.py endpoints don't use authentication directly
+            # They accept user_id as a parameter in the request body
                 
                 request_data = {
                     "ascendant_id": 1,
@@ -131,8 +131,8 @@ class TestDungeonAPIEndpoints:
         mock_dungeon_service.enter_dungeon.side_effect = InsufficientRequirementsError("Not enough aura")
         
         with patch("app.api.v2.dungeons.get_dungeon_service", return_value=mock_dungeon_service):
-            with patch("app.api.v2.dungeons.get_current_user") as mock_user:
-                mock_user.return_value = MagicMock(id=1, username="test_user")
+            # Note: The dungeons.py endpoints don't use authentication directly
+            # They accept user_id as a parameter in the request body
                 
                 request_data = {
                     "ascendant_id": 1,
@@ -535,8 +535,8 @@ class TestDungeonAPIIntegration:
             mock_service = AsyncMock()
             mock_service_dep.return_value = mock_service
             
-            with patch("app.api.v2.dungeons.get_current_user") as mock_user:
-                mock_user.return_value = MagicMock(id=1, username="test_user")
+            # Note: The dungeons.py endpoints don't use authentication directly
+            # They accept user_id as a parameter in the request body
                 
                 # Mock successful entry
                 mock_service.enter_dungeon.return_value = {

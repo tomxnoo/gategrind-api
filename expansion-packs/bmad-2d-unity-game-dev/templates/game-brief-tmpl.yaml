@@ -1,10 +1,10 @@
 template:
-  id: game-brief-template-v3
+  id: game-brief-template-v2
   name: Game Brief
-  version: 3.0
+  version: 2.0
   output:
     format: markdown
-    filename: docs/game-brief.md
+    filename: "docs/{{game_name}}-game-brief.md"
     title: "{{game_title}} Game Brief"
 
 workflow:

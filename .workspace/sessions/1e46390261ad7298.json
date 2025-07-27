@@ -1,0 +1,30 @@
+{
+  "id": "1e46390261ad7298",
+  "ide": "vscode",
+  "created": "2025-07-27T16:32:26.020Z",
+  "lastHeartbeat": "2025-07-27T16:32:26.020Z",
+  "pid": 28732,
+  "user": "sakko",
+  "cwd": "C:\\Users\\sakko\\Documents\\GitHub\\RoS-TRAE",
+  "nodeVersion": "v22.17.1",
+  "platform": "win32",
+  "arch": "x64",
+  "metadata": {
+    "ideSpecific": {
+      "supportsTerminalCommands": true,
+      "hasIntegratedGit": true,
+      "supportsPanels": true,
+      "hasExtensionSystem": true,
+      "features": [
+        "extensions",
+        "integrated-terminal",
+        "git-integration"
+      ]
+    },
+    "features": [
+      "context-sharing",
+      "agent-handoffs",
+      "quality-tracking"
+    ]
+  }
+}

@@ -40,6 +40,14 @@ class TestDungeonService:
         """Create a DungeonService with mocked session."""
         service = DungeonService(mock_session)
         service.get_session = AsyncMock(return_value=mock_session)
+        # Mock cache service with async methods
+        mock_cache = MagicMock()
+        mock_cache.get_cached_level_requirements = AsyncMock(return_value=None)
+        mock_cache.cache_level_requirements = AsyncMock()
+        mock_cache.get_cached_aura_requirement = MagicMock(return_value=225)  # 100 * 1.5^2
+        mock_cache.get_cached_daily_modifier = AsyncMock(return_value=None)
+        mock_cache.cache_daily_modifier = AsyncMock()
+        service.get_cache_service = AsyncMock(return_value=mock_cache)
         return service
     
     @pytest.fixture
@@ -127,27 +135,29 @@ class TestDungeonService:
     
     async def test_validate_entry_requirements_success(self, dungeon_service, sample_ascendant, mock_session):
         """Test successful entry requirement validation."""
-        # Mock session.get to return the ascendant
-        mock_session.get = AsyncMock(return_value=sample_ascendant)
+        # Mock the ascendant query result
+        ascendant_result = MagicMock()
+        ascendant_result.scalar_one_or_none.return_value = sample_ascendant
+        
+        # Mock the unlock query result  
+        unlock_result = MagicMock()
+        unlock_result.scalar_one_or_none.return_value = None
+        
+        # Configure mock_session.execute to return appropriate results
+        mock_results = [ascendant_result, unlock_result]
+        mock_session.execute = AsyncMock(side_effect=mock_results)
         
         # Mock get_dungeon_progress
-        with patch.object(dungeon_service, 'get_dungeon_progress') as mock_progress:
-            mock_progress.return_value = DungeonProgress(ascendant_id=1, highest_level_completed=2)
-            
-            # Mock DungeonLevelUnlock query (no unlock requirements for this level)
-            unlock_result = MagicMock()
-            unlock_result.scalar_one_or_none.return_value = None
-            mock_session.execute.return_value = unlock_result
-            
-            # Mock get_shadow_keys method
-            with patch.object(dungeon_service, 'get_shadow_keys') as mock_get_keys:
-                mock_get_keys.return_value = 5  # Has enough keys
-                
-                # Test validation for level 3 (should pass) - pass ascendant_id instead of ascendant
-                result = await dungeon_service.validate_entry_requirements(1, 3)
-                
-                # The method returns True on success
-                assert result == True
+        mock_progress = DungeonProgress(ascendant_id=1, highest_level_completed=2)
+        with patch.object(dungeon_service, 'get_dungeon_progress', return_value=mock_progress):
+            # Mock both shadow key methods
+            with patch.object(dungeon_service, 'get_shadow_keys', return_value=5):
+                with patch.object(dungeon_service, 'get_shadow_keys_optimized', return_value=5):
+                    # Test validation for level 3 (should pass)
+                    result = await dungeon_service.validate_entry_requirements(1, 3)
+                    
+                    # The method returns True on success
+                    assert result == True
     
     async def test_validate_entry_requirements_insufficient_aura(self, dungeon_service, sample_ascendant, mock_session):
         """Test validation failure due to insufficient aura."""
@@ -175,23 +185,35 @@ class TestDungeonService:
     
     async def test_validate_entry_requirements_level_locked(self, dungeon_service, sample_ascendant, mock_session):
         """Test validation failure due to locked level."""
-        # Mock database queries
-        mock_session.get = AsyncMock(return_value=sample_ascendant)
+        # Mock the ascendant query result
+        ascendant_result = MagicMock()
+        ascendant_result.scalar_one_or_none.return_value = sample_ascendant
         
-        # Mock get_dungeon_progress
+        # Mock cache service to return level requirements that will fail
+        cache_service = await dungeon_service.get_cache_service()
+        cache_service.get_cached_level_requirements = AsyncMock(return_value={
+            'is_enabled': True,
+            'dungeon_level': 5,
+            'required_ascendant_level': 5,
+            'required_aura': 1000,
+            'required_skill_tree_progress': 50,
+            'required_previous_completion': True,
+            'unlock_description': 'Level 5 requirements'
+        })
+        
+        # Configure mock_session.execute for ascendant query
+        mock_session.execute = AsyncMock(return_value=ascendant_result)
+        
+        # Mock get_dungeon_progress to return low progress
         with patch.object(dungeon_service, 'get_dungeon_progress') as mock_progress:
             mock_progress.return_value = DungeonProgress(ascendant_id=1, highest_level_completed=1)
             
-            # Mock DungeonLevelUnlock query with unlock requirements
-            mock_unlock_req = MagicMock()
-            mock_unlock_req.check_unlock_requirements.return_value = (False, ["Level 4 not completed"])
-            
-            unlock_result = MagicMock()
-            unlock_result.scalar_one_or_none.return_value = mock_unlock_req
-            mock_session.execute.return_value = unlock_result
-            
-            with pytest.raises(DungeonLevelLockedError):
-                await dungeon_service.validate_entry_requirements(1, 5)
+            # Mock level unlock check to fail
+            with patch('app.infrastructure.database.models.v2.dungeon_level_unlocks.DungeonLevelUnlock.check_unlock_requirements') as mock_check:
+                mock_check.return_value = (False, ["Level 4 not completed"])
+                
+                with pytest.raises(DungeonLevelLockedError):
+                    await dungeon_service.validate_entry_requirements(1, 5)
     
     async def test_get_shadow_keys(self, dungeon_service, mock_session):
         """Test getting shadow keys count."""
@@ -251,11 +273,19 @@ class TestDungeonService:
         assert result.modifier_type == "xp_boost"
         assert result.reward_multiplier == 1.5
     
-    async def test_generate_trials(self, dungeon_service):
+    async def test_generate_trials(self, dungeon_service, mock_session):
         """Test trial generation."""
         # Mock the quest generation service
         mock_quest_service = AsyncMock()
         dungeon_service.get_quest_generation_service = AsyncMock(return_value=mock_quest_service)
+        
+        # Mock movement query result
+        from app.infrastructure.database.models.v2.movements import Movement
+        mock_movement = Movement(id=1, name="Push-up", xp_per_rep=1.0, stat_reward_type="STR")
+        
+        movement_result = MagicMock()
+        movement_result.scalar_one_or_none.return_value = mock_movement
+        mock_session.execute = AsyncMock(return_value=movement_result)
         
         # Create a mock daily modifier with to_dict method
         mock_modifier = MagicMock()
@@ -265,7 +295,11 @@ class TestDungeonService:
         
         assert len(trials) == 4  # 3 base + 1 additional for level 5
         assert all('trial_number' in trial for trial in trials)
-        assert all('target_reps' in trial for trial in trials)
+        assert all('target_value' in trial for trial in trials)
+        assert all('target_type' in trial for trial in trials)
+        assert all('movement_name' in trial for trial in trials)
+        assert all(trial['movement_name'] == "Push-up" for trial in trials)
+        assert all(trial['target_type'] == 'reps' for trial in trials)
     
     async def test_calculate_trial_difficulty(self, dungeon_service):
         """Test trial difficulty calculation."""
@@ -279,46 +313,50 @@ class TestDungeonService:
     
     async def test_enter_dungeon_success(self, dungeon_service, sample_ascendant, mock_session):
         """Test successful dungeon entry."""
+        # Mock get_active_session to return None (no active session)
+        dungeon_service.get_active_session = AsyncMock(return_value=None)
+        
         # Mock validation success
-        with patch.object(dungeon_service, 'validate_entry_requirements') as mock_validate:
-            mock_validate.return_value = True  # Service returns True on success
-            
-            # Mock deduct shadow keys
-            with patch.object(dungeon_service, 'deduct_shadow_keys') as mock_deduct:
-                mock_deduct.return_value = True
-                
-                # Mock daily modifier
-                mock_modifier = MagicMock()
-                mock_modifier.to_dict.return_value = {'modifier_name': 'test', 'reward_multiplier': 1.5}
-                with patch.object(dungeon_service, 'get_active_daily_modifier') as mock_daily:
-                    mock_daily.return_value = mock_modifier
-                    
-                    # Mock session creation
-                    mock_session.add = MagicMock()
-                    mock_session.commit = AsyncMock()
-                    mock_session.refresh = AsyncMock()
-                    
-                    # Mock trial generation
-                    with patch.object(dungeon_service, 'generate_trials') as mock_trials:
-                        mock_trials.return_value = [
-                            {
-                                "trial_number": 1,
-                                "trial_type": "movement_based", 
-                                "target_reps": 20, 
-                                "movement_category": "push",
-                                "difficulty_modifier": 0.6
-                            }
-                        ]
-                        
-                        result = await dungeon_service.enter_dungeon(sample_ascendant, 3)
-                        
-                        assert "session_id" in result
-                        assert "trials" in result
-                        assert result["level"] == 3
-                        assert len(result["trials"]) == 1
+        dungeon_service.validate_entry_requirements = AsyncMock(return_value=True)
+        
+        # Mock deduct shadow keys
+        dungeon_service.deduct_shadow_keys = AsyncMock(return_value=True)
+        
+        # Mock daily modifier
+        mock_modifier = MagicMock()
+        mock_modifier.to_dict.return_value = {'modifier_name': 'test', 'reward_multiplier': 1.5}
+        dungeon_service.get_active_daily_modifier = AsyncMock(return_value=mock_modifier)
+        
+        # Mock trial generation
+        dungeon_service.generate_trials = AsyncMock(return_value=[
+            {
+                "trial_number": 1,
+                "trial_type": "movement", 
+                "target_value": 20,
+                "target_type": "reps", 
+                "movement_category": "push",
+                "movement_name": "Push-up",
+                "difficulty_multiplier": 0.6
+            }
+        ])
+        
+        # Mock session operations
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+        mock_session.refresh = AsyncMock()
+        
+        result = await dungeon_service.enter_dungeon(sample_ascendant.id, 3)
+        
+        assert "session_id" in result
+        assert "trials" in result
+        assert result["level"] == 3
+        assert len(result["trials"]) == 1
     
     async def test_enter_dungeon_validation_failure(self, dungeon_service, sample_ascendant):
         """Test dungeon entry with validation failure."""
+        # Mock get_active_session to return None (no active session)
+        dungeon_service.get_active_session = AsyncMock(return_value=None)
+        
         # Mock validation to raise an exception
         dungeon_service.validate_entry_requirements = AsyncMock(side_effect=InsufficientRequirementsError("Insufficient aura"))
         
@@ -369,7 +407,7 @@ class TestDungeonService:
         mock_trial = MagicMock()
         mock_trial.id = 1
         mock_trial.session_id = 1
-        mock_trial.target_reps = 20
+        mock_trial.required_reps = 20
         mock_trial.completed_reps = 0
         mock_trial.trial_status = 'active'
         mock_trial.is_completed = False
@@ -385,8 +423,14 @@ class TestDungeonService:
         
         # Mock session.get calls
         mock_session.get = AsyncMock()
-        mock_session.get.side_effect = lambda model, id: mock_trial if model == DungeonTrial else mock_dungeon_session
+        mock_session.get.side_effect = lambda model, id, **kwargs: mock_trial if model == DungeonTrial else mock_dungeon_session
         mock_session.commit = AsyncMock()
+        
+        # Mock calculate_rewards
+        dungeon_service.calculate_rewards = MagicMock(return_value=[
+            {"type": "aura", "amount": 100},
+            {"type": "experience", "amount": 200}
+        ])
         
         progress_data = {"reps": 20}
         
@@ -403,7 +447,7 @@ class TestDungeonService:
         mock_trial = MagicMock()
         mock_trial.id = 1
         mock_trial.session_id = 1
-        mock_trial.target_reps = 20
+        mock_trial.required_reps = 20
         mock_trial.completed_reps = 0
         mock_trial.trial_status = 'active'
         mock_trial.is_completed = False
@@ -416,10 +460,18 @@ class TestDungeonService:
         mock_dungeon_session.trials_completed = 2  # Last trial
         mock_dungeon_session.session_status = 'active'
         mock_dungeon_session.is_active = True
+        mock_dungeon_session.created_at = datetime.now(timezone.utc)
+        
+        # Mock trials for session completion check
+        mock_trial_1 = MagicMock(is_completed=True)
+        mock_trial_2 = MagicMock(is_completed=True)
+        mock_trial_3 = MagicMock(is_completed=True)  # This will be the current trial after completion
+        mock_trial.is_completed = True  # After this completes
+        mock_dungeon_session.trials = [mock_trial_1, mock_trial_2, mock_trial]
         
         # Mock session.get calls
         mock_session.get = AsyncMock()
-        mock_session.get.side_effect = lambda model, id: mock_trial if model == DungeonTrial else mock_dungeon_session
+        mock_session.get.side_effect = lambda model, id, **kwargs: mock_trial if model == DungeonTrial else mock_dungeon_session
         mock_session.commit = AsyncMock()
         
         # Mock the methods that will be called
@@ -442,6 +494,11 @@ class TestDungeonService:
         mock_session.add = MagicMock()
         mock_session.commit = AsyncMock()
         
+        # Mock get_dungeon_progress
+        mock_progress = MagicMock()
+        mock_progress.total_shadow_essence_earned = 0
+        dungeon_service.get_dungeon_progress = AsyncMock(return_value=mock_progress)
+        
         rewards = [
             {"type": "aura", "amount": 100, "description": "Dungeon completion bonus"},
             {"type": "shadow_essence", "amount": 15, "description": "Shadow essence reward"}
@@ -453,6 +510,9 @@ class TestDungeonService:
         # Verify that rewards were added to session
         assert mock_session.add.call_count == 2  # Two rewards
         mock_session.commit.assert_called_once()
+        
+        # Verify shadow essence was tracked
+        assert mock_progress.total_shadow_essence_earned == 15
     
     async def test_update_dungeon_progress(self, dungeon_service, mock_session):
         """Test dungeon progress update."""
@@ -508,6 +568,15 @@ class TestDungeonServiceIntegration:
         # For now, we'll structure it but not implement the full database setup
         
         # Mock the complete flow
+        # Mock get_active_session to return None (no active session)
+        service.get_active_session = AsyncMock(return_value=None)
+        
+        # Mock cache service with async methods
+        mock_cache = MagicMock()
+        mock_cache.get_cached_daily_modifier = AsyncMock(return_value=None)
+        mock_cache.cache_daily_modifier = AsyncMock()
+        service.get_cache_service = AsyncMock(return_value=mock_cache)
+        
         with patch.object(service, 'validate_entry_requirements') as mock_validate:
             mock_validate.return_value = True  # Service returns True on success
             
@@ -524,10 +593,12 @@ class TestDungeonServiceIntegration:
                         mock_trials.return_value = [
                             {
                                 "trial_number": 1, 
-                                "trial_type": "movement_based", 
-                                "target_reps": 20,
-                                "movement_category": "Push",
-                                "difficulty_modifier": 0.6
+                                "trial_type": "movement", 
+                                "target_value": 20,
+                                "target_type": "reps",
+                                "movement_category": "push",
+                                "movement_name": "Push-up",
+                                "difficulty_multiplier": 0.6
                             }
                         ]
                         
@@ -546,7 +617,7 @@ class TestDungeonServiceIntegration:
                             endurance_points=50, 
                             technique_points=50
                         )
-                        entry_result = await service.enter_dungeon(ascendant, 3)
+                        entry_result = await service.enter_dungeon(ascendant.id, 3)
                         
                         assert "session_id" in entry_result
                         assert "trials" in entry_result
