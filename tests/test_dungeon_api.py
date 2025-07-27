@@ -537,46 +537,46 @@ class TestDungeonAPIIntegration:
             
             # Note: The dungeons.py endpoints don't use authentication directly
             # They accept user_id as a parameter in the request body
-                
-                # Mock successful entry
-                mock_service.enter_dungeon.return_value = {
-                    "session": MagicMock(id="session_123", dungeon_level=3),
-                    "trials": [{"trial_type": "movement_based", "target_reps": 20}]
-                }
-                
-                # Test entry
-                entry_response = integration_client.post(
-                    "/api/v2/dungeons/enter/3",
-                    json={"ascendant_id": 1, "shadow_keys_to_use": 3},
-                    headers={"Authorization": "Bearer test_token"}
-                )
-                
-                assert entry_response.status_code == status.HTTP_200_OK
-                
-                # Mock trial completion
-                mock_service.complete_trial.return_value = {
-                    "success": True,
-                    "trial_completed": True,
-                    "session_completed": True,
-                    "rewards": {"total_xp": 120, "shadow_keys": 2}
-                }
-                
-                # Test trial completion
-                completion_response = integration_client.post(
-                    "/api/v2/dungeons/complete-trial",
-                    json={
-                        "session_id": "session_123",
-                        "trial_data": {
-                            "reps_completed": 20,
-                            "target_reps": 20,
-                            "completion_time": 60.0,
-                            "form_score": 0.9
-                        }
-                    },
-                    headers={"Authorization": "Bearer test_token"}
-                )
-                
-                assert completion_response.status_code == status.HTTP_200_OK
-                completion_data = completion_response.json()
-                assert completion_data["success"] == True
-                assert completion_data["session_completed"] == True
+            
+            # Mock successful entry
+            mock_service.enter_dungeon.return_value = {
+                "session": MagicMock(id="session_123", dungeon_level=3),
+                "trials": [{"trial_type": "movement_based", "target_reps": 20}]
+            }
+            
+            # Test entry
+            entry_response = integration_client.post(
+                "/api/v2/dungeons/enter/3",
+                json={"ascendant_id": 1, "shadow_keys_to_use": 3},
+                headers={"Authorization": "Bearer test_token"}
+            )
+            
+            assert entry_response.status_code == status.HTTP_200_OK
+            
+            # Mock trial completion
+            mock_service.complete_trial.return_value = {
+                "success": True,
+                "trial_completed": True,
+                "session_completed": True,
+                "rewards": {"total_xp": 120, "shadow_keys": 2}
+            }
+            
+            # Test trial completion
+            completion_response = integration_client.post(
+                "/api/v2/dungeons/complete-trial",
+                json={
+                    "session_id": "session_123",
+                    "trial_data": {
+                        "reps_completed": 20,
+                        "target_reps": 20,
+                        "completion_time": 60.0,
+                        "form_score": 0.9
+                    }
+                },
+                headers={"Authorization": "Bearer test_token"}
+            )
+            
+            assert completion_response.status_code == status.HTTP_200_OK
+            completion_data = completion_response.json()
+            assert completion_data["success"] == True
+            assert completion_data["session_completed"] == True

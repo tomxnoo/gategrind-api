@@ -8,8 +8,9 @@ import os
 import asyncio
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
+from .async_polling import APIClientPollingMixin
 
-class APIClient:
+class APIClient(APIClientPollingMixin):
     """Client for making authenticated requests to the FastAPI backend"""
     
     def __init__(self, base_url: str = None):
@@ -160,6 +161,10 @@ class APIClient:
         """Get user profile from API"""
         return await self._make_request("GET", "/users/me", discord_user)
     
+    async def get_user_profile_v2(self, discord_user) -> Dict[str, Any]:
+        """Get comprehensive user profile from V2 endpoint"""
+        return await self._make_request("GET", "/v2/users/me/profile", discord_user)
+    
     async def update_user_profile(self, discord_user, update_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update user profile via API"""
         return await self._make_request("PUT", "/users/me", discord_user, json=update_data)
@@ -270,6 +275,49 @@ class APIClient:
     async def recover_awakening_session(self, discord_user) -> Dict[str, Any]:
         """Recover awakening session via API"""
         return await self._make_request("POST", "/awakening/recover", discord_user)
+    
+    # Async operation examples using the polling strategy
+    async def start_dungeon_generation(self, discord_user, generation_params: Dict[str, Any], wait_for_completion: bool = True) -> Dict[str, Any]:
+        """
+        Start async dungeon generation and optionally wait for completion.
+        
+        Example of how to use the async polling strategy for long-running operations.
+        """
+        return await self._submit_async_operation(
+            discord_user,
+            "/v2/dungeons/generate",
+            generation_params,
+            wait_for_completion=wait_for_completion,
+            status_endpoint="/v2/dungeons/generation/status"
+        )
+    
+    async def start_quest_generation(self, discord_user, quest_params: Dict[str, Any], wait_for_completion: bool = True) -> Dict[str, Any]:
+        """
+        Start async quest generation and optionally wait for completion.
+        
+        Example of how to use the async polling strategy for AI-generated content.
+        """
+        return await self._submit_async_operation(
+            discord_user,
+            "/v2/quests/generate",
+            quest_params,
+            wait_for_completion=wait_for_completion,
+            status_endpoint="/v2/quests/generation/status"
+        )
+    
+    async def start_profile_analysis(self, discord_user, analysis_params: Dict[str, Any], wait_for_completion: bool = True) -> Dict[str, Any]:
+        """
+        Start async profile analysis and optionally wait for completion.
+        
+        Example of how to use the async polling strategy for complex data processing.
+        """
+        return await self._submit_async_operation(
+            discord_user,
+            "/v2/users/me/analyze",
+            analysis_params,
+            wait_for_completion=wait_for_completion,
+            status_endpoint="/v2/users/me/analysis/status"
+        )
 
 
 api_client = APIClient()

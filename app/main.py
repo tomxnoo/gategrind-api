@@ -84,8 +84,16 @@ async def lifespan(app: FastAPI):
     app.state.db_pool = None
     if not dev_mode:
         try:
+            # Convert SQLAlchemy URL to asyncpg format
+            database_url = os.getenv("DATABASE_URL")
+            if database_url and database_url.startswith("postgresql+asyncpg://"):
+                # Remove the +asyncpg part for asyncpg.create_pool
+                asyncpg_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+            else:
+                asyncpg_url = database_url
+            
             app.state.db_pool = await asyncpg.create_pool(
-                dsn=os.getenv("DATABASE_URL"),
+                dsn=asyncpg_url,
                 min_size=5,
                 max_size=20,
                 command_timeout=60

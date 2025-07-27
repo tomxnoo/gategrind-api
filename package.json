@@ -30,7 +30,13 @@
     "version:expansion:all:patch": "node tools/bump-all-versions.js patch",
     "release": "semantic-release",
     "release:test": "semantic-release --dry-run --no-ci || echo 'Config test complete - authentication errors are expected locally'",
-    "prepare": "husky"
+    "prepare": "husky",
+    "workspace-init": "node workspace-utils-fixed/init.js",
+    "workspace-status": "node workspace-utils-fixed/status.js",
+    "workspace-cleanup": "node workspace-utils-fixed/cleanup.js",
+    "workspace-sync": "node workspace-utils-fixed/sync.js",
+    "workspace-handoff": "node workspace-utils-fixed/handoff.js",
+    "workspace-health": "node workspace-utils/health.js"
   },
   "dependencies": {
     "@kayvan/markdown-tree-parser": "^1.5.0",
