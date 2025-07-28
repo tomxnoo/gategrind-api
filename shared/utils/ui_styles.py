@@ -14,10 +14,15 @@ PANEL_ICONS = {
 
 PANEL_SUB_HEADERS = {
     "profile": "[ PROFILE MODULE ]\nSystem: SHADOW_PACT // Profile Access [GRANTED]\n──────────────────────────",
+    "profile_v2": "[ PROFILE V2 MODULE ]\nSystem: SHADOW_PACT // Enhanced Profile Access [GRANTED]\n──────────────────────────",
     "awakening": "[ AWAKENING MODULE ]\nSystem: SHADOW_PACT // Awakening Access [GRANTED]\n──────────────────────────",
+    "skill_tree": "[ SKILL TREE MODULE ]\nSystem: SHADOW_PACT // Movement Library Access [GRANTED]\n──────────────────────────",
+    "dungeons": "[ DUNGEON MODULE ]\nSystem: SHADOW_PACT // Dungeon System Access [GRANTED]\n──────────────────────────",
     "quests": "[ QUEST LOG MODULE ]\nSystem: SHADOW_PACT // Quest Log Access [GRANTED]\n──────────────────────────",
     "buffs": "[ BUFFS MODULE ]\nSystem: SHADOW_PACT // Buffs Access [GRANTED]\n──────────────────────────",
     "log": "[ LOG MODULE ]\nSystem: SHADOW_PACT // Log Access [GRANTED]\n──────────────────────────",
+    "log_reps": "[ LOG REPS MODULE ]\nSystem: SHADOW_PACT // Movement Logging Access [GRANTED]\n──────────────────────────",
+    "quest_log": "[ QUEST LOG MODULE ]\nSystem: SHADOW_PACT // Quest Management Access [GRANTED]\n──────────────────────────",
     "system_hub": "[ SYSTEM HUB MODULE ]\nSystem: SHADOW_PACT // System Hub Access [GRANTED]\n──────────────────────────",
     "daily_quest": "[ DAILY QUEST MODULE ]\nSystem: SHADOW_PACT // Daily Quest Access [GRANTED]\n──────────────────────────",
     "weekly_contract": "[ WEEKLY CONTRACT MODULE ]\nSystem: SHADOW_PACT // Weekly Contract Access [GRANTED]\n──────────────────────────",

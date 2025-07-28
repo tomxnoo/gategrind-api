@@ -59,6 +59,67 @@ def get_dungeon_service() -> DungeonService:
 
 
 # API Endpoints
+@router.get("/", response_model=Dict[str, Any])
+async def get_available_dungeons(
+    current_user_id: int = Depends(get_current_user_id),
+    service: DungeonService = Depends(get_dungeon_service)
+):
+    """
+    Get available dungeons with user progress.
+    
+    Args:
+        current_user_id: User ID extracted from authentication token
+        
+    Returns:
+        Dict containing available dungeons with user progress
+        
+    Raises:
+        HTTPException: If error retrieving dungeons
+    """
+    try:
+        # Get user's dungeon progress
+        progress = await service.get_dungeon_progress(ascendant_id=current_user_id)
+        
+        # Define available dungeons with their properties
+        dungeons = [
+            {
+                "tier": "shadow",
+                "min_level": 1,
+                "shadow_key_cost": 1,
+                "user_progress": {
+                    "current_level": progress.highest_level_completed if progress else 0,
+                    "highest_level": progress.highest_level_completed if progress else 0
+                }
+            },
+            {
+                "tier": "warrior", 
+                "min_level": 10,
+                "shadow_key_cost": 2,
+                "user_progress": {
+                    "current_level": 0,  # Would need separate tracking for different tiers
+                    "highest_level": 0
+                }
+            },
+            {
+                "tier": "ascendant",
+                "min_level": 25,
+                "shadow_key_cost": 3,
+                "user_progress": {
+                    "current_level": 0,  # Would need separate tracking for different tiers
+                    "highest_level": 0
+                }
+            }
+        ]
+        
+        return {"dungeons": dungeons}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get available dungeons: {str(e)}"
+        )
+
+
 @router.post("/enter", response_model=DungeonEntryResponse)
 async def enter_dungeon(
     request: DungeonEntryRequest,

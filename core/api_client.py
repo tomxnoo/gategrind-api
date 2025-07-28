@@ -348,13 +348,18 @@ class APIClient(APIClientPollingMixin):
     async def get_awakening_status_v2(self, discord_user, include_quests: bool = False) -> Dict[str, Any]:
         """Get awakening status from V2 endpoint with enhanced data"""
         params = {"include_quests": include_quests}
-        return await self._make_request("GET", "/v2/awakening/status", discord_user, 
+        return await self._make_request("GET", f"/v2/awakening/status/{discord_user.id}", discord_user, 
                                       params=params, version="v2")
     
     async def perform_awakening_v2(self, discord_user, readiness: str) -> Dict[str, Any]:
         """Perform awakening via V2 endpoint with improved tracking"""
-        return await self._make_request("POST", "/v2/awakening/action", discord_user, 
-                                      json={"readiness_level": readiness}, version="v2")
+        print(f"[API_CLIENT] perform_awakening_v2 called with user_id={discord_user.id}, readiness={readiness}")
+        request_data = {"user_id": discord_user.id, "readiness_level": readiness}
+        print(f"[API_CLIENT] Sending POST to /v2/awakening/action with data: {request_data}")
+        result = await self._make_request("POST", "/v2/awakening/action", discord_user, 
+                                      json=request_data, version="v2")
+        print(f"[API_CLIENT] Response: {result}")
+        return result
     
     async def get_awakening_quests_v2(self, discord_user) -> Dict[str, Any]:
         """Get awakening quests from V2 endpoint"""
@@ -375,6 +380,14 @@ class APIClient(APIClientPollingMixin):
                                       discord_user, version="v2")
 
     # V2 Dungeon System Methods
+    async def get_available_dungeons_v2(self, discord_user) -> Dict[str, Any]:
+        """Get available dungeons and user progress"""
+        return await self._make_request("GET", "/v2/dungeons/", discord_user, version="v2")
+    
+    async def get_dungeon_session_v2(self, discord_user) -> Dict[str, Any]:
+        """Get current dungeon session"""
+        return await self._make_request("GET", "/v2/dungeons/session", discord_user, version="v2")
+    
     async def enter_dungeon_v2(self, discord_user, dungeon_level: int, 
                              wait_for_completion: bool = True) -> Dict[str, Any]:
         """Enter dungeon using V2 endpoint (async operation)"""
@@ -585,7 +598,7 @@ class APIClient(APIClientPollingMixin):
             stacklevel=2
         )
         params = {"include_quests": include_quests}
-        return await self._make_request("GET", "/awakening/status", discord_user, params=params)
+        return await self._make_request("GET", f"/awakening/status/{discord_user.id}", discord_user, params=params)
 
     async def perform_awakening(self, discord_user, readiness: str) -> Dict[str, Any]:
         """Perform awakening via API"""

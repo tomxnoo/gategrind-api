@@ -15,7 +15,7 @@ from app.application.services.awakening_service import AwakeningService
 from app.application.services.progression_service import ProgressionService
 from app.infrastructure.database.session import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.v2.dependencies.auth import get_current_user_id
+from app.api.v2.dependencies.auth import get_current_user_id, get_db_session_or_none
 
 
 # Configure logging
@@ -63,8 +63,14 @@ class AwakeningResponse(BaseModel):
 
 
 # Dependency to get AwakeningService
-async def get_awakening_service(session: AsyncSession = Depends(get_async_session)) -> AwakeningService:
+async def get_awakening_service(session: Optional[AsyncSession] = Depends(get_db_session_or_none)) -> AwakeningService:
     """Dependency to create and return an AwakeningService instance."""
+    if session is None:
+        # In development mode, return mock service
+        from features.awakening.logic.mock_awakening_service import MockAwakeningService
+        return MockAwakeningService()
+    
+    # Production mode - use real service
     progression_service = ProgressionService(session=session)
     return AwakeningService(session=session, progression_service=progression_service)
 

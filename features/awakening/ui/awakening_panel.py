@@ -90,7 +90,7 @@ class EnhancedAwakeningPanel:
     async def build_view(bot, user: discord.User, **kwargs) -> discord.ui.View:
         api_client = APIClient()
         try:
-            status = await api_client.get_awakening_status(user)
+            status = await api_client.get_awakening_status_v2(user)
             if status and status.get("awakened"):
                 if status.get("status") == "active" and not status.get("quests"):
                     return RecoveryView(bot, user)
@@ -107,7 +107,7 @@ async def build_enhanced_awakening_embed(bot, user: Union[discord.User, discord.
 
     try:
         api_client = APIClient()
-        status = await asyncio.wait_for(api_client.get_awakening_status(user, include_quests=True), timeout=10.0)
+        status = await asyncio.wait_for(api_client.get_awakening_status_v2(user, include_quests=True), timeout=10.0)
 
         if not status:
             status = {"awakened": False}
@@ -215,7 +215,7 @@ class EnhancedReadinessSelectionView(discord.ui.View):
         self.bot = bot
         self.user = user
         self.add_item(EnhancedReadinessButton("low", "🔋 Recovery", discord.ButtonStyle.secondary))
-        self.add_item(EnhancedReadinessButton("standard", "⚖️ Balanced", discord.ButtonStyle.primary))
+        self.add_item(EnhancedReadinessButton("medium", "⚖️ Balanced", discord.ButtonStyle.primary))
         self.add_item(EnhancedReadinessButton("high", "🔥 Peak", discord.ButtonStyle.danger))
         self.add_item(BackToAwakeningButton())
 
@@ -246,8 +246,10 @@ class EnhancedReadinessButton(discord.ui.Button):
 
     async def _perform_awakening(self):
         api_client = APIClient()
-        response = await api_client.perform_awakening(self.view.user, self.readiness_level)
-        if not response or not response.get("awakening"):
+        print(f"[UI DEBUG] Calling perform_awakening_v2 with readiness={self.readiness_level}")
+        response = await api_client.perform_awakening_v2(self.view.user, self.readiness_level)
+        print(f"[UI DEBUG] Response from perform_awakening_v2: {response}")
+        if not response or not response.get("message"):
             raise ValueError("Invalid API response during awakening.")
         
         embed = await build_enhanced_awakening_embed(self.view.bot, self.view.user)
@@ -272,7 +274,7 @@ class ViewQuestsButton(discord.ui.Button):
         try:
             api_client = APIClient()
             # Single API call to get both status and quests
-            response = await api_client.get_awakening_status(self.view.user, include_quests=True)
+            response = await api_client.get_awakening_status_v2(self.view.user, include_quests=True)
             
             # If no awakening exists, show the "not initiated" message
             if not response or not response.get("awakened", False):
@@ -318,7 +320,7 @@ class ViewBriefingButton(discord.ui.Button):
 
     async def _show_briefing(self):
         api_client = APIClient()
-        briefing = await api_client.get_daily_briefing(self.view.user)
+        briefing = await api_client.get_awakening_briefing_v2(self.view.user)
         if not briefing:
             embed = discord.Embed(title="Briefing Unavailable", description="Could not retrieve the daily briefing.", color=discord.Color.red())
             return embed, self.view
@@ -355,7 +357,7 @@ class ViewHistoryButton(discord.ui.Button):
 
     async def _show_history(self):
         api_client = APIClient()
-        history = await api_client.get_awakening_history(self.view.user)
+        history = await api_client.get_awakening_history_v2(self.view.user)
         if not history or not history.get('recent_sessions'):
             embed = discord.Embed(title="History Unavailable", description="Could not retrieve awakening history.", color=discord.Color.red())
             return embed, self.view
@@ -364,10 +366,11 @@ class ViewHistoryButton(discord.ui.Button):
         sub_header = get_panel_sub_header("awakening")
         stats = history.get('stats', {})
         sessions_list = ""
+        from datetime import datetime
         for session in history.get('recent_sessions', [])[:5]:
             dt = datetime.fromisoformat(session['date'])
             date_str = dt.strftime("%b %d")
-            readiness_map = {"low": "L", "standard": "S", "high": "H"}
+            readiness_map = {"low": "L", "medium": "M", "high": "H"}
             readiness = readiness_map.get(session['readiness_level'], '?')
             sessions_list += f"├─ {date_str} | {session['total_xp']} XP | Readiness: {readiness}\n"
 
@@ -545,12 +548,12 @@ class CompleteQuestButton(discord.ui.Button):
     async def _complete_quest(self):
         quest = self.view.get_current_quest()
         api_client = APIClient()
-        response = await api_client.complete_awakening_quest(self.view.user, quest['id'])
+        response = await api_client.complete_awakening_quest_v2(self.view.user, quest['id'])
         if not response or not response.get('success'):
             raise ValueError("Failed to complete quest.")
         
         # Refresh data
-        awakening_data = await api_client.get_awakening_quests(self.view.user)
+        awakening_data = await api_client.get_awakening_status_v2(self.view.user, include_quests=True)
         quests = awakening_data.get("quests", [])
         self.view.quests = quests
         self.view.awakening_data = awakening_data
@@ -613,7 +616,7 @@ class RecoveryButton(discord.ui.Button):
 
     async def _attempt_recovery(self):
         api_client = APIClient()
-        response = await api_client.get_awakening_quests(self.view.user)
+        response = await api_client.get_awakening_status_v2(self.view.user, include_quests=True)
         if response and response.get("quests"):
             embed = await build_enhanced_awakening_embed(self.view.bot, self.view.user)
             view = await EnhancedAwakeningPanel.build_view(self.view.bot, self.view.user)

@@ -107,12 +107,13 @@ class RealmBot(commands.AutoShardedBot):  # <-- Use AutoShardedBot
         try:
             # Import all panel classes to trigger their @register decorators
             from features.awakening.ui.awakening_panel import EnhancedAwakeningPanel
+            from features.dungeons.ui.dungeon_panel import DungeonPanel
             from features.user.ui.profile_view import ProfilePanel
             from features.user.ui.profile_v2_panel import ProfileV2Panel  # Add V2 Profile Panel
             from features.logging.ui.view import LogRepsPanel
             from features.buffs.ui.view import BuffsPanel
             from features.incursions.ui.incursion_panel import IncursionPanel
-            from features.quests.ui.quest_panel import QuestPanel
+            # Note: quest_panel doesn't exist in current implementation
             
             # Debug: Show what panels are now registered
             from shared.utils.panel_registry import debug_registry

@@ -10,7 +10,7 @@ from .movements import router as movements_router
 from .progression import router as progression_router
 from .events import router as events_router
 from .incursions import router as incursions_router
-from .awakening import router as awakening_router
+from .endpoints.awakening import router as awakening_router
 from .dungeons import router as dungeons_router
 from .profiles import router as profiles_router
 

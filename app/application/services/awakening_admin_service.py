@@ -14,7 +14,7 @@ from sqlalchemy import and_, func, desc
 from app.infrastructure.database.models.v2.awakening import (
     AwakeningSession, AwakeningQuest, AwakeningReward, UserAwakeningProgress
 )
-from app.infrastructure.database.models.v2.user import User
+from app.infrastructure.database.models.v2.ascendants import Ascendant
 from app.application.services.cache_service import cache_service
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class AwakeningAdminService:
         """
         try:
             # Verify admin permissions (implement based on your auth system)
-            admin_user = self.db.query(User).filter(User.id == admin_id).first()
+            admin_user = self.db.query(Ascendant).filter(Ascendant.id == admin_id).first()
             if not admin_user:
                 raise ValueError("Admin user not found")
             

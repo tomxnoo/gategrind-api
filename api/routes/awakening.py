@@ -17,7 +17,10 @@ from api.models.user import UserProfile as User
 from app.infrastructure.database.session import get_async_session
 from app.application.services.awakening_service import AwakeningService
 from app.application.services.progression_service import ProgressionService
+from features.awakening.logic.mock_awakening_service import MockAwakeningService
 from core.config import settings
+from api.deps import is_development_mode
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +29,22 @@ router = APIRouter()
 
 async def get_awakening_service(
     session: AsyncSession = Depends(get_async_session),
-) -> AwakeningService:
-    """Get the awakening service with database session."""
-    progression_service = ProgressionService(session)
-    return AwakeningService(session, progression_service)
+):
+    """Get the awakening service - mock in development mode, real service in production."""
+    # Check for development mode using both environment variables
+    dev_mode = (
+        is_development_mode() or 
+        os.getenv("DEV_MODE", "false").lower() == "true" or
+        settings.DEV_MODE
+    )
+    
+    if dev_mode:
+        logger.info("Using MockAwakeningService in development mode")
+        return MockAwakeningService()
+    else:
+        logger.info("Using real AwakeningService in production mode")
+        progression_service = ProgressionService(session)
+        return AwakeningService(session, progression_service)
 
 
 @router.post("/action", response_model=Dict[str, Any])
