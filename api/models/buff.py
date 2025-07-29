@@ -56,3 +56,26 @@ class BuffInventory(BaseModel):
     consumable_buffs: List[Buff]
     active_buffs: List[ActiveBuff]
     total_active_effects: Dict[str, float]
+
+class BuffData(BaseModel):
+    """Buff data model for API responses"""
+    id: int
+    name: str
+    description: str
+    buff_type: BuffType
+    rarity: BuffRarity
+    effects: Dict[str, Any]
+    duration_minutes: Optional[int] = None
+    active: bool = True
+    stacks: int = 1
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class BuffResponse(BaseModel):
+    """Buff response model for API endpoints"""
+    success: bool
+    message: str
+    data: Optional[BuffData] = None
+    error: Optional[str] = None

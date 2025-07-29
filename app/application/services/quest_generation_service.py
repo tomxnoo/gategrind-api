@@ -11,17 +11,12 @@ from typing import List, Dict, Any, Optional
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-import logfire
 
 from app.infrastructure.database.models.v2.ascendants import Ascendant
 from app.infrastructure.database.models.v2.movements import Movement
 from app.infrastructure.database.models.v2.user_skill_progress import UserSkillProgress
 from app.infrastructure.database.models.v2.awakening import AwakeningSession, AwakeningQuest
 from sqlalchemy.util import greenlet_spawn
-
-# Configure logfire
-logfire.configure(token='pylf_v1_us_0vf7l4GHks4z9FpVz9f58Pz0409xff57M6nlsJtCqDnw')
-logfire.instrument_sqlalchemy()
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +49,6 @@ class QuestGenerationService:
             10: 6  # Transcendent
         }
 
-    @logfire.instrument('generate_daily_quests')
     async def generate_daily_quests(
         self, 
         user_id: int, 
@@ -148,7 +142,6 @@ class QuestGenerationService:
             logger.error(f"Error generating daily quests for user {user_id}: {e}", exc_info=True)
             raise
 
-    @logfire.instrument('get_user_progression_data')
     async def _get_user_progression_data(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get user's progression data for quest personalization"""
         try:
@@ -204,7 +197,6 @@ class QuestGenerationService:
             logger.error(f"Error getting user progression data for {user_id}: {str(e)}")
             return None
 
-    @logfire.instrument('get_user_available_movements')
     async def _get_user_available_movements(
         self, 
         user_id: int, 

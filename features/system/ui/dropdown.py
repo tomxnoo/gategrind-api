@@ -30,13 +30,17 @@ class SystemHubPublicDropdown(discord.ui.Select):
             await interaction.response.send_message("This is not your menu.", ephemeral=True)
             return
 
-        # Send ephemeral response directly instead of using run_with_animation
+        # Defer the response to avoid timeout
+        await interaction.response.defer(ephemeral=True)
+        
+        # Send ephemeral response after deferring
         try:
             embed = await render_hub_embed(self.bot, interaction.user)
             view = EphemeralPanelView(self.bot, interaction.user)
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
         except Exception as e:
-            await interaction.response.send_message(
+            # Since we deferred, always use followup
+            await interaction.followup.send(
                 "❌ Failed to open System Hub. Please try again.", 
                 ephemeral=True
             )

@@ -21,8 +21,8 @@ from contextlib import asynccontextmanager
 import asyncpg
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
-import logfire
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
@@ -30,45 +30,34 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure Sentry (using DSN from environment)
+# Sentry configuration
 sentry_dsn = os.getenv('SENTRY_DSN')
 if sentry_dsn:
     sentry_sdk.init(
         dsn=sentry_dsn,
-        environment="development",
         traces_sample_rate=1.0,
-        integrations=[
-            FastApiIntegration(),
-            SqlalchemyIntegration(),
-        ],
-        send_default_pii=True,
-        # Prevent pickling errors by excluding frame locals
-        include_local_variables=False,
-        include_source_context=False,
+        profiles_sample_rate=1.0,
     )
     print(f"[OK] Sentry initialized with DSN: {sentry_dsn[:50]}...")
 else:
     print("[WARN] No Sentry DSN found in environment variables")
 
-# Debug: Check if token is loaded
-logfire_token = os.getenv('LOGFIRE_TOKEN')
-print(f"[DEBUG] Logfire token loaded: {logfire_token[:20]}..." if logfire_token else "[DEBUG] No Logfire token found")
+# Logfire removed - causing authentication issues in production
+print("[INFO] Logfire monitoring disabled")
 
-# Configure Logfire early in the application startup
-logfire.configure(
-    token=logfire_token,
-    service_name='realm-of-shadows-api',
-    service_version='2.0.0'
-)
-logfire.instrument_sqlalchemy()
-
-# Add project root to path for imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# Get project root for static files
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 from core.redis_cache import RedisCache
-from api.routes import health, users, quests, logging, auth, buffs, incursions, awakening
+# Import route modules directly to avoid __init__.py issues
+from api.routes.health import router as health_router
+from api.routes.users import router as users_router
+from api.routes.quests import router as quests_router
+from api.routes.logging import router as logging_router
+from api.routes.auth import router as auth_router
+from api.routes.buffs import router as buffs_router
+from api.routes.incursions import router as incursions_router
+from api.routes.awakening import router as awakening_router
 from app.api.v2.router import api_v2_router
 
 @asynccontextmanager
@@ -141,9 +130,6 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Instrument the FastAPI app with Logfire
-logfire.instrument_fastapi(app)
-
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -154,14 +140,14 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(health.router, prefix="/api/health", tags=["Health"])
-app.include_router(users.router, prefix="/api/users", tags=["Users"])
-app.include_router(quests.router, prefix="/api/quests", tags=["Quests"])
-app.include_router(logging.router, prefix="/api/logging", tags=["Logging"])
-app.include_router(buffs.router, prefix="/api/buffs", tags=["Buffs"])
-app.include_router(incursions.router, prefix="/api/incursions", tags=["Incursions"])
-app.include_router(awakening.router, prefix="/api/awakening", tags=["Awakening"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(health_router, prefix="/api/health", tags=["Health"])
+app.include_router(users_router, prefix="/api/users", tags=["Users"])
+app.include_router(quests_router, prefix="/api/quests", tags=["Quests"])
+app.include_router(logging_router, prefix="/api/logging", tags=["Logging"])
+app.include_router(buffs_router, prefix="/api/buffs", tags=["Buffs"])
+app.include_router(incursions_router, prefix="/api/incursions", tags=["Incursions"])
+app.include_router(awakening_router, prefix="/api/awakening", tags=["Awakening"])
 
 # Include V2 API router
 app.include_router(api_v2_router)

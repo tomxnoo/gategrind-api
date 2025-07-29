@@ -100,3 +100,33 @@ class IncursionFullListResponse(BaseModel):
     """Response model for listing full incursion objects"""
     active_incursions: List[Incursion]
     total_count: int
+
+class IncursionData(BaseModel):
+    """Incursion data model for API responses"""
+    id: int
+    incursion_id: str
+    title: str
+    description: str
+    incursion_type: IncursionType
+    target_exercise: str
+    target_reps: int
+    current_reps: int = 0
+    reward_type: RewardType
+    reward_value: int
+    reward_description: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    expires_at: datetime
+    is_active: bool = True
+    progress_percentage: float = 0.0
+    participants_count: int = 0
+    time_remaining: Optional[int] = None  # minutes
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class IncursionResponse(BaseModel):
+    """Incursion response model for API endpoints"""
+    success: bool
+    message: str
+    data: Optional[IncursionData] = None
+    error: Optional[str] = None

@@ -13,9 +13,11 @@ sentry-sdk>=1.0.0,<2.0.0
 fastapi>=0.104.0,<1.0.0
 uvicorn[standard]>=0.24.0,<1.0.0
 pydantic>=2.5.0,<3.0.0
+pydantic-settings>=2.0.0,<3.0.0
 python-multipart>=0.0.6,<1.0.0
 httpx>=0.25.0,<1.0.0
 python-jose[cryptography]>=3.3.0,<4.0.0
 redis>=5.0.0,<6.0.0
-logfire>=4.0.0,<5.0.0
 greenlet>=1.1.0
+# Database ORM
+sqlalchemy>=2.0.0,<3.0.0

@@ -2,7 +2,7 @@
 DungeonReward SQLAlchemy model for V2 database schema.
 This model tracks rewards earned from dungeon completion.
 """
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Index, CheckConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, DateTime, Boolean, Float, Index, CheckConstraint
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from datetime import datetime
 from typing import Optional
@@ -23,7 +23,7 @@ class DungeonReward(BaseModel):
     __tablename__ = 'dungeon_rewards'
     
     session_id: Mapped[int] = mapped_column(ForeignKey('dungeon_sessions.id', ondelete="CASCADE"), nullable=False)
-    ascendant_id: Mapped[int] = mapped_column(ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False)
+    ascendant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False)
     reward_type: Mapped[str] = mapped_column(String(20), nullable=False)
     amount: Mapped[int] = mapped_column(nullable=False)
     applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

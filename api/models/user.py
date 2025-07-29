@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 class UserStats(BaseModel):
@@ -44,3 +44,14 @@ class UserSummary(BaseModel):
     username: str
     level: int
     discord_id: str
+
+class UserPreferences(BaseModel):
+    """User preferences model for quest generation and system customization"""
+    preferred_stats: Optional[List[str]] = Field(default_factory=list, description="Preferred stats to focus on (STR, END, TECH)")
+    excluded_categories: Optional[List[str]] = Field(default_factory=list, description="Movement categories to exclude from quests")
+    time_limit: Optional[int] = Field(default=None, description="Preferred time limit for quests in minutes")
+    intensity_preference: Optional[str] = Field(default="normal", description="Intensity preference: low, normal, or high")
+    notification_preferences: Optional[Dict[str, bool]] = Field(default_factory=dict, description="Notification settings")
+    ui_preferences: Optional[Dict[str, Any]] = Field(default_factory=dict, description="UI customization preferences")
+    
+    model_config = ConfigDict(from_attributes=True)

@@ -3,7 +3,7 @@ Quest and QuestCompletion SQLAlchemy models for V2 database schema.
 These models provide a simple, robust log of all quests generated
 and completed within the GateGrind ecosystem.
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -23,7 +23,7 @@ class Quest(BaseModel):
     """
     __tablename__ = 'quests'
     
-    ascendant_id = Column(Integer, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False)
+    ascendant_id = Column(BigInteger, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(String)
     source = Column(String(50), nullable=False, index=True)  # 'Awakening', 'Dungeon_L1', etc.
@@ -48,7 +48,7 @@ class QuestCompletion(BaseModel):
     """
     __tablename__ = 'quest_completions'
     
-    ascendant_id = Column(Integer, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False)
+    ascendant_id = Column(BigInteger, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False)
     quest_id = Column(Integer, ForeignKey('quests.id', ondelete="CASCADE"), nullable=False, unique=True)
     
     # The 'created_at' field from BaseModel serves as the completion timestamp.

@@ -152,6 +152,14 @@ async def on_ready():
     print(f"Guilds: {len(bot.guilds)}  •  Cogs: {len(bot.cogs)}")
     print("═" * 60)
     
+    # Check API health
+    try:
+        from core.api_client import api_client
+        health = await api_client.health_check()
+        print(f"[OK] API Health Check: {health.get('status', 'unknown')} - {health.get('service', 'unknown')}")
+    except Exception as e:
+        print(f"[WARN] API Health Check failed: {e}")
+    
     # Add persistent views
     try:
         from features.system.ui.dropdown import SystemHubPublicView

@@ -2,7 +2,7 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, text
 from sqlalchemy import pool
 
 from alembic import context
@@ -75,11 +75,17 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Set PostgreSQL timeouts for large migrations
+        connection.execute(text("SET statement_timeout TO '30min'"))
+        connection.execute(text("SET lock_timeout TO '5min'"))
+        connection.execute(text("SET idle_in_transaction_session_timeout TO '60min'"))
+        
         context.configure(
             connection=connection, 
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,
+            transaction_per_migration=True,  # Smaller transactions
         )
 
         with context.begin_transaction():

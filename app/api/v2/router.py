@@ -13,6 +13,8 @@ from .incursions import router as incursions_router
 from .endpoints.awakening import router as awakening_router
 from .dungeons import router as dungeons_router
 from .profiles import router as profiles_router
+from .auth import router as auth_router
+from .health import router as health_router
 
 # Import admin router
 from .admin.skill_requirements import router as admin_skill_requirements_router
@@ -21,6 +23,8 @@ from .admin.skill_requirements import router as admin_skill_requirements_router
 api_v2_router = APIRouter(prefix="/api/v2")
 
 # Include all sub-routers
+api_v2_router.include_router(health_router)  # Health checks first (no auth required)
+api_v2_router.include_router(auth_router)  # Auth router (no auth required)
 api_v2_router.include_router(movements_router)
 api_v2_router.include_router(progression_router)
 api_v2_router.include_router(events_router)

@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from core.config import settings
 from app.api.v2.dependencies.auth import get_current_user_id, get_db_session_or_none
@@ -71,9 +72,12 @@ async def get_my_profile(
         )
     
     try:
-        # Query the Ascendant model for the user's profile
+        # Query the Ascendant model for the user's profile with eager loading
+        # Note: current_user_id is the actual user ID from JWT, not discord_id
         result = await db_session.execute(
-            select(Ascendant).where(Ascendant.discord_id == str(current_user_id))
+            select(Ascendant)
+            .options(selectinload(Ascendant.stats))
+            .where(Ascendant.id == current_user_id)
         )
         ascendant = result.scalar_one_or_none()
         
@@ -87,18 +91,38 @@ async def get_my_profile(
         # TODO: Implement full profile assembly with related data
         from app.api.v2.schemas.ascendant_schemas import AscendantStatsSchema
         
+        # Build stats object, handling case where stats might not exist
+        if ascendant.stats:
+            stats = AscendantStatsSchema(
+                str_level=ascendant.stats.str_level,
+                str_xp=ascendant.stats.str_xp,
+                end_level=ascendant.stats.end_level,
+                end_xp=ascendant.stats.end_xp,
+                tech_level=ascendant.stats.tech_level,
+                tech_xp=ascendant.stats.tech_xp,
+                str_value=ascendant.stats.str_value,
+                end_value=ascendant.stats.end_value,
+                tech_value=ascendant.stats.tech_value
+            )
+        else:
+            # Default stats if none exist
+            stats = AscendantStatsSchema(
+                str_level=1,
+                str_xp=0.0,
+                end_level=1,
+                end_xp=0.0,
+                tech_level=1,
+                tech_xp=0.0,
+                str_value=10,
+                end_value=10,
+                tech_value=10
+            )
+        
         return AscendantProfileResponse(
             id=ascendant.id,
             discord_id=ascendant.discord_id,
             username=ascendant.username,
-            stats=AscendantStatsSchema(
-                str_level=ascendant.stats.str_level if ascendant.stats else 1,
-                str_xp=ascendant.stats.str_xp if ascendant.stats else 0.0,
-                end_level=ascendant.stats.end_level if ascendant.stats else 1,
-                end_xp=ascendant.stats.end_xp if ascendant.stats else 0.0,
-                tech_level=ascendant.stats.tech_level if ascendant.stats else 1,
-                tech_xp=ascendant.stats.tech_xp if ascendant.stats else 0.0
-            ),
+            stats=stats,
             dungeon_progress=None,  # TODO: Implement dungeon progress retrieval
             dungeon_keys=[],  # TODO: Implement dungeon keys retrieval
             unlocked_skills=[],  # TODO: Implement skills retrieval

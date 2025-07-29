@@ -67,3 +67,28 @@ class DailyQuestSummary(BaseModel):
     completed_quests: int
     total_xp_gained: int
     completion_rate: float
+
+class QuestData(BaseModel):
+    """Quest data model for API responses"""
+    id: int
+    title: str
+    description: str
+    tier: QuestTier
+    xp_reward: int
+    movements: List[str]
+    target: Dict[str, Any]
+    status: QuestStatus
+    progress: Dict[str, QuestProgress]
+    created_at: datetime
+    updated_at: datetime
+    expires_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class QuestResponse(BaseModel):
+    """Quest response model for API endpoints"""
+    success: bool
+    message: str
+    data: Optional[QuestData] = None
+    error: Optional[str] = None

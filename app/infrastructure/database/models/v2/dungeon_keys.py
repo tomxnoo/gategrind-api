@@ -2,7 +2,7 @@
 DungeonKey SQLAlchemy model for V2 database schema.
 This model manages the Shadow Keys that users earn and consume for dungeon entry.
 """
-from sqlalchemy import Column, Integer, String, ForeignKey, Index
+from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, Index
 from sqlalchemy.orm import relationship
 
 from .base import BaseModel
@@ -19,7 +19,7 @@ class DungeonKey(BaseModel):
     """
     __tablename__ = 'dungeon_keys'
     
-    ascendant_id = Column(Integer, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False)
+    ascendant_id = Column(BigInteger, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False)
     key_type = Column(String(50), nullable=False, default='shadow_key')  # 'shadow_key', future key types
     quantity = Column(Integer, nullable=False, default=0)
     

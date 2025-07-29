@@ -5,7 +5,7 @@ This module provides authentication utilities specifically for the v2 API,
 including user ID extraction and authentication validation.
 """
 import os
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,11 +17,13 @@ def is_development_mode() -> bool:
     return os.getenv("DEV_MODE", "false").lower() == "true"
 
 
-def get_db_session_or_none():
+async def get_db_session_or_none() -> AsyncGenerator[Optional[AsyncSession], None]:
     """Get database session only if not in development mode"""
     if is_development_mode():
-        return None
-    return get_async_session()
+        yield None
+    else:
+        async for session in get_async_session():
+            yield session
 
 
 async def get_current_user_id(

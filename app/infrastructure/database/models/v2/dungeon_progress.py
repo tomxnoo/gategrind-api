@@ -2,7 +2,7 @@
 DungeonProgress SQLAlchemy model for V2 database schema.
 This model tracks the highest dungeon level completed by each user.
 """
-from sqlalchemy import Column, Integer, ForeignKey, Index, DateTime
+from sqlalchemy import Column, Integer, BigInteger, ForeignKey, Index, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
@@ -24,7 +24,7 @@ class DungeonProgress(BaseModel):
     """
     __tablename__ = 'dungeon_progress'
     
-    ascendant_id = Column(Integer, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False, unique=True)
+    ascendant_id = Column(BigInteger, ForeignKey('ascendants.id', ondelete="CASCADE"), nullable=False, unique=True)
     highest_level_completed = Column(Integer, nullable=False, default=0)
     total_completions = Column(Integer, nullable=False, default=0)
     total_shadow_keys_spent = Column(Integer, nullable=False, default=0)

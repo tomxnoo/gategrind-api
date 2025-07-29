@@ -1,3 +1,14 @@
+# Import modules to expose them for access to .router attributes
+from . import health
+from . import users
+from . import quests
+from . import logging
+from . import auth
+from . import buffs
+from . import incursions
+from . import awakening
+
+# Also import routers for backward compatibility
 from .health import router as health_router
 from .users import router as users_router
 from .quests import router as quests_router
@@ -8,6 +19,16 @@ from .incursions import router as incursions_router
 from .awakening import router as awakening_router
 
 __all__ = [
+    # Modules
+    "health",
+    "users", 
+    "quests",
+    "logging",
+    "auth",
+    "buffs",
+    "incursions",
+    "awakening",
+    # Routers (for backward compatibility)
     "health_router",
     "users_router", 
     "quests_router",

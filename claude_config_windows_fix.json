@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "visioncraft": {
+      "command": "cmd",
+      "args": ["/c", "npx", "@visioncraft/mcp-server"]
+    },
+    "clear-thought": {
+      "command": "cmd", 
+      "args": ["/c", "npx", "@clear-thought/mcp-server"]
+    },
+    "PostgreSQL": {
+      "command": "cmd",
+      "args": ["/c", "npx", "@modelcontextprotocol/server-postgres"]
+    },
+    "File_System": {
+      "command": "cmd",
+      "args": ["/c", "npx", "@modelcontextprotocol/server-filesystem", "C:\\Users\\sakko\\Documents\\GitHub\\RoS-TRAE"]
+    },
+    "neon": {
+      "command": "cmd",
+      "args": ["/c", "npx", "@neondatabase/mcp-server"]
+    },
+    "sequential-thinking": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}

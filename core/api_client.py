@@ -22,50 +22,24 @@ class APIClient(APIClientPollingMixin):
     """Client for making authenticated requests to the FastAPI backend"""
     
     def __init__(self, base_url: str = None):
-        # Debug logging to understand environment
-        replit_url = os.getenv("REPLIT_URL")
-        custom_api_domain = os.getenv("CUSTOM_API_DOMAIN")
-        print(f"[API_CLIENT] REPLIT_URL: {replit_url}")
-        print(f"[API_CLIENT] CUSTOM_API_DOMAIN: {custom_api_domain}")
-        
-        # Check if we're in Replit by looking for multiple indicators
-        is_replit = (
-            os.getenv("REPLIT_URL") is not None or 
-            os.getenv("REPL_SLUG") is not None or 
-            os.getenv("REPL_OWNER") is not None or
-            os.path.exists("/.replit")
-        )
-        
-        if is_replit:
-            # In Replit, check for dynamic port at runtime
-            port = os.getenv("PORT", "5000")
-            self.base_url = f"http://127.0.0.1:{port}/api"
-            print(f"[API_CLIENT] Using Replit internal connection: {self.base_url}")
-        elif base_url:
+        # Simplified configuration - use environment variable or default
+        if base_url:
             self.base_url = base_url
-            print(f"[API_CLIENT] Using provided base_url: {self.base_url}")
         else:
-            # For external clients or local development
-            if custom_api_domain:
-                # Remove any existing protocol prefix to avoid double https://
-                domain = custom_api_domain.replace("https://", "").replace("http://", "")
-                self.base_url = f"https://{domain}/api"
-                print(f"[API_CLIENT] Using custom domain: {self.base_url}")
-            else:
-                # Fallback for local development, using PORT environment variable
-                port = os.getenv("PORT", "5000")
-                self.base_url = os.getenv("API_BASE_URL", f"http://localhost:{port}/api")
-                print(f"[API_CLIENT] Using fallback: {self.base_url}")
+            self.base_url = os.getenv("API_BASE_URL", "http://localhost:5000/api")
+        
+        print(f"[API_CLIENT] Using base URL: {self.base_url}")
 
         self.jwt_secret = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
         self.jwt_algorithm = "HS256"
         self._user_tokens: Dict[int, str] = {}  # Cache tokens by discord user_id
         self._system_token: Optional[str] = None  # Cache system token
+        self._registered_users: Dict[int, bool] = {}  # Track registered users
         
         # Check if we're in development mode
         self.dev_mode = os.getenv("DEVELOPMENT_MODE", "false").lower() == "true"
         if self.dev_mode:
-            print(f"[API_CLIENT] Running in development mode - authentication disabled")
+            print(f"[API_CLIENT] Running in development mode - authentication may be bypassed")
     
     def _validate_response(self, response_data: Dict[str, Any], endpoint: str) -> Dict[str, Any]:
         """Validate API response and handle common error patterns"""
@@ -146,6 +120,10 @@ class APIClient(APIClientPollingMixin):
         discord_user_id = discord_user.id
         username = discord_user.display_name or discord_user.name
         
+        # Check if user is registered, if not, register them
+        if discord_user_id not in self._registered_users:
+            await self._ensure_user_registered(discord_user)
+        
         # Check if we have a cached token
         if discord_user_id in self._user_tokens:
             token = self._user_tokens[discord_user_id]
@@ -157,7 +135,18 @@ class APIClient(APIClientPollingMixin):
             except jwt.InvalidTokenError:
                 pass
         
-        # Create new token
+        # Get token from login endpoint if we have a registered user
+        if discord_user_id in self._registered_users:
+            try:
+                login_response = await self._login_user(str(discord_user_id))
+                if login_response and "access_token" in login_response:
+                    token = login_response["access_token"]
+                    self._user_tokens[discord_user_id] = token
+                    return token
+            except Exception as e:
+                print(f"[API_CLIENT] Failed to get token from login: {e}")
+        
+        # Fallback: Create new token locally
         token = self._create_user_token(discord_user_id, username)
         self._user_tokens[discord_user_id] = token
         return token
@@ -166,10 +155,12 @@ class APIClient(APIClientPollingMixin):
         """Make authenticated API request with version support"""
         headers = kwargs.get("headers", {})
         
-        # Only add Authorization header if not in development mode
-        if not self.dev_mode:
-            token = await self._get_user_token(discord_user)
-            headers["Authorization"] = f"Bearer {token}"
+        # Skip auth for health and auth endpoints
+        if endpoint not in ["/v2/auth/health", "/v2/auth/register", "/v2/auth/login"]:
+            # Only add Authorization header if not in development mode
+            if not self.dev_mode:
+                token = await self._get_user_token(discord_user)
+                headers["Authorization"] = f"Bearer {token}"
         
         kwargs["headers"] = headers
         url = f"{self.base_url}{endpoint}"
@@ -186,9 +177,10 @@ class APIClient(APIClientPollingMixin):
                     error_data = e.response.json()
                     raise APIError(f"HTTP {e.response.status_code}: {error_data.get('detail', e.response.text)}", 
                                  status_code=e.response.status_code, response_data=error_data)
-                except:
+                except (ValueError, KeyError, AttributeError) as json_error:
+                    # JSON parsing failed or missing expected fields
                     raise APIError(f"HTTP {e.response.status_code}: {e.response.text}", 
-                                 status_code=e.response.status_code)
+                                 status_code=e.response.status_code) from json_error
             except Exception as e:
                 print(f"[API_CLIENT] Request failed: {e}")
                 raise APIError(f"Request failed: {str(e)}")
@@ -441,6 +433,12 @@ class APIClient(APIClientPollingMixin):
     async def calculate_aura_v2(self, discord_user) -> Dict[str, Any]:
         """Calculate current aura value using V2 endpoint"""
         return await self._make_request("POST", "/v2/progression/calculate-aura", discord_user, version="v2")
+    
+    async def unlock_skill_v2(self, discord_user, node_id: str) -> Dict[str, Any]:
+        """Unlock a skill tree node using V2 endpoint"""
+        unlock_data = {"node_id": node_id}
+        return await self._make_request("POST", "/v2/progression/unlock-skill", discord_user, 
+                                      json=unlock_data, version="v2")
 
     # V2 Incursion System Methods (Enhanced)
     async def get_active_incursions_v2(self, discord_user) -> Dict[str, Any]:
@@ -519,6 +517,62 @@ class APIClient(APIClientPollingMixin):
             stacklevel=2
         )
         return await self._make_request("GET", f"/quests/history?limit={limit}", discord_user)
+    
+    async def _ensure_user_registered(self, discord_user) -> bool:
+        """Ensure user is registered in the database"""
+        discord_id = str(discord_user.id)
+        username = discord_user.name
+        display_name = getattr(discord_user, 'display_name', None) or username
+        
+        try:
+            # Try to register the user
+            registration_data = {
+                "discord_id": discord_id,
+                "username": username,
+                "display_name": display_name
+            }
+            
+            response = await self._make_request(
+                "POST", 
+                "/v2/auth/register", 
+                None,  # No auth needed for registration
+                version="v2",
+                json=registration_data
+            )
+            
+            if response:
+                self._registered_users[discord_user.id] = True
+                # Cache the token if provided
+                if "access_token" in response:
+                    self._user_tokens[discord_user.id] = response["access_token"]
+                print(f"[API_CLIENT] User {username} registered successfully")
+                return True
+        except Exception as e:
+            print(f"[API_CLIENT] Failed to register user {username}: {e}")
+        
+        return False
+    
+    async def _login_user(self, discord_id: str) -> Dict[str, Any]:
+        """Login user to get fresh token"""
+        try:
+            login_data = {"discord_id": discord_id}
+            
+            response = await self._make_request(
+                "POST",
+                "/v2/auth/login",
+                None,  # No auth needed for login
+                version="v2",
+                json=login_data
+            )
+            
+            return response
+        except Exception as e:
+            print(f"[API_CLIENT] Login failed for Discord ID {discord_id}: {e}")
+            raise
+    
+    async def health_check(self) -> Dict[str, str]:
+        """Check API health without authentication"""
+        return await self._make_request("GET", "/v2/auth/health", None, version="v2")
     
     async def get_weekly_quests(self, discord_user) -> Dict[str, Any]:
         """Get weekly quests from API"""

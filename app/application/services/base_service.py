@@ -117,14 +117,22 @@ class BaseService(ABC):
                 result = await operation(session)
                 return result
         except Exception as e:
-            self._logger.error(f"Transaction failed in {self.__class__.__name__}: {e}")
+            self._logger.error(
+                f"Transaction failed in {self.__class__.__name__}: {e}",
+                exc_info=True,
+                extra={"operation": operation.__name__ if hasattr(operation, '__name__') else str(operation)}
+            )
             raise
     
     async def close_session(self):
         """Close the database session if it exists."""
         if self._session:
-            await self._session.close()
-            self._session = None
+            try:
+                await self._session.close()
+            except Exception as e:
+                self._logger.warning(f"Error closing session: {e}", exc_info=True)
+            finally:
+                self._session = None
     
     def handle_service_error(self, error: Exception, context: str = "") -> None:
         """

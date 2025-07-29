@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.util import greenlet_spawn
-import logfire
 
 from app.infrastructure.database.models.v2.awakening import (
     AwakeningSession, AwakeningQuest, AwakeningReward, UserAwakeningProgress
@@ -22,13 +21,6 @@ from app.infrastructure.database.models.v2.user_skill_progress import UserSkillP
 from app.application.services.progression_service import ProgressionService
 from app.application.services.quest_generation_service import QuestGenerationService
 from app.application.services.cache_service import cache_service
-
-# Configure logfire (if not already configured)
-try:
-    logfire.configure(token='pylf_v1_us_0vf7l4GHks4z9FpVz9f58Pz0409xff57M6nlsJtCqDnw')
-    logfire.instrument_sqlalchemy()
-except Exception:
-    pass  # Already configured
 
 # Standard Python exceptions
 class ValidationError(ValueError):
@@ -90,7 +82,6 @@ class AwakeningService:
             logger.error(f"Error getting daily session for user {user_id}: {str(e)}")
             raise
 
-    @logfire.instrument('get_or_create_daily_session')
     async def get_or_create_daily_session(self, user_id: int, readiness_level: int) -> Dict[str, Any]:
         """
         Get or create today's awakening session for a user with caching
@@ -124,7 +115,6 @@ class AwakeningService:
         
         return session_data
 
-    @logfire.instrument('create_daily_session')
     async def create_daily_session(
         self, 
         user_id: int, 

@@ -22,7 +22,7 @@ class Movement(BaseModel):
     __tablename__ = 'movements'
     
     # Core identification and linking
-    node_id = Column(Integer, ForeignKey('skill_tree_nodes.id'), nullable=False)
+    node_id = Column(String(50), ForeignKey('skill_tree_nodes.node_id'), nullable=False)
     name = Column(String(100), nullable=False)
     xp_per_rep = Column(Float, default=1.0, nullable=False)
     stat_reward_type = Column(Enum('STR', 'END', 'TECH', name='stat_enum'), nullable=False)

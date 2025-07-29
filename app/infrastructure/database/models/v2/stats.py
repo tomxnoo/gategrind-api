@@ -4,7 +4,7 @@ This model tracks the individual level and experience points for each of
 the three core stats (STR, END, TECH), forming a one-to-one relationship
 with the Ascendant model.
 """
-from sqlalchemy import Column, Integer, Float, ForeignKey, Index, CheckConstraint
+from sqlalchemy import Column, Integer, BigInteger, Float, ForeignKey, Index, CheckConstraint
 from sqlalchemy.orm import relationship
 
 from .base import BaseModel
@@ -22,7 +22,7 @@ class AscendantStats(BaseModel):
     """
     __tablename__ = 'ascendant_stats'
 
-    ascendant_id = Column(Integer, ForeignKey('ascendants.id', ondelete='CASCADE'), unique=True, nullable=False)
+    ascendant_id = Column(BigInteger, ForeignKey('ascendants.id', ondelete='CASCADE'), unique=True, nullable=False)
 
     # Strength progression (for milestone calculations)
     str_level = Column(Integer, default=1, nullable=False)

@@ -2,7 +2,7 @@
 DungeonSession SQLAlchemy model for V2 database schema.
 This model tracks active dungeon runs and session state management.
 """
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Index
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, Text, ForeignKey, Index
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSON
 from datetime import datetime, timedelta, UTC
@@ -18,7 +18,7 @@ class DungeonSession(BaseModel):
     __tablename__ = "dungeon_sessions"
     
     # Core session data
-    ascendant_id: Mapped[int] = mapped_column(ForeignKey("ascendants.id"), nullable=False, index=True)
+    ascendant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("ascendants.id"), nullable=False, index=True)
     dungeon_level: Mapped[int] = mapped_column(nullable=False, index=True)
     shadow_keys_spent: Mapped[int] = mapped_column(nullable=False)
     status: Mapped[str] = mapped_column("session_status", String(20), default="active", nullable=False)
