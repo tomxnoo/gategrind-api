@@ -10,7 +10,7 @@ REPLIT_PYTHON_PACKAGE_LAYER = "1"
 
 # This is the primary command that runs when you press the "Run" button.
 # It will also be used for deployment.
-run = "python3 main.py"
+run = "nodemon"
 
 # Background processes
 [[processes]]

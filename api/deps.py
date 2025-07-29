@@ -12,7 +12,18 @@ from core.database.db import get_user_profile_from_db, get_unified_user_data, cr
 # Development mode helpers
 def is_development_mode() -> bool:
     """Check if we're running in development mode"""
-    return os.getenv("DEVELOPMENT_MODE", "false").lower() == "true"
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    dev_mode_raw = os.getenv("DEVELOPMENT_MODE", "NOT_SET")
+    dev_mode = dev_mode_raw.lower() == "true"
+    
+    # Use both print and logging to ensure we see the output
+    debug_msg = f"DEBUG V1 AUTH: DEVELOPMENT_MODE env var: '{dev_mode_raw}', is_development_mode: {dev_mode}"
+    print(debug_msg)
+    logger.info(debug_msg)
+    
+    return dev_mode
 
 # JWT Configuration
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")

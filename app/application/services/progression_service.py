@@ -859,6 +859,7 @@ class ProgressionService(BaseService):
                 raise ValueError("Insufficient stat values to unlock this skill")
         
         # Check skill point requirements (these will be deducted)
+        # Note: requirements use *_skill_points naming, but user model uses *_points
         if user.strength_points < requirements.strength_skill_points:
             raise ValueError(
                 f"Strength skill points {requirements.strength_skill_points} required, "
@@ -895,7 +896,7 @@ class ProgressionService(BaseService):
                 select(UserSkillProgress)
                 .where(
                     UserSkillProgress.ascendant_id == user_id,
-                    UserSkillProgress.node_id == node_record.id
+                    UserSkillProgress.node_id == node_record.node_id
                 )
             )
             progress_result = await session.execute(progress_stmt)
@@ -909,6 +910,7 @@ class ProgressionService(BaseService):
         requirements = node_config.requirements
         
         # Deduct skill points
+        # Note: requirements use *_skill_points naming, but user model uses *_points
         user.strength_points -= requirements.strength_skill_points
         user.endurance_points -= requirements.endurance_skill_points
         user.technique_points -= requirements.technique_skill_points

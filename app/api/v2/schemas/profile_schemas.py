@@ -15,6 +15,13 @@ from .dungeon_schemas import DungeonKeyResponse, DungeonProgressResponse
 from .quest_schemas import QuestResponse
 
 
+class AvailablePointsSchema(BaseModel):
+    """Schema for available skill points that can be spent."""
+    strength: int = Field(ge=0, description="Available strength skill points")
+    endurance: int = Field(ge=0, description="Available endurance skill points") 
+    technique: int = Field(ge=0, description="Available technique skill points")
+
+
 class AscendantProfileResponse(AscendantBase):
     """
     Comprehensive profile response that combines all Ascendant-related data.
@@ -28,6 +35,9 @@ class AscendantProfileResponse(AscendantBase):
     
     # Detailed Stats Breakdown
     stats: AscendantStatsSchema
+    
+    # Available skill points for spending
+    available_points: AvailablePointsSchema
     
     # Dungeon System Data
     dungeon_progress: Optional[DungeonProgressResponse] = None

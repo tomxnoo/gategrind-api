@@ -1,0 +1,26 @@
+{
+  "watch": [
+    "*.py",
+    "features/**/*.py",
+    "core/**/*.py",
+    "shared/**/*.py",
+    "api/**/*.py",
+    "cogs/**/*.py"
+  ],
+  "ext": "py",
+  "ignore": [
+    "*.pyc",
+    "__pycache__/**",
+    "tests/**",
+    "*.log",
+    "restart_signal",
+    "stop_restart"
+  ],
+  "exec": "python3 main.py",
+  "restartable": "rs",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000,
+  "verbose": true
+}

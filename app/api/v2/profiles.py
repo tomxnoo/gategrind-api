@@ -14,9 +14,20 @@ from sqlalchemy.orm import selectinload
 from core.config import settings
 from app.api.v2.dependencies.auth import get_current_user_id, get_db_session_or_none
 from app.infrastructure.database.models.v2.ascendants import Ascendant
-from app.api.v2.schemas.profile_schemas import AscendantProfileResponse
+from app.api.v2.schemas.profile_schemas import AscendantProfileResponse, AvailablePointsSchema
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
+
+
+@router.get("/debug")
+async def debug_env():
+    """Debug endpoint to check environment variables."""
+    import os
+    return {
+        "DEV_MODE": os.getenv("DEV_MODE", "NOT_SET"),
+        "environment": settings.environment,
+        "is_development": settings.is_development()
+    }
 
 
 @router.get("/me", response_model=AscendantProfileResponse)
@@ -28,14 +39,14 @@ async def get_my_profile(
     Get the current user's profile.
     
     Returns comprehensive profile information including stats, progression,
-    and other relevant data for the authenticated user.
+    and available skill points for the authenticated user.
     
     Args:
         current_user_id: The authenticated user's ID
         db_session: Database session (None in development mode)
         
     Returns:
-        AscendantProfileResponse: The user's profile data
+        AscendantProfileResponse: The user's profile data including available skill points
         
     Raises:
         HTTPException: If user not found or database error
@@ -55,6 +66,11 @@ async def get_my_profile(
                 end_xp=1800.0,
                 tech_level=12,
                 tech_xp=3200.0
+            ),
+            available_points=AvailablePointsSchema(
+                strength=5,
+                endurance=3,
+                technique=7
             ),
             dungeon_progress=None,
             dungeon_keys=[],
@@ -118,11 +134,19 @@ async def get_my_profile(
                 tech_value=10
             )
         
+        # Build available points from the ascendant model
+        available_points = AvailablePointsSchema(
+            strength=ascendant.strength_points or 0,
+            endurance=ascendant.endurance_points or 0,
+            technique=ascendant.technique_points or 0
+        )
+        
         return AscendantProfileResponse(
             id=ascendant.id,
             discord_id=ascendant.discord_id,
             username=ascendant.username,
             stats=stats,
+            available_points=available_points,
             dungeon_progress=None,  # TODO: Implement dungeon progress retrieval
             dungeon_keys=[],  # TODO: Implement dungeon keys retrieval
             unlocked_skills=[],  # TODO: Implement skills retrieval

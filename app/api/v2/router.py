@@ -16,8 +16,9 @@ from .profiles import router as profiles_router
 from .auth import router as auth_router
 from .health import router as health_router
 
-# Import admin router
+# Import admin routers
 from .admin.skill_requirements import router as admin_skill_requirements_router
+from .admin.progression_admin import router as admin_progression_router
 
 # Create the main v2 router
 api_v2_router = APIRouter(prefix="/api/v2")
@@ -33,6 +34,7 @@ api_v2_router.include_router(awakening_router)
 api_v2_router.include_router(dungeons_router)
 api_v2_router.include_router(profiles_router)
 api_v2_router.include_router(admin_skill_requirements_router)
+api_v2_router.include_router(admin_progression_router)
 
 # Export for easy import
 __all__ = ["api_v2_router"]

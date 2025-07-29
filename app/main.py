@@ -54,7 +54,7 @@ from api.routes.health import router as health_router
 from api.routes.users import router as users_router
 from api.routes.quests import router as quests_router
 from api.routes.logging import router as logging_router
-from api.routes.auth import router as auth_router
+# V1 auth removed - using V2 auth only
 from api.routes.buffs import router as buffs_router
 from api.routes.incursions import router as incursions_router
 from api.routes.awakening import router as awakening_router
@@ -140,7 +140,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+# V1 auth removed - using V2 auth only (available at /api/v2/auth/)
 app.include_router(health_router, prefix="/api/health", tags=["Health"])
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(quests_router, prefix="/api/quests", tags=["Quests"])
@@ -172,7 +172,7 @@ async def root():
         "redoc": "/redoc",
         "health": "/api/health",
         "endpoints": {
-            "auth": "/api/auth",
+            "auth": "/api/v2/auth",  # V2 auth only
             "users": "/api/users",
             "quests": "/api/quests",
             "logging": "/api/logging",
@@ -181,7 +181,9 @@ async def root():
             "awakening": "/api/awakening",
             "health": "/api/health",
             "v2": {
-                "movements": "/api/v2/movements"
+                "auth": "/api/v2/auth",
+                "movements": "/api/v2/movements",
+                "profiles": "/api/v2/profiles"
             }
         }
     }
