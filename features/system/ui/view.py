@@ -31,21 +31,10 @@ async def build_hub_embed(bot, user, show_header: bool = True):
         dungeon_progress = profile.get('dungeon_progress')
         unlocked_skills = profile.get('unlocked_skills', [])
         
-        # Build embed content with proper Discord formatting
-        content = f"""**{header}**
-**{sub_header}**
-────────────────────────────────────────────────
-
-🎭 **Operative:** {username}
-⚡ **Level {level}** • {global_xp:,} XP
-✨ **Aura:** {aura:,}
-
-📊 **Combat Statistics:**
-💪 **Strength:** Lv.{stats.get('str_level', 1)} ({stats.get('str_xp', 0):,.0f} XP)
-🛡️ **Endurance:** Lv.{stats.get('end_level', 1)} ({stats.get('end_xp', 0):,.0f} XP)
-⚔️ **Technique:** Lv.{stats.get('tech_level', 1)} ({stats.get('tech_xp', 0):,.0f} XP)
-
-🎯 **Active Missions:**"""
+        # Extract stats properly
+        strength = stats.get('strength', {}).get('level', 1) if isinstance(stats.get('strength'), dict) else 1
+        endurance = stats.get('endurance', {}).get('level', 1) if isinstance(stats.get('endurance'), dict) else 1
+        technique = stats.get('technique', {}).get('level', 1) if isinstance(stats.get('technique'), dict) else 1
         
         # Extract quest data
         completed_today = len([q for q in active_quests if q.get('completed', False)])
@@ -98,7 +87,7 @@ async def build_hub_embed(bot, user, show_header: bool = True):
             description=content,
             color=discord.Color.from_rgb(145, 70, 255)  # Purple theme matching other panels
         )
-        embed.set_footer(text="Shadow Nexus • System Hub • V2 API (Pre-cached)")
+        embed.set_footer(text="Shadow Nexus • System Hub • V2 API")
         
     except (asyncio.TimeoutError, Exception) as e:
         # Fallback embed with universal header pattern

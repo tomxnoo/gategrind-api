@@ -178,14 +178,14 @@ class SkillTreePanel:
     @staticmethod
     async def render_embed(bot: discord.Client, user: Union[discord.User, discord.Member], **kwargs) -> discord.Embed:
         """Render the skill tree panel embed."""
-        return await build_skill_tree_embed(bot, user)
+        return await build_skill_tree_embed(bot, user, current_group=None)
 
     @staticmethod
     async def build_view(bot: discord.Client, user: Union[discord.User, discord.Member], **kwargs) -> discord.ui.View:
         """Build the skill tree panel view with category navigation."""
         return SkillTreeView(bot, user)
 
-async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, discord.Member], category: Optional[str] = None) -> discord.Embed:
+async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, discord.Member], category: Optional[str] = None, current_group: Optional[str] = None) -> discord.Embed:
     """
     Build the skill tree panel embed showing movement library data.
     
@@ -274,7 +274,26 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
             )
         else:
             # Show specific category details
-            category_data = next((cat for cat in categories if cat.get('id') == category), None)
+            # Use normalized category IDs for proper matching
+            normalized_target = normalize_category_id(category)
+            category_data = None
+            
+            # First try exact match with normalized IDs
+            for cat in categories:
+                if normalize_category_id(cat.get('id', '')) == normalized_target:
+                    category_data = cat
+                    break
+            
+            # If no exact match, try name-based matching as fallback
+            if not category_data:
+                target_lower = normalized_target.lower()
+                for cat in categories:
+                    cat_name = cat.get('name', '').lower()
+                    if target_lower in cat_name or cat_name in target_lower:
+                        category_data = cat
+                        break
+            
+            # Final fallback to first category
             if not category_data:
                 category_data = categories[0] if categories else None
             
@@ -287,11 +306,16 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
                 user_stat_value = user_stats.get(primary_stat.lower() + '_points', 0)
                 user_level = user_stats.get('ascendant_level', 1)
                 
+                # Get page position info if we have a current group
+                page_info = ""
+                if current_group:
+                    page_info = get_category_position_info(categories, category, current_group)
+                
                 content = (
                     f"```ansi\n"
                     f"{header}\n"
                     f"{sub_header}\n\n"
-                    f"\x1b[1;36m● {cat_name}\x1b[0m\n"
+                    f"\x1b[1;36m● {cat_name}{page_info}\x1b[0m\n"
                     f"Primary Stat: \x1b[1;33m{primary_stat}\x1b[0m (You: {user_stat_value})\n"
                     f"Your Level: \x1b[1;33m{user_level}\x1b[0m\n"
                     f"Skill Levels: \x1b[1;33m{len(skill_tree)}\x1b[0m\n\n"
@@ -495,7 +519,7 @@ class UpperBodyButton(discord.ui.Button):
             # Use PUSH as the primary category
             upper_body_cat = 'PUSH' if 'PUSH' in upper_body_categories else (upper_body_categories[0] if upper_body_categories else None)
             
-            embed = await build_skill_tree_embed(self.bot, self.user, category=upper_body_cat)
+            embed = await build_skill_tree_embed(self.bot, self.user, category=upper_body_cat, current_group='upper')
             view = SkillTreeView(self.bot, self.user, current_group='upper', current_category=upper_body_cat)
             
             # Check if there are unlockable skills
@@ -540,7 +564,7 @@ class LowerBodyButton(discord.ui.Button):
             # Use SQUAT as the primary category
             lower_body_cat = 'SQUAT' if 'SQUAT' in lower_body_categories else (lower_body_categories[0] if lower_body_categories else None)
             
-            embed = await build_skill_tree_embed(self.bot, self.user, category=lower_body_cat)
+            embed = await build_skill_tree_embed(self.bot, self.user, category=lower_body_cat, current_group='lower')
             view = SkillTreeView(self.bot, self.user, current_group='lower', current_category=lower_body_cat)
             
             # Check if there are unlockable skills
@@ -585,7 +609,7 @@ class CoreButton(discord.ui.Button):
             # Use CORE as the primary category
             core_cat = 'CORE' if 'CORE' in core_categories else (core_categories[0] if core_categories else None)
             
-            embed = await build_skill_tree_embed(self.bot, self.user, category=core_cat)
+            embed = await build_skill_tree_embed(self.bot, self.user, category=core_cat, current_group='core')
             view = SkillTreeView(self.bot, self.user, current_group='core', current_category=core_cat)
             
             # Check if there are unlockable skills
@@ -614,7 +638,7 @@ class BackToOverviewButton(discord.ui.Button):
             return
         
         async def do_work():
-            embed = await build_skill_tree_embed(self.bot, self.user, category=None)
+            embed = await build_skill_tree_embed(self.bot, self.user, category=None, current_group=None)
             view = SkillTreeView(self.bot, self.user)
             view.current_category = None
             # No need to update unlock button on overview page since it doesn't exist
@@ -697,7 +721,7 @@ class UnlockSkillButton(discord.ui.Button):
             
             # Show skill selection dropdown
             view = SkillSelectionView(self.bot, self.user, self.current_category, unlockable_skills)
-            embed = create_skill_selection_embed(unlockable_skills, user_stats)
+            embed = create_skill_selection_embed(unlockable_skills, user_stats, self.user)
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
             
         except Exception as e:
@@ -706,8 +730,15 @@ class UnlockSkillButton(discord.ui.Button):
 
 # --- SKILL SELECTION SYSTEM ---
 
-def create_skill_selection_embed(unlockable_skills: List[Dict], user_stats: Dict) -> discord.Embed:
-    """Create embed showing available skills to unlock."""
+def create_skill_selection_embed(unlockable_skills: List[Dict], user_stats: Dict, user: discord.User) -> discord.Embed:
+    """Create embed showing available skills to unlock with proper headers and navigation."""
+    from shared.utils.headers import get_system_status_header
+    from shared.utils.ui_styles import get_panel_sub_header
+    
+    # Get universal header and sub-header to match other interfaces
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    sub_header = get_panel_sub_header("skill_unlock")
+    
     user_level = user_stats.get('ascendant_level', 1)
     user_str = user_stats.get('str_points', 0)
     user_end = user_stats.get('end_points', 0)
@@ -715,6 +746,8 @@ def create_skill_selection_embed(unlockable_skills: List[Dict], user_stats: Dict
     
     content = (
         f"```ansi\n"
+        f"{header}\n"
+        f"{sub_header}\n\n"
         f"\x1b[1;36m🌟 Available Skills to Unlock\x1b[0m\n"
         f"Your Stats: Lv.{user_level} | STR:{user_str} | END:{user_end} | TECH:{user_tech}\n\n"
         f"\x1b[1;32mYou can unlock {len(unlockable_skills)} skill(s):\x1b[0m\n"
@@ -727,7 +760,11 @@ def create_skill_selection_embed(unlockable_skills: List[Dict], user_stats: Dict
     if len(unlockable_skills) > 10:
         content += f"\n... and {len(unlockable_skills) - 10} more\n"
     
-    content += f"\n\x1b[1;37mSelect a skill from the dropdown below to unlock it.\x1b[0m\n```"
+    content += (
+        f"\n\x1b[1;37mSelect a skill from the dropdown below to unlock it.\x1b[0m\n"
+        f"──────────────────────────\n"
+        f"```"
+    )
     
     embed = discord.Embed(
         description=content,
@@ -748,6 +785,9 @@ class SkillSelectionView(discord.ui.View):
         
         # Add skill selection dropdown
         self.add_item(SkillSelectionDropdown(bot, user, category, unlockable_skills))
+        
+        # Add back to menu button for proper navigation
+        self.add_item(BackToOverviewButton(bot, user))
 
 class SkillSelectionDropdown(discord.ui.Select):
     """Dropdown for selecting which skill to unlock."""
@@ -841,6 +881,114 @@ class SkillSelectionDropdown(discord.ui.Select):
 
 # --- ENHANCED RPG NAVIGATION BUTTONS ---
 
+def get_category_position_info(categories: List[Dict], current_category: str, current_group: str) -> str:
+    """Get position information for the current category within its group."""
+    try:
+        # Get categories for the current group
+        group_categories = find_categories_for_group(categories, current_group)
+        
+        if not group_categories:
+            return ""
+        
+        # Find current category position
+        normalized_current = normalize_category_id(current_category)
+        current_index = -1
+        
+        for i, cat_id in enumerate(group_categories):
+            if normalize_category_id(cat_id) == normalized_current:
+                current_index = i
+                break
+        
+        if current_index >= 0:
+            return f" ({current_index + 1}/{len(group_categories)})"
+        else:
+            return f" (1/{len(group_categories)})"  # Fallback
+    except Exception as e:
+        logger.warning(f"Error getting category position: {e}")
+        return ""
+
+
+def normalize_category_id(category_id: str) -> str:
+    """Normalize category ID to handle different formats from the API."""
+    if not category_id:
+        return ""
+    
+    # Convert to uppercase and handle common variations
+    normalized = str(category_id).upper().strip()
+    
+    # Handle numeric to string mapping (legacy database IDs)
+    numeric_mapping = {
+        "10": "PUSH",
+        "11": "PULL", 
+        "12": "SQUAT",
+        "13": "HINGE",
+        "14": "LUNGE",
+        "15": "CORE",
+        "16": "ROTATION",
+        "17": "BALANCE",
+        "18": "PULL_VERTICAL",
+        "19": "UPPER_DYNAMIC",
+        "20": "GRIP",
+        "21": "BALLISTIC",
+        "22": "GAIT",
+        "23": "LOADED_CARRY",
+        "24": "FLEXIBILITY",
+        "25": "MOBILITY_FLOW"
+    }
+    
+    if normalized in numeric_mapping:
+        return numeric_mapping[normalized]
+    
+    return normalized
+
+def get_category_group_mapping():
+    """Get the mapping of category groups to their category IDs."""
+    return {
+        'upper': ['PUSH', 'PULL', 'PULL_VERTICAL', 'UPPER_DYNAMIC', 'GRIP', 'BALLISTIC'],
+        'lower': ['SQUAT', 'LUNGE', 'HINGE', 'GAIT', 'LOADED_CARRY'],
+        'core': ['CORE', 'ROTATION', 'BALANCE', 'FLEXIBILITY', 'MOBILITY_FLOW']
+    }
+
+def find_categories_for_group(categories: List[Dict], group: str) -> List[str]:
+    """Find all category IDs that belong to a specific group."""
+    group_mapping = get_category_group_mapping()
+    expected_categories = group_mapping.get(group, [])
+    
+    found_categories = []
+    all_category_ids = []
+    
+    for cat in categories:
+        cat_id = cat.get('id', '')
+        cat_name = cat.get('name', '').lower()
+        
+        # Normalize the category ID
+        normalized_id = normalize_category_id(cat_id)
+        all_category_ids.append(f"{cat_id} -> {normalized_id}")
+        
+        # Check if this category belongs to the group
+        if normalized_id in expected_categories:
+            if normalized_id not in found_categories:  # Avoid duplicates
+                found_categories.append(normalized_id)
+        else:
+            # Fallback: check by name patterns for robustness
+            if group == 'upper':
+                if any(keyword in cat_name for keyword in ['push', 'pull', 'overhead', 'upper', 'grip', 'ballistic']):
+                    if normalized_id not in found_categories:  # Avoid duplicates
+                        found_categories.append(normalized_id)
+            elif group == 'lower':
+                if any(keyword in cat_name for keyword in ['squat', 'lunge', 'hinge', 'leg', 'hip', 'gait', 'carry']):
+                    if normalized_id not in found_categories:  # Avoid duplicates
+                        found_categories.append(normalized_id)
+            elif group == 'core':
+                if any(keyword in cat_name for keyword in ['core', 'rotation', 'balance', 'flexibility', 'mobility']):
+                    if normalized_id not in found_categories:  # Avoid duplicates
+                        found_categories.append(normalized_id)
+    
+    logger.info(f"Category mapping for group '{group}': {all_category_ids}")
+    logger.info(f"Found categories for group '{group}': {found_categories}")
+    
+    return found_categories
+
 class PrevCategoryButton(discord.ui.Button):
     """Button for navigating to previous category in body group."""
     
@@ -866,41 +1014,35 @@ class PrevCategoryButton(discord.ui.Button):
             library_data = await get_cached_library_data(self.user)
             categories = library_data.get('categories', [])
             
-            # Define category groups with proper cycling
-            if self.group == 'upper':
-                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['PUSH', 'PULL', 'PULL_VERTICAL', 'UPPER_DYNAMIC', 'GRIP', 'BALLISTIC']]
-            elif self.group == 'lower':  
-                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['SQUAT', 'LUNGE', 'HINGE', 'GAIT', 'LOADED_CARRY']]
-            else:  # core
-                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['CORE', 'ROTATION', 'BALANCE', 'FLEXIBILITY', 'MOBILITY_FLOW']]
-            
-            # Filter out None values
-            category_ids = [cat_id for cat_id in category_ids if cat_id is not None]
-            logger.info(f"Available categories for group {self.group}: {category_ids}")
+            # Use the improved category finding logic
+            category_ids = find_categories_for_group(categories, self.group)
             
             if not category_ids:
                 logger.warning(f"No categories found for group {self.group}, returning to overview")
                 # Fallback - no categories found, go back to overview
-                embed = await build_skill_tree_embed(self.bot, self.user, category=None)
+                embed = await build_skill_tree_embed(self.bot, self.user, category=None, current_group=None)
                 view = SkillTreeView(self.bot, self.user)
                 return embed, view
             
             # Get current category and move to previous
             try:
-                if self.current_category and self.current_category in category_ids:
-                    current_index = category_ids.index(self.current_category)
+                # Normalize current category for comparison
+                normalized_current = normalize_category_id(self.current_category) if self.current_category else None
+                
+                if normalized_current and normalized_current in category_ids:
+                    current_index = category_ids.index(normalized_current)
                     prev_index = (current_index - 1) % len(category_ids)
                     target_category = category_ids[prev_index]
                     logger.info(f"Moving from index {current_index} to {prev_index}, target: {target_category}")
                 else:
                     target_category = category_ids[-1]  # Go to last category
-                    logger.info(f"Current category {self.current_category} not found, using last: {target_category}")
+                    logger.info(f"Current category {normalized_current} not found, using last: {target_category}")
             except Exception as e:
                 logger.error(f"Error in prev navigation: {e}")
                 target_category = category_ids[-1]
             
             # Build embed and view for target category
-            embed = await build_skill_tree_embed(self.bot, self.user, category=target_category)
+            embed = await build_skill_tree_embed(self.bot, self.user, category=target_category, current_group=self.group)
             view = SkillTreeView(self.bot, self.user, current_group=self.group, current_category=target_category)
             
             # Check if there are unlockable skills and update button
@@ -936,41 +1078,35 @@ class NextCategoryButton(discord.ui.Button):
             library_data = await get_cached_library_data(self.user)
             categories = library_data.get('categories', [])
             
-            # Define category groups with proper cycling
-            if self.group == 'upper':
-                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['PUSH', 'PULL', 'PULL_VERTICAL', 'UPPER_DYNAMIC', 'GRIP', 'BALLISTIC']]
-            elif self.group == 'lower':  
-                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['SQUAT', 'LUNGE', 'HINGE', 'GAIT', 'LOADED_CARRY']]
-            else:  # core
-                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['CORE', 'ROTATION', 'BALANCE', 'FLEXIBILITY', 'MOBILITY_FLOW']]
-            
-            # Filter out None values
-            category_ids = [cat_id for cat_id in category_ids if cat_id is not None]
-            logger.info(f"Available categories for group {self.group}: {category_ids}")
+            # Use the improved category finding logic
+            category_ids = find_categories_for_group(categories, self.group)
             
             if not category_ids:
                 logger.warning(f"No categories found for group {self.group}, returning to overview")
                 # Fallback - no categories found, go back to overview
-                embed = await build_skill_tree_embed(self.bot, self.user, category=None)
+                embed = await build_skill_tree_embed(self.bot, self.user, category=None, current_group=None)
                 view = SkillTreeView(self.bot, self.user)
                 return embed, view
             
             # Get current category and move to next
             try:
-                if self.current_category and self.current_category in category_ids:
-                    current_index = category_ids.index(self.current_category)
+                # Normalize current category for comparison
+                normalized_current = normalize_category_id(self.current_category) if self.current_category else None
+                
+                if normalized_current and normalized_current in category_ids:
+                    current_index = category_ids.index(normalized_current)
                     next_index = (current_index + 1) % len(category_ids)
                     target_category = category_ids[next_index]
                     logger.info(f"Moving from index {current_index} to {next_index}, target: {target_category}")
                 else:
                     target_category = category_ids[0]  # Go to first category
-                    logger.info(f"Current category {self.current_category} not found, using first: {target_category}")
+                    logger.info(f"Current category {normalized_current} not found, using first: {target_category}")
             except Exception as e:
                 logger.error(f"Error in next navigation: {e}")
                 target_category = category_ids[0]
             
             # Build embed and view for target category
-            embed = await build_skill_tree_embed(self.bot, self.user, category=target_category)
+            embed = await build_skill_tree_embed(self.bot, self.user, category=target_category, current_group=self.group)
             view = SkillTreeView(self.bot, self.user, current_group=self.group, current_category=target_category)
             
             # Check if there are unlockable skills and update button
