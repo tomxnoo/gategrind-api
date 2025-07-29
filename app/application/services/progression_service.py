@@ -810,20 +810,12 @@ class ProgressionService(BaseService):
 
     async def _check_existing_skill_progress(self, session: AsyncSession, user_id: int, node_id: str) -> Optional[UserSkillProgress]:
         """Check if user has already unlocked this skill node."""
-        # First get the SkillTreeNode database record
-        node_stmt = select(SkillTreeNode).where(SkillTreeNode.node_id == node_id)
-        node_result = await session.execute(node_stmt)
-        node_record = node_result.scalar_one_or_none()
-        
-        if not node_record:
-            return None
-            
-        # Check for existing progress
+        # Check for existing progress using string node_id directly
         progress_stmt = (
             select(UserSkillProgress)
             .where(
                 UserSkillProgress.ascendant_id == user_id,
-                UserSkillProgress.node_id == node_record.id
+                UserSkillProgress.node_id == node_id
             )
         )
         progress_result = await session.execute(progress_stmt)
@@ -944,7 +936,7 @@ class ProgressionService(BaseService):
         # Create the progress record
         skill_progress = UserSkillProgress(
             ascendant_id=user_id,
-            node_id=node_record.id
+            node_id=node_id
         )
         session.add(skill_progress)
 

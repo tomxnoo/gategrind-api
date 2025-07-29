@@ -133,14 +133,21 @@ class UserService(BaseService):
             
             # Create skill tree root node progress (if skill tree exists)
             try:
-                root_skill = UserSkillProgress(
-                    ascendant_id=user.id,
-                    node_id=1,  # Assuming node ID 1 is the root node
-                    unlocked_at=datetime.utcnow()
-                )
-                session.add(root_skill)
+                # Give new users access to all foundation nodes (level 1 of each category)
+                foundation_nodes = [
+                    "upper_dynamic_1", "mobility_flow_1", "pull_vertical_1", "push_1", "pull_1", 
+                    "squat_1", "hinge_1", "lunge_1", "rotation_1", "gait_1"
+                ]
+                
+                for node_id in foundation_nodes:
+                    root_skill = UserSkillProgress(
+                        ascendant_id=user.id,
+                        node_id=node_id,
+                        unlocked_at=datetime.utcnow()
+                    )
+                    session.add(root_skill)
             except Exception as e:
-                logger.warning(f"Could not create root skill progress: {e}")
+                logger.warning(f"Could not create foundation skill progress: {e}")
             
             await session.commit()
             logger.info(f"Initialized default data for user {user.username}")

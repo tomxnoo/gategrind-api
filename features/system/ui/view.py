@@ -87,7 +87,7 @@ async def build_hub_embed(bot, user, show_header: bool = True):
             description=content,
             color=discord.Color.from_rgb(145, 70, 255)  # Purple theme matching other panels
         )
-        embed.set_footer(text="Shadow Nexus • System Hub • V2 API")
+        embed.set_footer(text="Shadow Nexus • System Hub • V2 API (Pre-cached)")
         
     except (asyncio.TimeoutError, Exception) as e:
         # Fallback embed with universal header pattern

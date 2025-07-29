@@ -18,7 +18,20 @@ class APIError(Exception):
         self.status_code = status_code
         self.response_data = response_data
 
-class APIClient(APIClientPollingMixin):
+class SingletonMeta(type):
+    """Metaclass that creates a singleton instance"""
+    _instances = {}
+    
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+            print(f"[API_CLIENT] Created new singleton instance for {cls.__name__}")
+        else:
+            print(f"[API_CLIENT] Returning existing singleton instance for {cls.__name__}")
+        return cls._instances[cls]
+
+class APIClient(APIClientPollingMixin, metaclass=SingletonMeta):
     """Client for making authenticated requests to the FastAPI backend"""
     
     def __init__(self, base_url: str = None):
@@ -120,33 +133,46 @@ class APIClient(APIClientPollingMixin):
         discord_user_id = discord_user.id
         username = discord_user.display_name or discord_user.name
         
-        # Check if user is registered, if not, register them
-        if discord_user_id not in self._registered_users:
-            await self._ensure_user_registered(discord_user)
-        
-        # Check if we have a cached token
+        # Check if we have a cached token first (performance optimization)
         if discord_user_id in self._user_tokens:
             token = self._user_tokens[discord_user_id]
             try:
                 # Verify token is still valid
                 payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
                 if payload["exp"] > datetime.utcnow().timestamp():
+                    print(f"[API_CLIENT] Using cached valid token for user {discord_user_id}")
                     return token
-            except jwt.InvalidTokenError:
-                pass
+                else:
+                    print(f"[API_CLIENT] Cached token expired for user {discord_user_id}")
+            except jwt.InvalidTokenError as e:
+                print(f"[API_CLIENT] Cached token invalid for user {discord_user_id}: {e}")
+                # Token is invalid, remove from cache
+                del self._user_tokens[discord_user_id]
+        
+        # Check if user is registered, if not, register them
+        if discord_user_id not in self._registered_users:
+            print(f"[API_CLIENT] User {discord_user_id} not in registered cache, ensuring registration")
+            registration_success = await self._ensure_user_registered(discord_user)
+            if not registration_success:
+                print(f"[API_CLIENT] Failed to register user {discord_user_id}, falling back to local token")
         
         # Get token from login endpoint if we have a registered user
         if discord_user_id in self._registered_users:
             try:
+                print(f"[API_CLIENT] Attempting login for registered user {discord_user_id}")
                 login_response = await self._login_user(str(discord_user_id))
                 if login_response and "access_token" in login_response:
                     token = login_response["access_token"]
                     self._user_tokens[discord_user_id] = token
+                    print(f"[API_CLIENT] Successfully obtained token from login for user {discord_user_id}")
                     return token
             except Exception as e:
-                print(f"[API_CLIENT] Failed to get token from login: {e}")
+                print(f"[API_CLIENT] Failed to get token from login for user {discord_user_id}: {e}")
+                # Clear registration cache to force re-registration on next attempt
+                self._registered_users.pop(discord_user_id, None)
         
         # Fallback: Create new token locally
+        print(f"[API_CLIENT] Using fallback local token creation for user {discord_user_id}")
         token = self._create_user_token(discord_user_id, username)
         self._user_tokens[discord_user_id] = token
         return token
@@ -525,9 +551,24 @@ class APIClient(APIClientPollingMixin):
         display_name = getattr(discord_user, 'display_name', None) or username
         
         try:
-            # Try to register the user
+            # First try to login - if user exists, this will work
+            try:
+                login_response = await self._login_user(discord_id)
+                if login_response and "access_token" in login_response:
+                    self._registered_users[discord_user.id] = True
+                    self._user_tokens[discord_user.id] = login_response["access_token"]
+                    print(f"[API_CLIENT] User {username} logged in successfully")
+                    return True
+            except Exception as login_error:
+                # Login failed, user probably doesn't exist - try to register
+                print(f"[API_CLIENT] Initial login failed for {username}, attempting registration: {login_error}")
+                # Clear any stale registration cache
+                self._registered_users.pop(discord_user.id, None)
+                self._user_tokens.pop(discord_user.id, None)
+            
+            # Try to register the user (only if login failed)
             registration_data = {
-                "discord_id": discord_id,
+                "discord_id": discord_id,  
                 "username": username,
                 "display_name": display_name
             }
@@ -542,15 +583,45 @@ class APIClient(APIClientPollingMixin):
             
             if response:
                 self._registered_users[discord_user.id] = True
-                # Cache the token if provided
+                # Cache the token if provided - this prevents immediate re-login
                 if "access_token" in response:
                     self._user_tokens[discord_user.id] = response["access_token"]
-                print(f"[API_CLIENT] User {username} registered successfully")
+                    print(f"[API_CLIENT] User {username} registered and token cached")
+                else:
+                    # Registration successful but no token - perform one login to get token
+                    try:
+                        login_response = await self._login_user(discord_id)
+                        if login_response and "access_token" in login_response:
+                            self._user_tokens[discord_user.id] = login_response["access_token"]
+                            print(f"[API_CLIENT] User {username} registered and logged in")
+                    except Exception as post_reg_login_error:
+                        print(f"[API_CLIENT] Post-registration login failed for {username}: {post_reg_login_error}")
+                        # Don't fail completely - registration was successful
+                        pass
+                
                 return True
         except Exception as e:
             print(f"[API_CLIENT] Failed to register user {username}: {e}")
         
         return False
+    
+    def clear_auth_cache(self, discord_user_id: int = None):
+        """Clear authentication cache for a specific user or all users.
+        
+        This can help resolve persistent login issues by forcing fresh authentication.
+        
+        Args:
+            discord_user_id: Specific user ID to clear, or None to clear all caches
+        """
+        if discord_user_id:
+            self._user_tokens.pop(discord_user_id, None)
+            self._registered_users.pop(discord_user_id, None)
+            print(f"[API_CLIENT] Cleared auth cache for user {discord_user_id}")
+        else:
+            self._user_tokens.clear()
+            self._registered_users.clear()
+            self._system_token = None
+            print(f"[API_CLIENT] Cleared all auth caches")
     
     async def _login_user(self, discord_id: str) -> Dict[str, Any]:
         """Login user to get fresh token"""

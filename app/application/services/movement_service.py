@@ -74,7 +74,7 @@ class MovementService(BaseService):
                 
                 for node in sorted_nodes:
                     node_data = {
-                        "id": node.id,
+                        "id": node.node_id,  # Use string node_id instead of integer id
                         "level": node.level,
                         "name": node.name,
                         "description": node.description,
@@ -148,7 +148,7 @@ class MovementService(BaseService):
             
             for node in sorted_nodes:
                 node_data = {
-                    "id": node.id,
+                    "id": node.node_id,  # Use string node_id instead of integer id
                     "level": node.level,
                     "name": node.name,
                     "description": node.description,

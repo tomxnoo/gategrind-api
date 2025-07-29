@@ -51,14 +51,34 @@ async def get_cached_library_data(user: discord.User) -> Dict[str, Any]:
     
     # Cache expired or empty, fetch new data
     logger.info("Fetching fresh library data...")
+    # Use singleton APIClient instance to prevent multiple login attempts
     api_client = APIClient()
-    library_data = await asyncio.wait_for(api_client.get_movement_library_v2(user), timeout=10.0)
     
-    # Update cache
-    _library_cache = library_data
-    _cache_timestamp = datetime.now()
-    
-    return library_data
+    try:
+        library_data = await asyncio.wait_for(api_client.get_movement_library_v2(user), timeout=10.0)
+        
+        # Update cache
+        _library_cache = library_data
+        _cache_timestamp = datetime.now()
+        
+        return library_data
+    except Exception as e:
+        logger.error(f"Failed to fetch library data for user {user.id}: {e}")
+        # If we have stale cache data, use it as fallback
+        if _library_cache:
+            logger.info("Using stale cached data as fallback")
+            return _library_cache
+        # Clear auth cache and retry once
+        logger.info("Clearing auth cache and retrying...")
+        api_client.clear_auth_cache(user.id)
+        try:
+            library_data = await asyncio.wait_for(api_client.get_movement_library_v2(user), timeout=10.0)
+            _library_cache = library_data
+            _cache_timestamp = datetime.now()
+            return library_data
+        except Exception as retry_error:
+            logger.error(f"Retry also failed: {retry_error}")
+            raise retry_error
 
 async def get_cached_profile_data(user: discord.User) -> Dict[str, Any]:
     """Get profile data from cache or fetch if expired."""
@@ -75,14 +95,34 @@ async def get_cached_profile_data(user: discord.User) -> Dict[str, Any]:
     
     # Cache expired or empty, fetch new data
     logger.info(f"Fetching fresh profile data for user {user_id}...")
+    # Use singleton APIClient instance to prevent multiple login attempts
     api_client = APIClient()
-    profile_data = await api_client.get_user_profile_v2(user)
     
-    # Update cache
-    _profile_cache[user_id] = profile_data
-    _profile_cache_timestamp[user_id] = datetime.now()
-    
-    return profile_data
+    try:
+        profile_data = await api_client.get_user_profile_v2(user)
+        
+        # Update cache
+        _profile_cache[user_id] = profile_data
+        _profile_cache_timestamp[user_id] = datetime.now()
+        
+        return profile_data
+    except Exception as e:
+        logger.error(f"Failed to fetch profile data for user {user_id}: {e}")
+        # If we have stale cache data, use it as fallback
+        if user_id in _profile_cache:
+            logger.info(f"Using stale cached profile data for user {user_id} as fallback")
+            return _profile_cache[user_id]
+        # Clear auth cache and retry once
+        logger.info(f"Clearing auth cache for user {user_id} and retrying...")
+        api_client.clear_auth_cache(user_id)
+        try:
+            profile_data = await api_client.get_user_profile_v2(user)
+            _profile_cache[user_id] = profile_data
+            _profile_cache_timestamp[user_id] = datetime.now()
+            return profile_data
+        except Exception as retry_error:
+            logger.error(f"Profile retry also failed for user {user_id}: {retry_error}")
+            raise retry_error
 
 def clear_library_cache():
     """Clear the library cache (useful after unlock operations)."""
@@ -368,37 +408,48 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
 class SkillTreeView(discord.ui.View):
     """View for skill tree panel with category navigation buttons."""
     
-    def __init__(self, bot: discord.Client, user: discord.User):
+    def __init__(self, bot: discord.Client, user: discord.User, current_group: Optional[str] = None, current_category: Optional[str] = None):
         super().__init__(timeout=300)
         self.bot = bot
         self.user = user
-        self.current_category: Optional[str] = None
+        self.current_category: Optional[str] = current_category
+        self.current_group: Optional[str] = current_group
         
         # Add the panel switch dropdown first
         from shared.utils.common_views import EphemeralPanelSelect
         for item in EphemeralPanelView(bot, user).children:
             self.add_item(item)
         
-        # Add category navigation buttons
-        self.add_item(UpperBodyButton(bot, user))
-        self.add_item(LowerBodyButton(bot, user))
-        self.add_item(CoreButton(bot, user))
-        self.add_item(BackToOverviewButton(bot, user))
-        
-        # Add unlock button (only shown when in a category with unlockable skills)
-        self.unlock_button = UnlockSkillButton(bot, user)
-        self.unlock_button.disabled = True  # Disabled by default
-        self.add_item(self.unlock_button)
+        # Add navigation buttons based on state
+        if current_group and current_category:
+            # Show RPG navigation when in a category - all in row 1
+            # Button order: prev, unlock skill, next, back to menu
+            logger.info(f"Adding navigation buttons for group={current_group}, category={current_category}")
+            self.add_item(PrevCategoryButton(bot, user, current_group, current_category))
+            
+            # Add unlock button - ensure it's on row 1 with other navigation buttons
+            self.unlock_button = UnlockSkillButton(bot, user)
+            self.unlock_button.disabled = True  # Disabled by default
+            self.unlock_button.row = 1  # Ensure it's on the same row as other nav buttons
+            self.add_item(self.unlock_button)
+            
+            self.add_item(NextCategoryButton(bot, user, current_group, current_category))
+            self.add_item(BackToOverviewButton(bot, user))
+        else:
+            # Show body group selection when in overview
+            self.add_item(UpperBodyButton(bot, user))
+            self.add_item(LowerBodyButton(bot, user))
+            self.add_item(CoreButton(bot, user))
+            self.add_item(BackToOverviewButton(bot, user))
+            
+            # Don't add unlock button on overview page - it should only appear in category view
+            self.unlock_button = None
 
     def update_unlock_button(self, category: Optional[str], has_unlockable: bool):
         """Update the unlock button state based on current category."""
         self.current_category = category
-        # Hide button entirely on overview page, show and enable/disable on category pages
-        if category is None:
-            self.unlock_button.style = discord.ButtonStyle.secondary
-            self.unlock_button.disabled = True
-            self.unlock_button.label = "🔒 Select Category"
-        else:
+        # Only update unlock button if it exists (category view only)
+        if hasattr(self, 'unlock_button') and self.unlock_button is not None:
             self.unlock_button.disabled = not has_unlockable
             if has_unlockable:
                 self.unlock_button.style = discord.ButtonStyle.success
@@ -406,7 +457,7 @@ class SkillTreeView(discord.ui.View):
             else:
                 self.unlock_button.style = discord.ButtonStyle.secondary
                 self.unlock_button.label = "🔒 No Skills Available"
-        self.unlock_button.current_category = category
+            self.unlock_button.current_category = category
 
 # --- CATEGORY NAVIGATION BUTTONS ---
 
@@ -432,15 +483,20 @@ class UpperBodyButton(discord.ui.Button):
             library_data = await get_cached_library_data(self.user)
             categories = library_data.get('categories', [])
             
-            upper_body_cat = None
+            # Find upper body categories - prioritize PUSH first
+            upper_body_categories = []
             for cat in categories:
-                if any(keyword in cat.get('name', '').lower() for keyword in ['pull', 'push', 'overhead']):
-                    upper_body_cat = cat.get('id')
-                    break
+                cat_id = cat.get('id', '').upper()
+                cat_name = cat.get('name', '').lower()
+                if (cat_id in ['PUSH', 'PULL', 'PULL_VERTICAL', 'UPPER_DYNAMIC', 'GRIP', 'BALLISTIC'] or
+                    any(keyword in cat_name for keyword in ['push', 'pull', 'overhead', 'upper', 'grip', 'ballistic'])):
+                    upper_body_categories.append(cat.get('id'))
+            
+            # Use PUSH as the primary category
+            upper_body_cat = 'PUSH' if 'PUSH' in upper_body_categories else (upper_body_categories[0] if upper_body_categories else None)
             
             embed = await build_skill_tree_embed(self.bot, self.user, category=upper_body_cat)
-            view = SkillTreeView(self.bot, self.user)
-            view.current_category = upper_body_cat
+            view = SkillTreeView(self.bot, self.user, current_group='upper', current_category=upper_body_cat)
             
             # Check if there are unlockable skills
             has_unlockable = await check_has_unlockable_skills(self.user, upper_body_cat, library_data)
@@ -472,15 +528,20 @@ class LowerBodyButton(discord.ui.Button):
             library_data = await get_cached_library_data(self.user)
             categories = library_data.get('categories', [])
             
-            lower_body_cat = None
+            # Find lower body categories - prioritize SQUAT first
+            lower_body_categories = []
             for cat in categories:
-                if any(keyword in cat.get('name', '').lower() for keyword in ['squat', 'lunge', 'leg', 'hip']):
-                    lower_body_cat = cat.get('id')
-                    break
+                cat_id = cat.get('id', '').upper()
+                cat_name = cat.get('name', '').lower()
+                if (cat_id in ['SQUAT', 'LUNGE', 'HINGE', 'GAIT', 'LOADED_CARRY'] or
+                    any(keyword in cat_name for keyword in ['squat', 'lunge', 'hinge', 'leg', 'hip', 'gait', 'carry'])):
+                    lower_body_categories.append(cat.get('id'))
+            
+            # Use SQUAT as the primary category
+            lower_body_cat = 'SQUAT' if 'SQUAT' in lower_body_categories else (lower_body_categories[0] if lower_body_categories else None)
             
             embed = await build_skill_tree_embed(self.bot, self.user, category=lower_body_cat)
-            view = SkillTreeView(self.bot, self.user)
-            view.current_category = lower_body_cat
+            view = SkillTreeView(self.bot, self.user, current_group='lower', current_category=lower_body_cat)
             
             # Check if there are unlockable skills
             has_unlockable = await check_has_unlockable_skills(self.user, lower_body_cat, library_data)
@@ -512,16 +573,20 @@ class CoreButton(discord.ui.Button):
             library_data = await get_cached_library_data(self.user)
             categories = library_data.get('categories', [])
             
-            core_cat = None
+            # Find core and stability categories - prioritize CORE first
+            core_categories = []
             for cat in categories:
+                cat_id = cat.get('id', '').upper()
                 cat_name = cat.get('name', '').lower()
-                if not any(keyword in cat_name for keyword in ['pull', 'push', 'squat', 'lunge', 'overhead']):
-                    core_cat = cat.get('id')
-                    break
+                if (cat_id in ['CORE', 'ROTATION', 'BALANCE', 'FLEXIBILITY', 'MOBILITY_FLOW'] or
+                    any(keyword in cat_name for keyword in ['core', 'rotation', 'balance', 'flexibility', 'mobility'])):
+                    core_categories.append(cat.get('id'))
+            
+            # Use CORE as the primary category
+            core_cat = 'CORE' if 'CORE' in core_categories else (core_categories[0] if core_categories else None)
             
             embed = await build_skill_tree_embed(self.bot, self.user, category=core_cat)
-            view = SkillTreeView(self.bot, self.user)
-            view.current_category = core_cat
+            view = SkillTreeView(self.bot, self.user, current_group='core', current_category=core_cat)
             
             # Check if there are unlockable skills
             has_unlockable = await check_has_unlockable_skills(self.user, core_cat, library_data)
@@ -536,8 +601,8 @@ class BackToOverviewButton(discord.ui.Button):
     
     def __init__(self, bot: discord.Client, user: discord.User):
         super().__init__(
-            label="📚 Overview",
-            style=discord.ButtonStyle.secondary,
+            label="🏠 Back to Menu",
+            style=discord.ButtonStyle.secondary,  # Gray color as requested
             row=1
         )
         self.bot = bot
@@ -552,7 +617,7 @@ class BackToOverviewButton(discord.ui.Button):
             embed = await build_skill_tree_embed(self.bot, self.user, category=None)
             view = SkillTreeView(self.bot, self.user)
             view.current_category = None
-            view.update_unlock_button(None, False)
+            # No need to update unlock button on overview page since it doesn't exist
             return embed, view
         
         await run_with_animation(interaction, do_work)
@@ -566,7 +631,7 @@ class UnlockSkillButton(discord.ui.Button):
         super().__init__(
             label="🔓 Unlock Skill",
             style=discord.ButtonStyle.success,
-            row=2
+            row=1  # Move to row 1 to be with other navigation buttons
         )
         self.bot = bot
         self.user = user
@@ -751,8 +816,9 @@ class SkillSelectionDropdown(discord.ui.Select):
             await interaction.response.send_message("❌ Selected skill not found.", ephemeral=True)
             return
         
-        # Unlock the selected skill
+        # Unlock the selected skill using singleton APIClient
         try:
+            # Use singleton APIClient instance - this will reuse existing token cache
             api_client = APIClient()
             unlock_result = await api_client.unlock_skill_v2(self.user, str(selected_skill['id']))
             
@@ -772,6 +838,148 @@ class SkillSelectionDropdown(discord.ui.Select):
         except Exception as e:
             logger.error(f"Failed to unlock skill {selected_skill['id']} for user {self.user.id}: {e}")
             await interaction.response.send_message(f"❌ Failed to unlock skill: {str(e)}", ephemeral=True)
+
+# --- ENHANCED RPG NAVIGATION BUTTONS ---
+
+class PrevCategoryButton(discord.ui.Button):
+    """Button for navigating to previous category in body group."""
+    
+    def __init__(self, bot: discord.Client, user: discord.User, group: str, current_category: Optional[str] = None):
+        super().__init__(
+            label="⬅️ Prev",
+            style=discord.ButtonStyle.primary,
+            row=1
+        )
+        self.bot = bot
+        self.user = user
+        self.group = group
+        self.current_category = current_category
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("This is not for you.", ephemeral=True)
+            return
+        
+        async def do_work():
+            logger.info(f"PrevCategoryButton: Processing navigation from {self.current_category} in group {self.group}")
+            # Get library data to find available categories
+            library_data = await get_cached_library_data(self.user)
+            categories = library_data.get('categories', [])
+            
+            # Define category groups with proper cycling
+            if self.group == 'upper':
+                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['PUSH', 'PULL', 'PULL_VERTICAL', 'UPPER_DYNAMIC', 'GRIP', 'BALLISTIC']]
+            elif self.group == 'lower':  
+                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['SQUAT', 'LUNGE', 'HINGE', 'GAIT', 'LOADED_CARRY']]
+            else:  # core
+                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['CORE', 'ROTATION', 'BALANCE', 'FLEXIBILITY', 'MOBILITY_FLOW']]
+            
+            # Filter out None values
+            category_ids = [cat_id for cat_id in category_ids if cat_id is not None]
+            logger.info(f"Available categories for group {self.group}: {category_ids}")
+            
+            if not category_ids:
+                logger.warning(f"No categories found for group {self.group}, returning to overview")
+                # Fallback - no categories found, go back to overview
+                embed = await build_skill_tree_embed(self.bot, self.user, category=None)
+                view = SkillTreeView(self.bot, self.user)
+                return embed, view
+            
+            # Get current category and move to previous
+            try:
+                if self.current_category and self.current_category in category_ids:
+                    current_index = category_ids.index(self.current_category)
+                    prev_index = (current_index - 1) % len(category_ids)
+                    target_category = category_ids[prev_index]
+                    logger.info(f"Moving from index {current_index} to {prev_index}, target: {target_category}")
+                else:
+                    target_category = category_ids[-1]  # Go to last category
+                    logger.info(f"Current category {self.current_category} not found, using last: {target_category}")
+            except Exception as e:
+                logger.error(f"Error in prev navigation: {e}")
+                target_category = category_ids[-1]
+            
+            # Build embed and view for target category
+            embed = await build_skill_tree_embed(self.bot, self.user, category=target_category)
+            view = SkillTreeView(self.bot, self.user, current_group=self.group, current_category=target_category)
+            
+            # Check if there are unlockable skills and update button
+            has_unlockable = await check_has_unlockable_skills(self.user, target_category, library_data)
+            view.update_unlock_button(target_category, has_unlockable)
+            
+            return embed, view
+        
+        await run_with_animation(interaction, do_work)
+
+class NextCategoryButton(discord.ui.Button):
+    """Button for navigating to next category in body group."""
+    
+    def __init__(self, bot: discord.Client, user: discord.User, group: str, current_category: Optional[str] = None):
+        super().__init__(
+            label="Next ➡️",
+            style=discord.ButtonStyle.primary,
+            row=1
+        )
+        self.bot = bot
+        self.user = user
+        self.group = group
+        self.current_category = current_category
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("This is not for you.", ephemeral=True)
+            return
+        
+        async def do_work():
+            logger.info(f"NextCategoryButton: Processing navigation from {self.current_category} in group {self.group}")
+            # Get library data to find available categories
+            library_data = await get_cached_library_data(self.user)
+            categories = library_data.get('categories', [])
+            
+            # Define category groups with proper cycling
+            if self.group == 'upper':
+                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['PUSH', 'PULL', 'PULL_VERTICAL', 'UPPER_DYNAMIC', 'GRIP', 'BALLISTIC']]
+            elif self.group == 'lower':  
+                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['SQUAT', 'LUNGE', 'HINGE', 'GAIT', 'LOADED_CARRY']]
+            else:  # core
+                category_ids = [cat.get('id') for cat in categories if cat.get('id') in ['CORE', 'ROTATION', 'BALANCE', 'FLEXIBILITY', 'MOBILITY_FLOW']]
+            
+            # Filter out None values
+            category_ids = [cat_id for cat_id in category_ids if cat_id is not None]
+            logger.info(f"Available categories for group {self.group}: {category_ids}")
+            
+            if not category_ids:
+                logger.warning(f"No categories found for group {self.group}, returning to overview")
+                # Fallback - no categories found, go back to overview
+                embed = await build_skill_tree_embed(self.bot, self.user, category=None)
+                view = SkillTreeView(self.bot, self.user)
+                return embed, view
+            
+            # Get current category and move to next
+            try:
+                if self.current_category and self.current_category in category_ids:
+                    current_index = category_ids.index(self.current_category)
+                    next_index = (current_index + 1) % len(category_ids)
+                    target_category = category_ids[next_index]
+                    logger.info(f"Moving from index {current_index} to {next_index}, target: {target_category}")
+                else:
+                    target_category = category_ids[0]  # Go to first category
+                    logger.info(f"Current category {self.current_category} not found, using first: {target_category}")
+            except Exception as e:
+                logger.error(f"Error in next navigation: {e}")
+                target_category = category_ids[0]
+            
+            # Build embed and view for target category
+            embed = await build_skill_tree_embed(self.bot, self.user, category=target_category)
+            view = SkillTreeView(self.bot, self.user, current_group=self.group, current_category=target_category)
+            
+            # Check if there are unlockable skills and update button
+            has_unlockable = await check_has_unlockable_skills(self.user, target_category, library_data)
+            view.update_unlock_button(target_category, has_unlockable)
+            
+            return embed, view
+        
+        await run_with_animation(interaction, do_work)
 
 # --- HELPER FUNCTIONS ---
 

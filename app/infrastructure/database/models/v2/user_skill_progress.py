@@ -5,7 +5,7 @@ This model serves as a join table to track which SkillTreeNodes have been
 unlocked by each Ascendant. It represents the progression state of users
 through the skill tree system.
 """
-from sqlalchemy import Column, Integer, BigInteger, ForeignKey, DateTime, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, DateTime, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -27,7 +27,7 @@ class UserSkillProgress(BaseModel):
     
     # Foreign key relationships
     ascendant_id = Column(BigInteger, ForeignKey('ascendants.id'), nullable=False)
-    node_id = Column(Integer, ForeignKey('skill_tree_nodes.id'), nullable=False)
+    node_id = Column(String(50), ForeignKey('skill_tree_nodes.node_id'), nullable=False)
     
     # Tracking information
     unlocked_at = Column(DateTime, default=func.now(), nullable=False)

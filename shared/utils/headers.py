@@ -40,3 +40,15 @@ def render_loading_embed(user: Union[discord.User, discord.Member], dot_count: i
     desc = f"{header}[ SYSTEM LOADING{dots} ]\n───────────────────────────\n```"  # Wrap in ansi codeblock
     embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
     return embed
+
+def render_logging_in_embed(user: Union[discord.User, discord.Member], dot_count: int = 1) -> discord.Embed:
+    """
+    Returns a Discord embed with the universal header and an animated [ SYSTEM LOGGING IN... ] line.
+    dot_count cycles from 1 to 3 for animation.
+    Used specifically for the ephemeral menu login process.
+    """
+    header = get_system_status_header(user)  # No need to strip the ansi codeblock
+    dots = '.' * dot_count
+    desc = f"{header}[ SYSTEM LOGGING IN{dots} ]\n───────────────────────────\n```"  # Wrap in ansi codeblock
+    embed = discord.Embed(description=desc, color=discord.Color.dark_teal())
+    return embed
