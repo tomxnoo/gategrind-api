@@ -47,6 +47,14 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")  # <-- Get DB URL from .env
 
+# Configure enhanced logging for better console readability
+try:
+    from shared.utils.enhanced_logging import configure_project_logging
+    configure_project_logging()
+    print("Enhanced logging configured - WARN and ERROR messages will now stand out!")
+except ImportError:
+    print("Enhanced logging not available, using default Discord.py logging")
+
 def run_fastapi():
     """Run FastAPI server in a separate thread"""
     port = int(os.environ.get("PORT", 5000))

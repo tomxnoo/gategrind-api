@@ -44,11 +44,20 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 load_dotenv()
+
 # Import settings to get Discord token properly
 from app.core.config import get_settings
 settings = get_settings()
 TOKEN = settings.get_discord_token()
 DATABASE_URL = os.getenv("DATABASE_URL")  # <-- Get DB URL from .env
+
+# Configure enhanced logging AFTER all imports to ensure it's not overridden
+try:
+    from shared.utils.enhanced_logging import configure_project_logging
+    configure_project_logging()
+    print("* Enhanced logging configured - WARN and ERROR messages will now stand out!")
+except ImportError:
+    print("* Enhanced logging not available, using default Discord.py logging")
 
 def run_fastapi():
     """Run FastAPI server in a separate thread"""
@@ -65,6 +74,13 @@ class RealmBot(commands.AutoShardedBot):  # <-- Use AutoShardedBot
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.db_pool = None  # Placeholder for the pool
+        
+        # Reconfigure enhanced logging after Discord.py initialization
+        try:
+            from shared.utils.enhanced_logging import EnhancedLogger
+            EnhancedLogger.configure_library_loggers()
+        except ImportError:
+            pass
         self.redis = None  # Placeholder for RedisCache
 
     async def setup_hook(self):
@@ -157,6 +173,15 @@ async def on_ready():
     if not bot.user:
         print("[ERROR] Bot user not found on ready.", file=sys.stderr)
         return
+    
+    # Final reconfiguration of enhanced logging after everything is loaded
+    try:
+        from shared.utils.enhanced_logging import configure_project_logging
+        configure_project_logging()
+        print("* Enhanced logging reconfigured after bot startup")
+    except ImportError:
+        pass
+    
     print("═" * 60)
     print(f"🌒 {bot.user} online • ID {bot.user.id}")
     print(f"Guilds: {len(bot.guilds)}  •  Cogs: {len(bot.cogs)}")

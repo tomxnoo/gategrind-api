@@ -58,3 +58,4 @@ __pycache__/
 htmlcov/
 *.db
 test_*.db
+.env.example

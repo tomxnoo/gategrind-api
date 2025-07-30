@@ -6,11 +6,13 @@ import traceback
 from typing import Union
 
 from discord.ui import Select, View
+from shared.utils.base_views import BaseEphemeralView, SimpleFallbackView
 
 # This import is no longer needed as we will pass the connection pool via the bot object.
 # from utils.database.db import get_db
 from shared.utils.panel_registry import get_panel_by_key, get_registered_panels
 from shared.utils.headers import render_loading_embed
+from shared.utils.ui_helpers import run_with_animation
 
 class EphemeralPanelSelect(Select):
     """
@@ -43,7 +45,6 @@ class EphemeralPanelSelect(Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        from shared.utils.ui_helpers import run_with_animation
         
         try:
             if not interaction.user or interaction.user.id != self.user_id:
@@ -71,17 +72,52 @@ class EphemeralPanelSelect(Select):
                         description=f"Panel `{key}` took too long to load. Please try again.",
                         color=0xff6b35
                     )
-                    view = EphemeralPanelView(self.bot, interaction.user) if interaction.user else None
+                    # Use fallback view to avoid circular dependency
+                    view = SimpleFallbackView(timeout=300)
                     return embed, view
                 except Exception as render_error:
                     print(f"[ERROR] Panel render failed for {key}: {render_error}")
                     traceback.print_exc()
+                    
+                    # Create detailed error information with RPG styling
+                    from shared.utils.headers import get_system_status_header
+                    from shared.utils.ui_styles import get_panel_sub_header
+                    
+                    error_type = type(render_error).__name__
+                    error_msg = str(render_error)
+                    
+                    header = get_system_status_header(interaction.user).replace('```ansi', '').replace('```', '').strip()
+                    sub_header = get_panel_sub_header("system_error")
+                    
+                    content = (
+                        f"```ansi\n"
+                        f"{header}\n"
+                        f"{sub_header}\n\n"
+                        f"\x1b[1;31m● PANEL LOADING FAILURE\x1b[0m\n"
+                        f"Panel: \x1b[1;33m{key}\x1b[0m\n"
+                        f"Error Type: \x1b[1;31m{error_type}\x1b[0m\n"
+                        f"Details: \x1b[0;37m{error_msg[:80]}{'...' if len(error_msg) > 80 else ''}\x1b[0m\n\n"
+                        f"\x1b[1;33m⚠️ SYSTEM DIAGNOSTICS\x1b[0m\n"
+                        f"• Panel initialization failure\n"
+                        f"• API connection timeout\n"
+                        f"• Missing or corrupted data\n"
+                        f"• Authentication issues\n\n"
+                        f"\x1b[1;37m🔧 RECOVERY PROCEDURES\x1b[0m\n"
+                        f"• Try selecting the panel again\n"
+                        f"• Check your internet connection\n"
+                        f"• Restart the bot if error persists\n"
+                        f"• Contact support with error details\n\n"
+                        f"\x1b[1;90m[ERROR LOGGED FOR DEBUGGING]\x1b[0m\n"
+                        f"```"
+                    )
+                    
                     embed = discord.Embed(
-                        title="⚠️ Panel Loading Error",
-                        description=f"Could not load `{key}` panel. Please try again.",
+                        description=content,
                         color=0xff6b35
                     )
-                    view = EphemeralPanelView(self.bot, interaction.user) if interaction.user else None
+                    embed.set_footer(text="Shadow Archive • System Diagnostics • Error State")
+                    # Use fallback view to avoid circular dependency
+                    view = SimpleFallbackView(timeout=300)
                     return embed, view
             
             # CRITICAL FIX: Pass the function, not the coroutine result
@@ -105,11 +141,10 @@ class EphemeralPanelSelect(Select):
             await asyncio.sleep(0.4)
 
 
-class EphemeralPanelView(View):
+class EphemeralPanelView(BaseEphemeralView):
     """
     A view that contains the EphemeralPanelSelect dropdown.
     """
     def __init__(self, bot, user: Union[discord.User, discord.Member]):
-        super().__init__(timeout=None)
-        self.bot = bot
+        super().__init__(bot, user, timeout=None)
         self.add_item(EphemeralPanelSelect(self.bot, user.id))

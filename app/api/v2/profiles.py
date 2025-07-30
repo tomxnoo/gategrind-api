@@ -14,7 +14,9 @@ from sqlalchemy.orm import selectinload
 from core.config import settings
 from app.api.v2.dependencies.auth import get_current_user_id, get_db_session_or_none
 from app.infrastructure.database.models.v2.ascendants import Ascendant
+from app.infrastructure.database.models.v2.user_skill_progress import UserSkillProgress
 from app.api.v2.schemas.profile_schemas import AscendantProfileResponse, AvailablePointsSchema
+from app.api.v2.schemas.skill_tree_schemas import UserSkillProgressResponse
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -103,6 +105,24 @@ async def get_my_profile(
                 detail="User profile not found"
             )
         
+        # Query unlocked skills from UserSkillProgress table
+        skills_result = await db_session.execute(
+            select(UserSkillProgress)
+            .where(UserSkillProgress.ascendant_id == current_user_id)
+        )
+        unlocked_skills_data = skills_result.scalars().all()
+        
+        # Convert to UserSkillProgressResponse objects
+        unlocked_skills = [
+            UserSkillProgressResponse(
+                id=skill.id,
+                ascendant_id=skill.ascendant_id,
+                node_id=skill.node_id,
+                unlocked_at=skill.unlocked_at
+            )
+            for skill in unlocked_skills_data
+        ]
+        
         # For now, return a simplified response based on the Ascendant model
         # TODO: Implement full profile assembly with related data
         from app.api.v2.schemas.ascendant_schemas import AscendantStatsSchema
@@ -149,7 +169,7 @@ async def get_my_profile(
             available_points=available_points,
             dungeon_progress=None,  # TODO: Implement dungeon progress retrieval
             dungeon_keys=[],  # TODO: Implement dungeon keys retrieval
-            unlocked_skills=[],  # TODO: Implement skills retrieval
+            unlocked_skills=unlocked_skills,  # Now returns actual unlocked skills
             active_quests=[],  # TODO: Implement quests retrieval
             created_at=ascendant.created_at,
             updated_at=ascendant.updated_at

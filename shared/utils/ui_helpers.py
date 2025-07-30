@@ -181,9 +181,38 @@ async def run_with_animation(
         sentry_sdk.capture_exception(e)
         sentry_sdk.add_breadcrumb(message=f"Failed to get or display final result: {e}", level="error")
         
+        # Create detailed error information
+        error_type = type(e).__name__
+        error_msg = str(e)
+        
+        # Get traceback for Sentry context
+        import traceback
+        tb_str = traceback.format_exc()
+        sentry_sdk.set_context("error_details", {
+            "error_type": error_type,
+            "error_message": error_msg,
+            "traceback": tb_str,
+            "work_task_done": work_task.done() if 'work_task' in locals() else "unknown",
+            "interaction_user": interaction.user.id if interaction.user else "unknown",
+            "interaction_guild": interaction.guild_id if interaction.guild else "unknown"
+        })
+        
+        # Enhanced error embed with actionable information
         error_embed = discord.Embed(
-            title="❌ Shadow Nexus Error",
-            description="The shadows have encountered an unexpected disturbance.",
+            title="❌ UI Processing Error",
+            description=(
+                f"**Error Type:** `{error_type}`\n"
+                f"**Details:** {error_msg[:100]}{'...' if len(error_msg) > 100 else ''}\n\n"
+                f"**Possible Causes:**\n"
+                f"• Work function returned invalid data format\n"
+                f"• Network timeout or API failure\n"
+                f"• Component initialization error\n\n"
+                f"**Troubleshooting:**\n"
+                f"• Try the action again\n"
+                f"• Check your internet connection\n"
+                f"• Contact support if this persists\n\n"
+                f"*Error ID: {interaction.id} (logged to Sentry)*"
+            ),
             color=discord.Color.red()
         )
         try:

@@ -440,20 +440,32 @@ class Settings(BaseSettings):
         return key
     
     def configure_logging(self):
-        """Configure application logging."""
-        logging.basicConfig(
-            level=getattr(logging, self.observability.log_level),
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.StreamHandler(),
-                logging.FileHandler("app.log") if self.is_production() else logging.NullHandler()
-            ]
-        )
-        
-        # Adjust third-party library log levels
-        if not self.debug:
-            logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-            logging.getLogger("discord").setLevel(logging.WARNING)
+        """Configure application logging with enhanced formatting."""
+        try:
+            from shared.utils.enhanced_logging import EnhancedLogger
+            
+            # Use enhanced logging with colors and visual separators
+            EnhancedLogger.setup_enhanced_logging(
+                level=self.observability.log_level,
+                use_colors=not self.is_production(),  # Disable colors in production
+                compact=self.is_production(),  # Use compact format in production
+                log_file="app.log" if self.is_production() else None
+            )
+        except ImportError:
+            # Fallback to basic logging if enhanced logging is not available
+            logging.basicConfig(
+                level=getattr(logging, self.observability.log_level),
+                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                handlers=[
+                    logging.StreamHandler(),
+                    logging.FileHandler("app.log") if self.is_production() else logging.NullHandler()
+                ]
+            )
+            
+            # Adjust third-party library log levels
+            if not self.debug:
+                logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+                logging.getLogger("discord").setLevel(logging.WARNING)
 
 
 @lru_cache()

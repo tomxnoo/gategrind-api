@@ -20,8 +20,9 @@ from datetime import datetime
 from shared.utils.ui_helpers import run_with_animation
 from shared.utils.headers import get_system_status_header
 from shared.utils.ui_styles import get_panel_sub_header
+from shared.utils.base_views import SimpleFallbackView
 from shared.utils.panel_registry import register
-from shared.utils.common_views import EphemeralPanelView
+# Removed EphemeralPanelView import to avoid circular import
 from shared.utils.ui_components import create_progress_bar
 from core.api_client import APIClient
 from shared.utils.error_helpers import handle_panel_errors
@@ -143,30 +144,6 @@ def clear_profile_cache(user_id: Optional[int] = None):
         _profile_cache_timestamp.clear()
         logger.info("All profile caches cleared")
 
-# --- FALLBACK EMBED ---
-
-async def _create_fallback_embed(user: discord.User, error_type: str) -> discord.Embed:
-    """Create a fallback embed for when the API is unavailable."""
-    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
-    sub_header = get_panel_sub_header("skill_tree")
-    content = (
-        f"```ansi\n"
-        f"{header}\n"
-        f"{sub_header}\n\n"
-        f"\x1b[1;31m● System Alert: Movement Library Offline\x1b[0m\n"
-        f"Status: \x1b[1;31m❌ OFFLINE\x1b[0m\n"
-        f"Reason: \x1b[1;33m{error_type}\x1b[0m\n\n"
-        f"\x1b[1;37mThe Movement Library system is currently unable to\n"
-        f"connect to the central archives. Your skill data is\n"
-        f"safe, but services are temporarily unavailable.\n\n"
-        f"\x1b[1;37mPlease try again shortly.\n"
-        f"──────────────────────────\n"
-        f"```"
-    )
-    embed = discord.Embed(description=content, color=discord.Color.red())
-    embed.set_footer(text="Shadow Archive • System Alert • Skill Tree")
-    return embed
-
 # --- MAIN SKILL TREE PANEL ---
 
 @register
@@ -177,60 +154,295 @@ class SkillTreePanel:
 
     @staticmethod
     async def render_embed(bot: discord.Client, user: Union[discord.User, discord.Member], **kwargs) -> discord.Embed:
-        """Render the skill tree panel embed."""
-        return await build_skill_tree_embed(bot, user, current_group=None)
+        """Render the skill tree panel embed with robust error handling."""
+        try:
+            embed = await build_skill_tree_embed(bot, user, view_mode="overview")
+            logger.info(f"Successfully created SkillTreePanel embed for user {user.id}")
+            return embed
+        except Exception as e:
+            logger.error(f"Failed to render skill tree embed for user {user.id}: {e}")
+            # Return fallback embed instead of letting exception bubble up
+            fallback_embed = await _create_fallback_embed(user, f"API Error: {str(e)[:50]}...")
+            return fallback_embed
 
     @staticmethod
     async def build_view(bot: discord.Client, user: Union[discord.User, discord.Member], **kwargs) -> discord.ui.View:
-        """Build the skill tree panel view with category navigation."""
-        return SkillTreeView(bot, user)
+        """Build the skill tree panel view with category navigation and error handling."""
+        try:
+            view = SkillTreeView(bot, user, view_mode="overview")
+            logger.info(f"Successfully created SkillTreeView for user {user.id}")
+            return view
+        except Exception as e:
+            logger.error(f"Failed to build skill tree view for user {user.id}: {e}", exc_info=True)
+            # Return fallback view to avoid circular import
+            logger.info(f"Created minimal fallback view for user {user.id}")
+            return SimpleFallbackView(timeout=300)
 
-async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, discord.Member], category: Optional[str] = None, current_group: Optional[str] = None) -> discord.Embed:
+async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, discord.Member], category: Optional[str] = None, current_group: Optional[str] = None, view_mode: str = "overview") -> discord.Embed:
+    """Build the skill tree embed with comprehensive error handling."""
+    try:
+        logger.info(f"build_skill_tree_embed called for user {user.id} with view_mode={view_mode}, category={category}, current_group={current_group}")
+        
+        # Attempt to get cached data with error handling
+        library_data = None
+        profile_data = None
+        
+        try:
+            library_data = await get_cached_library_data(user)
+            logger.info(f"Successfully retrieved library data for user {user.id}")
+        except Exception as e:
+            logger.error(f"Failed to get library data for user {user.id}: {e}", exc_info=True)
+            
+        try:
+            profile_data = await get_cached_profile_data(user)
+            logger.info(f"Successfully retrieved profile data for user {user.id}")
+        except Exception as e:
+            logger.error(f"Failed to get profile data for user {user.id}: {e}", exc_info=True)
+        
+        # If both API calls failed, return fallback embed
+        if library_data is None and profile_data is None:
+            logger.error(f"Both library and profile data failed for user {user.id}")
+            return await _create_fallback_embed(user, "Unable to load skill data - API unavailable")
+        
+        # If only one failed, create partial embed with available data
+        if library_data is None:
+            logger.warning(f"Library data unavailable for user {user.id}, creating partial embed")
+            return await _create_partial_embed(user, profile_data, "Library data unavailable")
+            
+        if profile_data is None:
+            logger.warning(f"Profile data unavailable for user {user.id}, creating partial embed")
+            return await _create_partial_embed(user, library_data, "Profile data unavailable")
+        
+        # Both data sources available, proceed with normal embed creation
+        logger.info(f"Both data sources available for user {user.id}, building full embed with view_mode={view_mode}")
+        return await _build_full_skill_tree_embed(bot, user, library_data, profile_data, category, current_group, view_mode)
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in build_skill_tree_embed for user {user.id}: {e}", exc_info=True)
+        return await _create_fallback_embed(user, f"Build Error: {str(e)[:50]}...")
+
+async def _build_full_skill_tree_embed(bot: discord.Client, user: Union[discord.User, discord.Member], library_data: dict, profile_data: dict, category: Optional[str] = None, current_group: Optional[str] = None, view_mode: str = "overview") -> discord.Embed:
     """
     Build the skill tree panel embed showing movement library data.
     
     Args:
         bot: The Discord bot instance
         user: The Discord user to show the panel for
+        library_data: The cached library data
+        profile_data: The cached profile data
         category: Optional category ID to show specific category details
+        view_mode: "overview" for category summary, "detailed" for full skill tree
         
     Returns:
         discord.Embed: The formatted embed for display
     """
-    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
-    sub_header = get_panel_sub_header("skill_tree")
-
+    logger.info(f"Starting _build_full_skill_tree_embed for user {user.id}, category={category}, view_mode={view_mode}")
+    
     try:
-        # Use cached data to improve performance
-        library_data = await get_cached_library_data(user)
-        
+        header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = get_panel_sub_header("skill_tree")
+        logger.info(f"Generated headers successfully for user {user.id}")
+
         if not library_data or 'categories' not in library_data:
+            logger.error(f"Invalid library data for user {user.id}: {library_data}")
             raise ValueError("Invalid library data received")
         
         categories = library_data['categories']
+        logger.info(f"Found {len(categories)} categories for user {user.id}")
         
-        # Fetch user's unlocked skills using cached profile data
-        try:
-            profile_data = await asyncio.wait_for(get_cached_profile_data(user), timeout=5.0)
-            unlocked_skills = profile_data.get('unlocked_skills', [])
-            unlocked_skill_ids = {skill.get('skill_tree_node_id') for skill in unlocked_skills}
-            user_stats = profile_data.get('stats', {})
-        except:
-            unlocked_skill_ids = set()
-            user_stats = {}
+        # DEBUG: Examine profile data structure
+        logger.info(f"Profile data keys for user {user.id}: {list(profile_data.keys())}")
+        logger.info(f"Profile data structure for user {user.id}: {profile_data}")
         
-        # If no category selected, show overview
-        if not category:
+        # Get user's unlocked skills and stats from profile data
+        unlocked_skills = profile_data.get('unlocked_skills', [])
+        logger.info(f"Raw unlocked_skills data for user {user.id}: {unlocked_skills}")
+        
+        # Check for alternative field names that might contain skill data
+        potential_skill_fields = ['skills', 'skill_nodes', 'unlocked_nodes', 'movement_skills', 'completed_skills']
+        for field in potential_skill_fields:
+            if field in profile_data:
+                logger.info(f"Found potential skill field '{field}' for user {user.id}: {profile_data[field]}")
+        
+        # Debug: Check the type and structure of unlocked_skills
+        logger.info(f"Type of unlocked_skills: {type(unlocked_skills)}")
+        if unlocked_skills:
+            logger.info(f"Type of first skill: {type(unlocked_skills[0])}")
+            logger.info(f"First skill data: {unlocked_skills[0]}")
+            if hasattr(unlocked_skills[0], 'node_id'):
+                logger.info(f"First skill has node_id attribute: {unlocked_skills[0].node_id}")
+            if isinstance(unlocked_skills[0], dict):
+                logger.info(f"First skill dict keys: {unlocked_skills[0].keys()}")
+        
+        # Handle both dictionary and object formats
+        unlocked_skill_ids = set()
+        for skill in unlocked_skills:
+            if isinstance(skill, dict):
+                node_id = skill.get('node_id')
+            else:
+                node_id = getattr(skill, 'node_id', None)
+            
+            if node_id:
+                unlocked_skill_ids.add(node_id)
+        
+        logger.info(f"Processed unlocked_skill_ids for user {user.id}: {unlocked_skill_ids}")
+        
+        user_stats = profile_data.get('stats', {})
+        available_points = profile_data.get('available_points', {})
+        logger.info(f"User stats for user {user.id}: {user_stats}")
+        logger.info(f"Available points for user {user.id}: {available_points}")
+        logger.info(f"User {user.id} has {len(unlocked_skill_ids)} unlocked skills")
+        
+        # Debug: Log the structure of skill node requirements
+        if categories and len(categories) > 0:
+            first_category = categories[0]
+            if first_category and len(first_category.get('skill_tree', [])) > 0:
+                first_node = first_category['skill_tree'][0]
+                if 'requirements' in first_node:
+                    logger.debug(f"Sample skill node requirements structure: {first_node['requirements']}")
+                    logger.debug(f"Sample skill node requirements keys: {list(first_node['requirements'].keys())}")
+                    logger.debug(f"Full first node structure: {first_node}")
+        
+        
+        # If overview mode and no category selected, show improved category overview
+        if view_mode == "overview" and not category:
+            logger.info(f"Processing overview mode for user {user.id}")
             # Calculate total skills available
             total_skills = sum(len(cat.get('skill_tree', [])) for cat in categories)
             
-            # Get user's stat and skill points
-            str_skill_points = user_stats.get('strength_points', 0)
-            end_skill_points = user_stats.get('endurance_points', 0)
-            tech_skill_points = user_stats.get('technique_points', 0)
-            user_str = user_stats.get('str_points', 0)
-            user_end = user_stats.get('end_points', 0)
-            user_tech = user_stats.get('tech_points', 0)
+            # Get user's stat and skill points with correct field mappings
+            str_skill_points = available_points.get('strength', 0)
+            end_skill_points = available_points.get('endurance', 0)
+            tech_skill_points = available_points.get('technique', 0)
+            user_str = user_stats.get('str_level', 1)
+            user_end = user_stats.get('end_level', 1)
+            user_tech = user_stats.get('tech_level', 1)
+            # Calculate user level as max of all stat levels since ascendant_level doesn't exist
+            user_level = max(user_str, user_end, user_tech)
+            
+            content = (
+                f"```ansi\n"
+                f"{header}\n"
+                f"{sub_header}\n\n"
+                f"\x1b[1;36m● Movement Library Overview\x1b[0m\n"
+                f"Operative: \x1b[1;33m{user.display_name}\x1b[0m\n"
+                f"Rank: \x1b[1;37mLevel {user_level}\x1b[0m\n"
+                f"Skills Mastered: \x1b[1;32m{len(unlocked_skill_ids)}\x1b[0m / \x1b[1;37m{total_skills}\x1b[0m\n\n"
+                f"\x1b[1;37m⚔️ Combat Statistics:\x1b[0m\n"
+                f"├─ 🔴 Strength: \x1b[1;33m{user_str}\x1b[0m pts\n"
+                f"├─ 🔵 Endurance: \x1b[1;33m{user_end}\x1b[0m pts\n"
+                f"└─ 🟡 Technique: \x1b[1;33m{user_tech}\x1b[0m pts\n\n"
+                f"\x1b[1;37m✨ Skill Points Available:\x1b[0m\n"
+                f"├─ 🔴 Strength SP: \x1b[1;33m{str_skill_points}\x1b[0m\n"
+                f"├─ 🔵 Endurance SP: \x1b[1;33m{end_skill_points}\x1b[0m\n"
+                f"└─ 🟡 Technique SP: \x1b[1;33m{tech_skill_points}\x1b[0m\n\n"
+                f"\x1b[1;37m📚 Training Categories:\x1b[0m\n"
+            )
+            
+            # Group categories and show unlockable skills for each
+            category_groups = {
+                "Upper Body": [],
+                "Lower Body": [],
+                "Core & Stability": []
+            }
+            
+            for cat in categories:
+                cat_name = cat.get('name', 'Unknown')
+                skill_tree = cat.get('skill_tree', [])
+                
+                # Find unlockable skills (limit to 2 per category for compactness)
+                unlockable_skills = []
+                for node in skill_tree[:5]:  # Check first 5 nodes only
+                    node_id = node.get('id')
+                    if node_id in unlocked_skill_ids:
+                        continue  # Skip already unlocked
+                    
+                    requirements = node.get('requirements', {})
+                    req_level = requirements.get('ascendant_level', 0)  # Using new V2 API field names
+                    req_str = requirements.get('str_level', 0)  # Using new V2 API field names
+                    req_end = requirements.get('end_level', 0)  # Changed from end_level to end_level
+                    req_tech = requirements.get('tech_level', 0)  # Changed from tech_level to tech_level
+                    
+                    can_unlock = (user_level >= req_level and 
+                                user_str >= req_str and 
+                                user_end >= req_end and 
+                                user_tech >= req_tech)
+                    
+                    if can_unlock:
+                        unlockable_skills.append(node)
+                        if len(unlockable_skills) >= 2:  # Limit to 2 unlockable skills shown
+                            break
+                
+                # Categorize by body area
+                if any(keyword in cat_name.lower() for keyword in ['pull', 'push', 'overhead', 'arm', 'shoulder']):
+                    category_groups["Upper Body"].append((cat_name, skill_tree, unlockable_skills))
+                elif any(keyword in cat_name.lower() for keyword in ['squat', 'lunge', 'leg', 'hip', 'hinge']):
+                    category_groups["Lower Body"].append((cat_name, skill_tree, unlockable_skills))
+                else:
+                    category_groups["Core & Stability"].append((cat_name, skill_tree, unlockable_skills))
+            
+            # Display categories with MUCH more compact structure - only show totals per group
+            for group_name, group_categories in category_groups.items():
+                if not group_categories:
+                    continue
+                    
+                # Calculate group totals
+                group_unlocked = sum(sum(1 for node in skill_tree if node.get('id') in unlocked_skill_ids) 
+                                   for _, skill_tree, _ in group_categories)
+                group_total = sum(len(skill_tree) for _, skill_tree, _ in group_categories)
+                group_ready = sum(len(unlockable_skills) for _, _, unlockable_skills in group_categories)
+                
+                # Group header with color coding and totals
+                group_colors = {
+                    "Upper Body": "\x1b[1;31m",
+                    "Lower Body": "\x1b[1;34m", 
+                    "Core & Stability": "\x1b[1;35m"
+                }
+                color = group_colors.get(group_name, "\x1b[1;37m")
+                ready_text = f" • \x1b[1;95m{group_ready} Ready!\x1b[0m" if group_ready else ""
+                content += f"{color}▸ {group_name}\x1b[0m (\x1b[1;32m{group_unlocked}\x1b[0m/\x1b[1;37m{group_total}\x1b[0m){ready_text}\n"
+            
+            content += (
+                f"\n────────────────────────\n"
+                f"\x1b[1;37mUse buttons below to explore\x1b[0m\n"
+                f"```"
+            )
+            
+            # Check if content is too long for Discord's 4096 character limit
+            if len(content) > 4000:  # Leave some buffer
+                logger.warning(f"Overview content too long ({len(content)} chars), truncating for user {user.id}")
+                # Find the last complete category group section
+                lines = content.split('\n')
+                truncated_lines = []
+                char_count = 0
+                
+                for line in lines:
+                    if char_count + len(line) + 1 > 3900:  # Leave more buffer for closing
+                        truncated_lines.append("\n\x1b[1;33m... (Additional categories truncated)\x1b[0m\n")
+                        truncated_lines.append("──────────────────────────\n")
+                        truncated_lines.append("\x1b[1;37mUse buttons below to explore or unlock skills\x1b[0m\n")
+                        truncated_lines.append("```")
+                        break
+                    truncated_lines.append(line)
+                    char_count += len(line) + 1
+                
+                content = '\n'.join(truncated_lines)
+                logger.info(f"Truncated overview content to {len(content)} chars for user {user.id}")
+            
+        # Detailed view (old overview) - now becomes detailed view
+        elif view_mode == "detailed" and not category:
+            logger.info(f"Processing detailed mode for user {user.id}")
+            # Calculate total skills available
+            total_skills = sum(len(cat.get('skill_tree', [])) for cat in categories)
+            
+            # Get user's stat and skill points with correct field mappings
+            str_skill_points = available_points.get('strength', 0)
+            end_skill_points = available_points.get('endurance', 0)
+            tech_skill_points = available_points.get('technique', 0)
+            user_str = user_stats.get('str_level', 1)
+            user_end = user_stats.get('end_level', 1)
+            user_tech = user_stats.get('tech_level', 1)
+            user_level = max(user_str, user_end, user_tech)
             
             content = (
                 f"```ansi\n"
@@ -283,6 +495,7 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
                 f"```"
             )
         else:
+            logger.info(f"Processing category view for user {user.id}, category={category}")
             # Show specific category details
             # Use normalized category IDs for proper matching
             normalized_target = normalize_category_id(category)
@@ -313,39 +526,53 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
                 skill_tree = category_data.get('skill_tree', [])
                 
                 # Get user's relevant stat
-                user_stat_value = user_stats.get(primary_stat.lower() + '_points', 0)
-                user_level = user_stats.get('ascendant_level', 1)
+                user_stat_value = user_stats.get(primary_stat.lower() + '_level', 1)  # Changed from _points to _level
+                user_level = max(user_stats.get('str_level', 1), user_stats.get('end_level', 1), user_stats.get('tech_level', 1))
                 
                 # Get page position info if we have a current group
                 page_info = ""
                 if current_group:
                     page_info = get_category_position_info(categories, category, current_group)
                 
-                # Get user's skill points for display
-                str_skill_points = user_stats.get('strength_points', 0)
-                end_skill_points = user_stats.get('endurance_points', 0)
-                tech_skill_points = user_stats.get('technique_points', 0)
+                # Get user's skill points for display with correct field mappings
+                str_skill_points = available_points.get('strength', 0)
+                end_skill_points = available_points.get('endurance', 0)
+                tech_skill_points = available_points.get('technique', 0)
                 
-                # Get user's stat points for display
-                user_str = user_stats.get('str_points', 0)
-                user_end = user_stats.get('end_points', 0)
-                user_tech = user_stats.get('tech_points', 0)
+                # Get user's stat levels for display
+                user_str = user_stats.get('str_level', 1)
+                user_end = user_stats.get('end_level', 1)
+                user_tech = user_stats.get('tech_level', 1)
                 
                 content = (
                     f"```ansi\n"
                     f"{header}\n"
                     f"{sub_header}\n\n"
                     f"\x1b[1;36m● {cat_name}{page_info}\x1b[0m\n"
-                    f"Primary Stat: \x1b[1;33m{primary_stat}\x1b[0m (You: {user_stat_value})\n"
-                    f"Your Level: \x1b[1;33m{user_level}\x1b[0m\n"
-                    f"Skill Levels: \x1b[1;33m{len(skill_tree)}\x1b[0m\n"
-                    f"Stat Points: \x1b[1;33mSTR:{user_str} END:{user_end} TECH:{user_tech}\x1b[0m\n"
-                    f"Skill Points: \x1b[1;33mSTR:{str_skill_points} END:{end_skill_points} TECH:{tech_skill_points}\x1b[0m\n\n"
-                    f"\x1b[1;37m🎯 Skill Progression:\x1b[0m\n"
+                    f"Operative: \x1b[1;33m{user.display_name}\x1b[0m\n"
+                    f"Rank: \x1b[1;37mLevel {user_level}\x1b[0m\n"
+                    f"Primary Stat: \x1b[1;33m{primary_stat}\x1b[0m (You: {user_stat_value})\n\n"
+                    f"\x1b[1;37m⚔️ Combat Statistics:\x1b[0m\n"
+                    f"├─ 🔴 Strength: \x1b[1;33m{user_str}\x1b[0m pts\n"
+                    f"├─ 🔵 Endurance: \x1b[1;33m{user_end}\x1b[0m pts\n"
+                    f"└─ 🟡 Technique: \x1b[1;33m{user_tech}\x1b[0m pts\n\n"
+                    f"\x1b[1;37m✨ Skill Points Available:\x1b[0m\n"
+                    f"├─ 🔴 Strength SP: \x1b[1;33m{str_skill_points}\x1b[0m\n"
+                    f"├─ 🔵 Endurance SP: \x1b[1;33m{end_skill_points}\x1b[0m\n"
+                    f"└─ 🟡 Technique SP: \x1b[1;33m{tech_skill_points}\x1b[0m\n\n"
+                    f"\x1b[1;37m🎯 Skill Progression ({len(skill_tree)} levels):\x1b[0m\n"
                 )
                 
-                # Display skill tree levels
-                for node in skill_tree[:5]:  # Show first 5 levels
+                # Display skill tree levels - sort by level and show all levels
+                logger.info(f"Skill tree for {cat_name}: {len(skill_tree)} nodes")
+                if skill_tree:
+                    logger.info(f"Sample skill node: {skill_tree[0]}")
+                    for i, node in enumerate(skill_tree[:3]):
+                        logger.info(f"Node {i}: level={node.get('level')}, name={node.get('name')}")
+                
+                sorted_skills = sorted(skill_tree, key=lambda x: x.get('level', 1))
+                logger.info(f"After sorting: levels = {[s.get('level') for s in sorted_skills[:5]]}")
+                for node in sorted_skills:  # Show all levels in order
                     node_id = node.get('id')
                     level = node.get('level', 1)
                     name = node.get('name', 'Unknown')
@@ -358,14 +585,14 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
                     # Check if can unlock (meets requirements)
                     can_unlock = False
                     if not is_unlocked:
-                        req_level = requirements.get('ascendant_level', 0)
-                        req_str = requirements.get('str_points', 0)
-                        req_end = requirements.get('end_points', 0)
-                        req_tech = requirements.get('tech_points', 0)
+                        req_level = requirements.get('ascendant_level', 0)  # Using new V2 API field names
+                        req_str = requirements.get('str_level', 0)  # Using new V2 API field names
+                        req_end = requirements.get('end_level', 0)  # Changed from end_level to end_level
+                        req_tech = requirements.get('tech_level', 0)  # Changed from tech_level to tech_level
                         
-                        user_str = user_stats.get('str_points', 0)
-                        user_end = user_stats.get('end_points', 0)
-                        user_tech = user_stats.get('tech_points', 0)
+                        user_str = user_stats.get('str_level', 1)  # Using new V2 API field names
+                        user_end = user_stats.get('end_level', 1)  # Changed from end_level to end_level
+                        user_tech = user_stats.get('tech_level', 1)  # Changed from tech_level to tech_level
                         
                         can_unlock = (user_level >= req_level and 
                                     user_str >= req_str and 
@@ -385,18 +612,20 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
                     
                     # Level indicator with color based on level
                     level_color = ["\x1b[1;37m", "\x1b[1;32m", "\x1b[1;34m", "\x1b[1;35m", "\x1b[1;31m"][min(level-1, 4)]
-                    content += f"\n{level_color}Level {level}: {name} {unlock_indicator}{status_text}\x1b[0m\n"
+                    level_line = f"\n{level_color}Level {level}: {name} {unlock_indicator}{status_text}\x1b[0m\n"
+                    content += level_line
+                    logger.info(f"Added level line for Level {level}: content length now {len(content)} chars")
                     
                     # Show requirements if not unlocked
                     if not is_unlocked and requirements:
                         req_parts = []
-                        req_level = requirements.get('ascendant_level', 0)
-                        req_str = requirements.get('str_points', 0)
-                        req_end = requirements.get('end_points', 0)
-                        req_tech = requirements.get('tech_points', 0)
-                        req_str_skill = requirements.get('strength_points', 0)
-                        req_end_skill = requirements.get('endurance_points', 0)
-                        req_tech_skill = requirements.get('technique_points', 0)
+                        req_level = requirements.get('ascendant_level', 0)  # Using new V2 API field names
+                        req_str = requirements.get('str_level', 0)  # Using new V2 API field names
+                        req_end = requirements.get('end_level', 0)  # Changed from end_level to end_level
+                        req_tech = requirements.get('tech_level', 0)  # Changed from tech_level to tech_level
+                        req_str_skill = requirements.get('strength', 0)  # Changed from strength_points to strength
+                        req_end_skill = requirements.get('endurance', 0)  # Changed from endurance_points to endurance
+                        req_tech_skill = requirements.get('technique', 0)  # Changed from technique_points to technique
                         
                         if req_level > 0:
                             req_parts.append(f"Level {req_level}")
@@ -422,18 +651,18 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
                         if skill_point_parts:
                             color = "\x1b[1;32m" if can_unlock else "\x1b[1;33m"
                             content += f"  {color}Skill Points: {', '.join(skill_point_parts)}\x1b[0m\n"
-                    
-                    # Show movements
-                    if movements:
-                        for i, mov in enumerate(movements[:3]):  # Limit to 3 movements shown
-                            mov_name = mov.get('name', 'Unknown')
-                            xp_per_rep = mov.get('xp_per_rep', 1)
-                            if i == len(movements[:3]) - 1:
-                                content += f"  └─ {mov_name} ({xp_per_rep} XP/rep)\n"
-                            else:
-                                content += f"  ├─ {mov_name} ({xp_per_rep} XP/rep)\n"
-                        if len(movements) > 3:
-                            content += f"  └─ ... and {len(movements) - 3} more\n"
+                        
+                        # Show movements
+                        if movements:
+                            for i, mov in enumerate(movements[:3]):  # Limit to 3 movements shown
+                                mov_name = mov.get('name', 'Unknown')
+                                xp_per_rep = mov.get('xp_per_rep', 1)
+                                if i == len(movements[:3]) - 1:
+                                    content += f"  └─ {mov_name} ({xp_per_rep} XP/rep)\n"
+                                else:
+                                    content += f"  ├─ {mov_name} ({xp_per_rep} XP/rep)\n"
+                            if len(movements) > 3:
+                                content += f"  └─ ... and {len(movements) - 3} more\n"
                 
                 content += (
                     f"\n──────────────────────────\n"
@@ -449,19 +678,157 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
                     f"```"
                 )
         
+        # Final check for Discord's 4096 character limit before creating embed
+        logger.info(f"Content length before truncation check: {len(content)} chars")
+        if len(content) > 4000:
+            logger.warning(f"Content too long ({len(content)} chars), applying smart truncation for user {user.id}")
+            
+            # Smart truncation - preserve skill levels but reduce detail
+            lines = content.split('\n')
+            
+            # For category views, preserve skill level structure
+            if category and lines:
+                # Find skill level lines (they start with level indicators)
+                new_lines = []
+                in_skill_section = False
+                current_skill_lines = []
+                
+                for line in lines:
+                    # Keep header lines (before skill progression section)
+                    if "🎯 Skill Progression" in line:
+                        in_skill_section = True
+                        new_lines.append(line)
+                        continue
+                    
+                    if not in_skill_section:
+                        new_lines.append(line)
+                        continue
+                        
+                    # In skill section - detect level lines vs detail lines  
+                    stripped_line = line.strip()
+                    if stripped_line.startswith('Level ') or 'Level ' in stripped_line:
+                        # This is a level header - keep it
+                        new_lines.append(line)
+                    elif 'Requires:' in line or 'Skill Points:' in line:
+                        # Keep requirement lines (compact)
+                        new_lines.append(line)
+                    elif line.strip().startswith('├─') or line.strip().startswith('└─'):
+                        # Skip movement detail lines to save space
+                        continue
+                    elif line.strip().startswith('...'):
+                        # Skip movement count lines
+                        continue
+                    else:
+                        # Keep other lines (footer, etc.)
+                        new_lines.append(line)
+                
+                # Rebuild content with preserved structure
+                content = '\n'.join(new_lines)
+                logger.info(f"Smart truncated category content to {len(content)} chars for user {user.id}")
+                
+                # If still too long, apply emergency truncation
+                if len(content) > 4000:
+                    logger.warning(f"Content still too long after smart truncation, applying emergency truncation")
+                    lines = content.split('\n')
+                    if len(lines) > 10:
+                        header_lines = lines[:12]  # Keep more header lines for category views
+                        footer_lines = lines[-3:]  # Keep last 3 lines (footer)
+                        truncated_content = '\n'.join(header_lines) + '\n\n\x1b[1;33m... (Movement details truncated)\x1b[0m\n\n' + '\n'.join(footer_lines)
+                        content = truncated_content
+                        logger.info(f"Emergency truncated content to {len(content)} chars for user {user.id}")
+            else:
+                # Original emergency truncation for overview mode
+                if len(lines) > 10:
+                    header_lines = lines[:8]  # Keep first 8 lines (header info)
+                    footer_lines = lines[-3:]  # Keep last 3 lines (footer)
+                    truncated_content = '\n'.join(header_lines) + '\n\n\x1b[1;33m... (Content truncated due to length limit)\x1b[0m\n\n' + '\n'.join(footer_lines)
+                    content = truncated_content
+                    logger.info(f"Emergency truncated content to {len(content)} chars for user {user.id}")
+        
         embed = discord.Embed(
             description=content,
             color=discord.Color.from_rgb(255, 215, 0)  # Gold color for skills
         )
         embed.set_footer(text="Shadow Archive • Movement Library • Skill Tree (Optimized)")
+        return embed
         
     except asyncio.TimeoutError:
         logger.error(f"Timeout fetching skill tree data for user {user.id}")
         return await _create_fallback_embed(user, "CONNECTION TIMEOUT")
     except Exception as e:
-        logger.error(f"Error building skill tree embed for user {user.id}: {e}")
+        logger.error(f"Error building skill tree embed for user {user.id}: {e}", exc_info=True)
         return await _create_fallback_embed(user, "SYSTEM ERROR")
+
+async def _create_fallback_embed(user: Union[discord.User, discord.Member], error_message: str) -> discord.Embed:
+    """Create a fallback embed when API calls fail."""
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    sub_header = get_panel_sub_header("skill_tree")
     
+    content = (
+        f"```ansi\n"
+        f"{header}\n"
+        f"{sub_header}\n\n"
+        f"\x1b[1;31m● Skill Tree Unavailable\x1b[0m\n"
+        f"Status: \x1b[1;31mOFFLINE\x1b[0m\n"
+        f"Error: {error_message}\n\n"
+        f"\x1b[1;33m⚠️ The skill tree system is temporarily unavailable.\x1b[0m\n"
+        f"This may be due to:\n"
+        f"• API connection issues\n"
+        f"• Authentication problems\n"
+        f"• Server maintenance\n\n"
+        f"\x1b[1;37mPlease try again in a few moments.\x1b[0m\n"
+        f"```"
+    )
+    
+    embed = discord.Embed(
+        description=content,
+        color=discord.Color.red()
+    )
+    embed.set_footer(text="Shadow Archive • Movement Library • Error State")
+    return embed
+
+async def _create_partial_embed(user: Union[discord.User, discord.Member], available_data: dict, missing_info: str) -> discord.Embed:
+    """Create a partial embed when only some data is available."""
+    header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
+    sub_header = get_panel_sub_header("skill_tree")
+    
+    content = (
+        f"```ansi\n"
+        f"{header}\n"
+        f"{sub_header}\n\n"
+        f"\x1b[1;33m● Skill Tree (Limited Data)\x1b[0m\n"
+        f"Status: \x1b[1;33mPARTIAL\x1b[0m\n"
+        f"Missing: {missing_info}\n\n"
+        f"\x1b[1;37m📚 Available Information:\x1b[0m\n"
+    )
+    
+    # Show what data we have
+    if 'categories' in available_data:
+        categories = available_data['categories']
+        content += f"• Movement Categories: \x1b[1;32m{len(categories)}\x1b[0m\n"
+        for cat in categories[:3]:  # Show first 3 categories
+            cat_name = cat.get('name', 'Unknown')
+            skill_count = len(cat.get('skill_tree', []))
+            content += f"  └─ {cat_name} ({skill_count} levels)\n"
+        if len(categories) > 3:
+            content += f"  └─ ... and {len(categories) - 3} more\n"
+    
+    if 'stats' in available_data:
+        stats = available_data['stats']
+        user_level = max(stats.get('str_level', 1), stats.get('end_level', 1), stats.get('tech_level', 1))  # Calculate from stat levels
+        content += f"• Your Level: \x1b[1;33m{user_level}\x1b[0m\n"
+    
+    content += (
+        f"\n\x1b[1;33m⚠️ Some features may be limited due to missing data.\x1b[0m\n"
+        f"\x1b[1;37mTry refreshing or check your connection.\x1b[0m\n"
+        f"```"
+    )
+    
+    embed = discord.Embed(
+        description=content,
+        color=discord.Color.orange()
+    )
+    embed.set_footer(text="Shadow Archive • Movement Library • Partial Data")
     return embed
 
 # --- VIEW IMPLEMENTATION ---
@@ -469,17 +836,24 @@ async def build_skill_tree_embed(bot: discord.Client, user: Union[discord.User, 
 class SkillTreeView(discord.ui.View):
     """View for skill tree panel with category navigation buttons."""
     
-    def __init__(self, bot: discord.Client, user: discord.User, current_group: Optional[str] = None, current_category: Optional[str] = None):
+    def __init__(self, bot: discord.Client, user: discord.User, current_group: Optional[str] = None, current_category: Optional[str] = None, view_mode: str = "overview"):
         super().__init__(timeout=300)
         self.bot = bot
         self.user = user
         self.current_category: Optional[str] = current_category
         self.current_group: Optional[str] = current_group
+        self.view_mode = view_mode
         
-        # Add the panel switch dropdown first
-        from shared.utils.common_views import EphemeralPanelSelect
-        for item in EphemeralPanelView(bot, user).children:
-            self.add_item(item)
+        # Add panel dropdown using local import to avoid circular dependency
+        try:
+            from shared.utils.common_views import EphemeralPanelSelect
+            panel_dropdown = EphemeralPanelSelect(bot, user.id)
+            panel_dropdown.row = 0
+            self.add_item(panel_dropdown)
+            logger.info(f"Successfully added panel dropdown for user {user.id}")
+        except ImportError as e:
+            logger.warning(f"Could not add panel dropdown for user {user.id}: {e}")
+            logger.info(f"Creating SkillTreeView for user {user.id} without panel dropdown")
         
         # Add navigation buttons based on state
         if current_group and current_category:
@@ -515,9 +889,16 @@ class SkillTreeView(discord.ui.View):
             core_button.row = 2
             self.add_item(core_button)
             
-            back_button = BackToOverviewButton(bot, user)
-            back_button.row = 2
-            self.add_item(back_button)
+            # Add View Skill Tree button for overview mode - row 3
+            if view_mode == "overview":
+                view_tree_button = ViewSkillTreeButton(bot, user)
+                view_tree_button.row = 3
+                self.add_item(view_tree_button)
+            else:
+                # Add Back to Overview button for detailed mode - row 3
+                back_overview_button = BackToOverviewButton(bot, user)
+                back_overview_button.row = 3
+                self.add_item(back_overview_button)
             
             # Don't add unlock button on overview page - it should only appear in category view
             self.unlock_button = None
@@ -625,7 +1006,7 @@ class LowerBodyButton(discord.ui.Button):
             view = SkillTreeView(self.bot, self.user, current_group='lower', current_category=lower_body_cat)
             await view.initialize_dropdown()  # Initialize dropdown options
             
-            # Check if there are unlockable skills
+            # Check if there are unlockable skills and update button
             has_unlockable = await check_has_unlockable_skills(self.user, lower_body_cat, library_data)
             view.update_unlock_button(lower_body_cat, has_unlockable)
             
@@ -678,6 +1059,62 @@ class CoreButton(discord.ui.Button):
         
         await run_with_animation(interaction, do_work)
 
+class ViewSkillTreeButton(discord.ui.Button):
+    """Button to switch from overview to detailed skill tree view."""
+    
+    def __init__(self, bot: discord.Client, user: discord.User):
+        super().__init__(
+            style=discord.ButtonStyle.primary,
+            label="🌳 View Skill Tree",
+            custom_id="view_skill_tree"
+        )
+        self.bot = bot
+        self.user = user
+    
+    async def callback(self, interaction: discord.Interaction):
+        """Handle view skill tree button click."""
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("This panel is not for you.", ephemeral=True)
+            return
+        
+        try:
+            # Defer the response immediately
+            await interaction.response.defer()
+            
+            # Create detailed view showing individual categories
+            embed = await build_skill_tree_embed(self.bot, self.user, view_mode="detailed")
+            view = SkillTreeView(self.bot, self.user, view_mode="detailed")
+            
+            # Initialize any dropdown components if they exist
+            if hasattr(view, 'initialize_dropdown'):
+                await view.initialize_dropdown()
+            
+            # Edit the original message with the new content
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+            logger.info(f"ViewSkillTreeButton: Successfully created expanded overview for user {self.user.id}")
+            
+        except Exception as e:
+            logger.error(f"ViewSkillTreeButton: Error creating expanded overview for user {self.user.id}: {e}")
+            
+            # Create fallback response
+            fallback_embed = await _create_fallback_embed(self.user, f"View Error: {str(e)[:50]}...")
+            fallback_view = SkillTreeView(self.bot, self.user, view_mode="overview")
+            
+            try:
+                await interaction.edit_original_response(embed=fallback_embed, view=fallback_view)
+            except Exception as fallback_error:
+                logger.error(f"ViewSkillTreeButton: Fallback also failed: {fallback_error}")
+                # Last resort - send a simple error message
+                try:
+                    await interaction.edit_original_response(
+                        content=f"Error loading skill tree: {str(e)[:100]}", 
+                        embed=None, 
+                        view=None
+                    )
+                except:
+                    pass
+
 class BackToOverviewButton(discord.ui.Button):
     """Button for returning to skill tree overview."""
     
@@ -695,11 +1132,21 @@ class BackToOverviewButton(discord.ui.Button):
             return
         
         async def do_work():
-            embed = await build_skill_tree_embed(self.bot, self.user, category=None, current_group=None)
-            view = SkillTreeView(self.bot, self.user)
-            view.current_category = None
-            # No need to update unlock button on overview page since it doesn't exist
-            return embed, view
+            try:
+                embed = await build_skill_tree_embed(self.bot, self.user, view_mode="overview")
+                view = SkillTreeView(self.bot, self.user, view_mode="overview")
+                view.current_category = None
+                # No need to update unlock button on overview page since it doesn't exist
+                
+                logger.info(f"BackToOverviewButton: Successfully created overview for user {self.user.id}")
+                return embed, view
+                
+            except Exception as e:
+                logger.error(f"BackToOverviewButton: Error creating overview for user {self.user.id}: {e}")
+                # Return fallback embed instead of letting exception bubble up
+                fallback_embed = await _create_fallback_embed(self.user, f"Overview Error: {str(e)[:50]}...")
+                fallback_view = SkillTreeView(self.bot, self.user, view_mode="overview")
+                return fallback_embed, fallback_view
         
         await run_with_animation(interaction, do_work)
 
@@ -740,7 +1187,7 @@ class UnlockSkillButton(discord.ui.Button):
                 return
             
             unlocked_skills = profile_data.get('unlocked_skills', [])
-            unlocked_skill_ids = {skill.get('skill_tree_node_id') for skill in unlocked_skills}
+            unlocked_skill_ids = {skill.get('node_id') for skill in unlocked_skills}  # Using new V2 API field names
             user_stats = profile_data.get('stats', {})
             
             # Find all unlockable skills
@@ -753,15 +1200,15 @@ class UnlockSkillButton(discord.ui.Button):
                     continue  # Already unlocked
                 
                 requirements = node.get('requirements', {})
-                req_level = requirements.get('ascendant_level', 0)
-                req_str = requirements.get('str_points', 0)
-                req_end = requirements.get('end_points', 0)
-                req_tech = requirements.get('tech_points', 0)
+                req_level = requirements.get('ascendant_level', 0)  # Using new V2 API field names
+                req_str = requirements.get('str_level', 0)  # Using new V2 API field names
+                req_end = requirements.get('end_level', 0)  # Fixed: use end_level instead of end_level
+                req_tech = requirements.get('tech_level', 0)  # Fixed: use tech_level instead of tech_level
                 
-                user_level = user_stats.get('ascendant_level', 1)
-                user_str = user_stats.get('str_points', 0)
-                user_end = user_stats.get('end_points', 0)
-                user_tech = user_stats.get('tech_points', 0)
+                user_level = max(user_stats.get('str_level', 1), user_stats.get('end_level', 1), user_stats.get('tech_level', 1))  # Fixed: calculate from actual levels
+                user_str = user_stats.get('str_level', 1)  # Using new V2 API field names
+                user_end = user_stats.get('end_level', 1)  # Fixed: use end_level instead of end_level
+                user_tech = user_stats.get('tech_level', 1)  # Fixed: use tech_level instead of tech_level
                 
                 can_unlock = (user_level >= req_level and 
                             user_str >= req_str and 
@@ -795,10 +1242,10 @@ def create_skill_selection_embed(unlockable_skills: List[Dict], user_stats: Dict
     header = get_system_status_header(user).replace('```ansi', '').replace('```', '').strip()
     sub_header = get_panel_sub_header("skill_unlock")
     
-    user_level = user_stats.get('ascendant_level', 1)
-    user_str = user_stats.get('str_points', 0)
-    user_end = user_stats.get('end_points', 0)
-    user_tech = user_stats.get('tech_points', 0)
+    user_level = max(user_stats.get('str_level', 1), user_stats.get('end_level', 1), user_stats.get('tech_level', 1))  # Fixed: calculate from actual levels
+    user_str = user_stats.get('str_level', 1)  # Using new V2 API field names
+    user_end = user_stats.get('end_level', 1)  # Fixed: use end_level instead of end_level
+    user_tech = user_stats.get('tech_level', 1)  # Fixed: use tech_level instead of tech_level
     
     content = (
         f"```ansi\n"
@@ -862,10 +1309,10 @@ class SkillSelectionDropdown(discord.ui.Select):
             
             # Show requirements in description
             requirements = skill.get('requirements', {})
-            req_level = requirements.get('ascendant_level', 0)
-            req_str = requirements.get('str_points', 0)
-            req_end = requirements.get('end_points', 0)
-            req_tech = requirements.get('tech_points', 0)
+            req_level = requirements.get('ascendant_level', 0)  # Using new V2 API field names
+            req_str = requirements.get('str_level', 0)  # Using new V2 API field names
+            req_end = requirements.get('end_level', 0)  # Fixed: use end_level instead of end_level
+            req_tech = requirements.get('tech_level', 0)  # Fixed: use tech_level instead of tech_level
             req_str_skill = requirements.get('strength_points', 0)
             req_end_skill = requirements.get('endurance_points', 0)
             req_tech_skill = requirements.get('technique_points', 0)
@@ -938,28 +1385,89 @@ class SkillSelectionDropdown(discord.ui.Select):
             await interaction.response.send_message("❌ Selected skill not found.", ephemeral=True)
             return
         
-        # Unlock the selected skill using singleton APIClient
-        try:
-            # Use singleton APIClient instance - this will reuse existing token cache
-            api_client = APIClient()
-            unlock_result = await api_client.unlock_skill_v2(self.user, str(selected_skill['id']))
-            
-            # Clear caches to force refresh
-            clear_library_cache()
-            clear_profile_cache(self.user.id)
-            
-            # Show success message
-            skill_name = selected_skill.get('name', 'Unknown')
-            await interaction.response.send_message(
-                f"🎉 **Successfully unlocked: {skill_name}!**\n"
-                f"✨ You can now access this skill in your training routines.\n"
-                f"🔄 The skill tree panel will refresh automatically.", 
-                ephemeral=True
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to unlock skill {selected_skill['id']} for user {self.user.id}: {e}")
-            await interaction.response.send_message(f"❌ Failed to unlock skill: {str(e)}", ephemeral=True)
+        # Use run_with_animation pattern to fix Shadow Nexus Error
+        async def do_work():
+            try:
+                # Use singleton APIClient instance - this will reuse existing token cache
+                api_client = APIClient()
+                unlock_result = await api_client.unlock_skill_v2(self.user, str(selected_skill['id']))
+                
+                # Clear caches to force refresh
+                clear_library_cache()
+                clear_profile_cache(self.user.id)
+                
+                # Show success message with universal formatting
+                skill_name = selected_skill.get('name', 'Unknown')
+                unlock_message = selected_skill.get('unlock_message', '')
+                
+                # Create formatted success message using universal headers
+                from shared.utils.headers import get_system_status_header
+                from shared.utils.ui_styles import get_panel_sub_header
+                
+                header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+                sub_header = get_panel_sub_header("skill_tree")
+                
+                success_content = (
+                    f"```ansi\n"
+                    f"{header}\n"
+                    f"{sub_header}\n\n"
+                    f"\x1b[1;32m🎉 SKILL MASTERED! 🎉\x1b[0m\n\n"
+                    f"\x1b[1;33m⚡ {skill_name}\x1b[0m\n"
+                    f"\x1b[0;37m{unlock_message}\x1b[0m\n\n"
+                    f"\x1b[1;36m✨ Your training has paid off, Ascendant!\x1b[0m\n"
+                    f"\x1b[0;37mThis skill is now available in your movement arsenal.\x1b[0m\n\n"
+                    f"\x1b[1;35m🔄 The skill tree will refresh automatically.\x1b[0m\n"
+                    f"──────────────────────────\n"
+                    f"```"
+                )
+                
+                success_embed = discord.Embed(
+                    description=success_content,
+                    color=discord.Color.gold()
+                )
+                success_embed.set_footer(text="Shadow Archive • Skill Mastery • Well Done!")
+                
+                # Return to skill tree after successful unlock - ensure proper initialization
+                embed = await build_skill_tree_embed(self.bot, self.user)
+                view = SkillTreeView(self.bot, self.user, view_mode="overview")
+                
+                logger.info(f"SkillSelectionDropdown: Successfully unlocked skill and returning to overview for user {self.user.id}")
+                return embed, view
+                
+            except Exception as e:
+                logger.error(f"Failed to unlock skill {selected_skill['id']} for user {self.user.id}: {e}")
+                # Return error embed and view
+                from shared.utils.headers import get_system_status_header
+                from shared.utils.ui_styles import get_panel_sub_header
+                
+                header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+                sub_header = get_panel_sub_header("skill_tree")
+                
+                error_content = (
+                    f"```ansi\n"
+                    f"{header}\n"
+                    f"{sub_header}\n\n"
+                    f"\x1b[1;31m❌ SKILL UNLOCK FAILED\x1b[0m\n\n"
+                    f"\x1b[0;37mError: {str(e)}\x1b[0m\n\n"
+                    f"\x1b[1;33m🔄 Returning to skill tree...\x1b[0m\n"
+                    f"──────────────────────────\n"
+                    f"```"
+                )
+                
+                error_embed = discord.Embed(
+                    description=error_content,
+                    color=discord.Color.red()
+                )
+                error_embed.set_footer(text="Shadow Archive • Error • Try Again")
+                
+                # Return to skill tree on error - ensure proper initialization
+                embed = await build_skill_tree_embed(self.bot, self.user)
+                view = SkillTreeView(self.bot, self.user, view_mode="overview")
+                
+                logger.info(f"SkillSelectionDropdown: Error handled, returning to overview for user {self.user.id}")
+                return embed, view
+        
+        await run_with_animation(interaction, do_work)
 
 # --- ENHANCED RPG NAVIGATION BUTTONS ---
 
@@ -988,48 +1496,6 @@ def get_category_position_info(categories: List[Dict], current_category: str, cu
     except Exception as e:
         logger.warning(f"Error getting category position: {e}")
         return ""
-
-
-def normalize_category_id(category_id: str) -> str:
-    """Normalize category ID to handle different formats from the API."""
-    if not category_id:
-        return ""
-    
-    # Convert to uppercase and handle common variations
-    normalized = str(category_id).upper().strip()
-    
-    # Handle numeric to string mapping (legacy database IDs)
-    numeric_mapping = {
-        "10": "PUSH",
-        "11": "PULL", 
-        "12": "SQUAT",
-        "13": "HINGE",
-        "14": "LUNGE",
-        "15": "CORE",
-        "16": "ROTATION",
-        "17": "BALANCE",
-        "18": "PULL_VERTICAL",
-        "19": "UPPER_DYNAMIC",
-        "20": "GRIP",
-        "21": "BALLISTIC",
-        "22": "GAIT",
-        "23": "LOADED_CARRY",
-        "24": "FLEXIBILITY",
-        "25": "MOBILITY_FLOW"
-    }
-    
-    if normalized in numeric_mapping:
-        return numeric_mapping[normalized]
-    
-    return normalized
-
-def get_category_group_mapping():
-    """Get the mapping of category groups to their category IDs."""
-    return {
-        'upper': ['PUSH', 'PULL', 'PULL_VERTICAL', 'UPPER_DYNAMIC', 'GRIP', 'BALLISTIC'],
-        'lower': ['SQUAT', 'LUNGE', 'HINGE', 'GAIT', 'LOADED_CARRY'],
-        'core': ['CORE', 'ROTATION', 'BALANCE', 'FLEXIBILITY', 'MOBILITY_FLOW']
-    }
 
 def find_categories_for_group(categories: List[Dict], group: str) -> List[str]:
     """Find all category IDs that belong to a specific group."""
@@ -1079,7 +1545,7 @@ async def check_has_unlockable_skills(user: discord.User, category_id: str, libr
         
         profile_data = await get_cached_profile_data(user)
         unlocked_skills = profile_data.get('unlocked_skills', [])
-        unlocked_skill_ids = {skill.get('skill_tree_node_id') for skill in unlocked_skills}
+        unlocked_skill_ids = {skill.get('node_id') for skill in unlocked_skills}  # Using new V2 API field names
         user_stats = profile_data.get('stats', {})
         
         # Find category
@@ -1098,14 +1564,14 @@ async def check_has_unlockable_skills(user: discord.User, category_id: str, libr
             
             requirements = node.get('requirements', {})
             req_level = requirements.get('ascendant_level', 0)
-            req_str = requirements.get('str_points', 0) 
-            req_end = requirements.get('end_points', 0)
-            req_tech = requirements.get('tech_points', 0)
+            req_str = requirements.get('str_level', 0)
+            req_end = requirements.get('end_level', 0)
+            req_tech = requirements.get('tech_level', 0)
             
-            user_level = user_stats.get('ascendant_level', 1)
-            user_str = user_stats.get('str_points', 0)
-            user_end = user_stats.get('end_points', 0)
-            user_tech = user_stats.get('tech_points', 0)
+            user_level = max(user_stats.get('str_level', 1), user_stats.get('end_level', 1), user_stats.get('tech_level', 1))
+            user_str = user_stats.get('str_level', 1)
+            user_end = user_stats.get('end_level', 1)
+            user_tech = user_stats.get('tech_level', 1)
             
             can_unlock = (user_level >= req_level and 
                         user_str >= req_str and 

@@ -44,13 +44,13 @@ class SkillTreeNodeResponse(SkillTreeNodeBase):
 class UserSkillProgressBase(BaseModel):
     """Base schema for UserSkillProgress"""
     ascendant_id: int = Field(description="Foreign key to Ascendant who unlocked the node")
-    node_id: int = Field(description="Foreign key to the SkillTreeNode that was unlocked")
+    node_id: str = Field(description="String identifier of the SkillTreeNode that was unlocked")
     unlocked_at: datetime = Field(description="Timestamp when the node was unlocked")
 
 class UserSkillProgressCreate(BaseModel):
     """Schema for creating a new UserSkillProgress"""
     ascendant_id: int = Field(description="Foreign key to Ascendant who unlocked the node")
-    node_id: int = Field(description="Foreign key to the SkillTreeNode that was unlocked")
+    node_id: str = Field(description="String identifier of the SkillTreeNode that was unlocked")
 
 class UserSkillProgressResponse(UserSkillProgressBase):
     """Schema for UserSkillProgress API responses"""
