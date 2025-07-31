@@ -1178,9 +1178,25 @@ class UnlockSkillButton(discord.ui.Button):
             library_data = await get_cached_library_data(self.user)
             profile_data = await get_cached_profile_data(self.user)
             
-            # Find all unlockable skills in current category
+            # Find all unlockable skills in current category using normalized ID matching
             categories = library_data.get('categories', [])
-            category_data = next((cat for cat in categories if cat.get('id') == self.current_category), None)
+            normalized_target = normalize_category_id(self.current_category)
+            category_data = None
+            
+            # First try exact match with normalized IDs
+            for cat in categories:
+                if normalize_category_id(cat.get('id', '')) == normalized_target:
+                    category_data = cat
+                    break
+            
+            # If no exact match, try name-based matching as fallback
+            if not category_data:
+                target_lower = normalized_target.lower()
+                for cat in categories:
+                    cat_name = cat.get('name', '').lower()
+                    if target_lower in cat_name or cat_name in target_lower:
+                        category_data = cat
+                        break
             
             if not category_data:
                 await interaction.response.send_message("❌ Category not found.", ephemeral=True)
@@ -1222,14 +1238,28 @@ class UnlockSkillButton(discord.ui.Button):
                 await interaction.response.send_message("❌ No skills available to unlock in this category.", ephemeral=True)
                 return
             
-            # Show skill selection dropdown
+            # Show skill selection dropdown - edit existing response instead of creating new one
             view = SkillSelectionView(self.bot, self.user, self.current_category, unlockable_skills)
             embed = create_skill_selection_embed(unlockable_skills, user_stats, self.user)
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            
+            # Defer the response if not already done, then edit it
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+            
+            await interaction.edit_original_response(embed=embed, view=view)
             
         except Exception as e:
             logger.error(f"Error showing skill selection for user {self.user.id}: {e}")
-            await interaction.response.send_message(f"❌ Error loading available skills: {str(e)}", ephemeral=True)
+            
+            # Handle error response properly - defer if needed, then edit
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+            
+            await interaction.edit_original_response(
+                content=f"❌ Error loading available skills: {str(e)}", 
+                embed=None, 
+                view=None
+            )
 
 # --- SKILL SELECTION SYSTEM ---
 
@@ -1385,20 +1415,138 @@ class SkillSelectionDropdown(discord.ui.Select):
             await interaction.response.send_message("❌ Selected skill not found.", ephemeral=True)
             return
         
+        # Validate that the skill node actually exists in the backend before showing confirmation
+        skill_id = selected_skill.get('id')
+        if not skill_id:
+            await interaction.response.send_message("❌ Invalid skill data - missing ID.", ephemeral=True)
+            return
+        
+        # Show confirmation interface
+        await self.show_unlock_confirmation(interaction, selected_skill)
+    
+    async def show_unlock_confirmation(self, interaction: discord.Interaction, skill: Dict):
+        """Show confirmation interface for skill unlock with RPG styling."""
+        from shared.utils.headers import get_system_status_header
+        from shared.utils.ui_styles import get_panel_sub_header
+        
+        # Get user's current profile data to show skill point costs
+        try:
+            profile_data = await get_cached_profile_data(self.user)
+            available_points = profile_data.get('available_points', {})
+            user_stats = profile_data.get('stats', {})
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error loading profile data: {str(e)}", ephemeral=True)
+            return
+        
+        # Calculate skill point costs
+        requirements = skill.get('requirements', {})
+        req_str_points = requirements.get('str_points', 0)
+        req_end_points = requirements.get('end_points', 0) 
+        req_tech_points = requirements.get('tech_points', 0)
+        
+        current_str_points = available_points.get('strength', 0)
+        current_end_points = available_points.get('endurance', 0)
+        current_tech_points = available_points.get('technique', 0)
+        
+        # Create confirmation embed with universal headers
+        header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
+        sub_header = get_panel_sub_header("skill_unlock")
+        
+        skill_name = skill.get('name', 'Unknown Skill')
+        skill_description = skill.get('description', 'No description available')
+        unlock_message = skill.get('unlock_message', '')
+        
+        # Build cost breakdown
+        cost_lines = []
+        total_cost = req_str_points + req_end_points + req_tech_points
+        
+        if req_str_points > 0:
+            status = "✅" if current_str_points >= req_str_points else "❌"
+            cost_lines.append(f"  {status} Strength: {req_str_points} SP (You have: {current_str_points})")
+        if req_end_points > 0:
+            status = "✅" if current_end_points >= req_end_points else "❌"
+            cost_lines.append(f"  {status} Endurance: {req_end_points} SP (You have: {current_end_points})")
+        if req_tech_points > 0:
+            status = "✅" if current_tech_points >= req_tech_points else "❌"
+            cost_lines.append(f"  {status} Technique: {req_tech_points} SP (You have: {current_tech_points})")
+        
+        can_afford = (current_str_points >= req_str_points and 
+                     current_end_points >= req_end_points and 
+                     current_tech_points >= req_tech_points)
+        
+        if total_cost == 0:
+            cost_text = "\x1b[1;32m🎯 FREE SKILL - No skill points required!\x1b[0m"
+        else:
+            cost_text = f"\x1b[1;33m💰 SKILL POINT COST:\x1b[0m\n" + "\n".join(cost_lines)
+        
+        # Show current stats for context
+        user_level = max(user_stats.get('str_level', 1), user_stats.get('end_level', 1), user_stats.get('tech_level', 1))
+        user_str = user_stats.get('str_level', 1)
+        user_end = user_stats.get('end_level', 1)
+        user_tech = user_stats.get('tech_level', 1)
+        
+        confirmation_content = (
+            f"```ansi\n"
+            f"{header}\n"
+            f"{sub_header}\n\n"
+            f"\x1b[1;36m🌟 READY TO MASTER NEW SKILL? 🌟\x1b[0m\n\n"
+            f"\x1b[1;33m⚡ {skill_name}\x1b[0m\n"
+            f"\x1b[0;37m{skill_description}\x1b[0m\n\n"
+            f"\x1b[1;35m📊 YOUR CURRENT STATS\x1b[0m\n"
+            f"Level: {user_level} | STR: {user_str} | END: {user_end} | TECH: {user_tech}\n\n"
+            f"{cost_text}\n\n"
+        )
+        
+        if can_afford:
+            confirmation_content += (
+                f"\x1b[1;32m✅ REQUIREMENTS MET\x1b[0m\n"
+                f"\x1b[0;37mYou can master this skill!\x1b[0m\n\n"
+                f"\x1b[1;93m⚠️  CONFIRM SKILL MASTERY ⚠️\x1b[0m\n"
+                f"\x1b[0;37mOnce mastered, skill points will be permanently spent.\x1b[0m\n"
+                f"──────────────────────────\n"
+                f"```"
+            )
+        else:
+            confirmation_content += (
+                f"\x1b[1;31m❌ INSUFFICIENT RESOURCES\x1b[0m\n"
+                f"\x1b[0;37mYou need more skill points to master this skill.\x1b[0m\n"
+                f"──────────────────────────\n"
+                f"```"
+            )
+        
+        confirmation_embed = discord.Embed(
+            description=confirmation_content,
+            color=discord.Color.gold() if can_afford else discord.Color.red()
+        )
+        confirmation_embed.set_footer(text="Shadow Archive • Skill Mastery • Choose Wisely")
+        
+        # Create confirmation view with Accept/Decline buttons
+        confirmation_view = SkillUnlockConfirmationView(
+            self.bot, self.user, skill, can_afford
+        )
+        
+        # Defer and edit response
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+        
+        await interaction.edit_original_response(embed=confirmation_embed, view=confirmation_view)
+    
+    async def unlock_skill_confirmed(self, interaction: discord.Interaction, skill: Dict):
+        """Actually unlock the skill after confirmation - moved from original callback."""
         # Use run_with_animation pattern to fix Shadow Nexus Error
         async def do_work():
             try:
                 # Use singleton APIClient instance - this will reuse existing token cache
                 api_client = APIClient()
-                unlock_result = await api_client.unlock_skill_v2(self.user, str(selected_skill['id']))
+                unlock_result = await api_client.unlock_skill_v2(self.user, str(skill['id']))
                 
                 # Clear caches to force refresh
                 clear_library_cache()
                 clear_profile_cache(self.user.id)
                 
                 # Show success message with universal formatting
-                skill_name = selected_skill.get('name', 'Unknown')
-                unlock_message = selected_skill.get('unlock_message', '')
+                skill_name = skill.get('name', 'Unknown')
+                unlock_message = skill.get('unlock_message', '')
                 
                 # Create formatted success message using universal headers
                 from shared.utils.headers import get_system_status_header
@@ -1435,7 +1583,7 @@ class SkillSelectionDropdown(discord.ui.Select):
                 return embed, view
                 
             except Exception as e:
-                logger.error(f"Failed to unlock skill {selected_skill['id']} for user {self.user.id}: {e}")
+                logger.error(f"Failed to unlock skill {skill['id']} for user {self.user.id}: {e}")
                 # Return error embed and view
                 from shared.utils.headers import get_system_status_header
                 from shared.utils.ui_styles import get_panel_sub_header
@@ -1443,16 +1591,36 @@ class SkillSelectionDropdown(discord.ui.Select):
                 header = get_system_status_header(self.user).replace('```ansi', '').replace('```', '').strip()
                 sub_header = get_panel_sub_header("skill_tree")
                 
-                error_content = (
-                    f"```ansi\n"
-                    f"{header}\n"
-                    f"{sub_header}\n\n"
-                    f"\x1b[1;31m❌ SKILL UNLOCK FAILED\x1b[0m\n\n"
-                    f"\x1b[0;37mError: {str(e)}\x1b[0m\n\n"
-                    f"\x1b[1;33m🔄 Returning to skill tree...\x1b[0m\n"
-                    f"──────────────────────────\n"
-                    f"```"
-                )
+                # Check if it's a "node not found" error
+                error_str = str(e).lower()
+                if "not found" in error_str or "skill tree node" in error_str:
+                    error_content = (
+                        f"```ansi\n"
+                        f"{header}\n"
+                        f"{sub_header}\n\n"
+                        f"\x1b[1;31m❌ SKILL NOT AVAILABLE\x1b[0m\n\n"
+                        f"\x1b[1;33m🚧 DEVELOPMENT NOTICE\x1b[0m\n"
+                        f"\x1b[0;37mThis skill is not yet implemented in the system.\x1b[0m\n"
+                        f"\x1b[0;37mThe development team is working on adding more skills.\x1b[0m\n\n"
+                        f"\x1b[1;35m💡 TRY INSTEAD:\x1b[0m\n"
+                        f"\x1b[0;37m• Focus on available skill categories\x1b[0m\n"
+                        f"\x1b[0;37m• Check back later for updates\x1b[0m\n"
+                        f"\x1b[0;37m• Train movements to gain XP and levels\x1b[0m\n\n"
+                        f"\x1b[1;36m🔄 Returning to skill tree...\x1b[0m\n"
+                        f"──────────────────────────\n"
+                        f"```"
+                    )
+                else:
+                    error_content = (
+                        f"```ansi\n"
+                        f"{header}\n"
+                        f"{sub_header}\n\n"
+                        f"\x1b[1;31m❌ SKILL UNLOCK FAILED\x1b[0m\n\n"
+                        f"\x1b[0;37mTechnical Error: {str(e)[:100]}{'...' if len(str(e)) > 100 else ''}\x1b[0m\n\n"
+                        f"\x1b[1;33m🔄 Returning to skill tree...\x1b[0m\n"
+                        f"──────────────────────────\n"
+                        f"```"
+                    )
                 
                 error_embed = discord.Embed(
                     description=error_content,
@@ -1466,6 +1634,76 @@ class SkillSelectionDropdown(discord.ui.Select):
                 
                 logger.info(f"SkillSelectionDropdown: Error handled, returning to overview for user {self.user.id}")
                 return embed, view
+        
+        await run_with_animation(interaction, do_work)
+
+# --- SKILL UNLOCK CONFIRMATION VIEW ---
+
+class SkillUnlockConfirmationView(discord.ui.View):
+    """Confirmation interface for skill unlocking with Accept/Decline buttons."""
+    
+    def __init__(self, bot: discord.Client, user: discord.User, skill: Dict, can_afford: bool):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.user = user
+        self.skill = skill
+        self.can_afford = can_afford
+        
+        # Only add Accept button if user can afford the skill
+        if can_afford:
+            self.add_item(AcceptUnlockButton(bot, user, skill))
+        
+        # Always add Decline/Cancel button
+        self.add_item(DeclineUnlockButton(bot, user))
+
+class AcceptUnlockButton(discord.ui.Button):
+    """Accept button for skill unlock confirmation."""
+    
+    def __init__(self, bot: discord.Client, user: discord.User, skill: Dict):
+        super().__init__(
+            style=discord.ButtonStyle.success,
+            label="🎯 Master This Skill",
+            emoji="⚡",
+            custom_id=f"accept_unlock_{user.id}_{skill.get('id', 'unknown')}"
+        )
+        self.bot = bot
+        self.user = user
+        self.skill = skill
+    
+    async def callback(self, interaction: discord.Interaction):
+        """Handle skill unlock confirmation."""
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This is not for you.", ephemeral=True)
+            return
+        
+        # Create dropdown instance to use its unlock method
+        dropdown = SkillSelectionDropdown(self.bot, self.user, "temp", [self.skill])
+        await dropdown.unlock_skill_confirmed(interaction, self.skill)
+
+class DeclineUnlockButton(discord.ui.Button):
+    """Decline button for skill unlock confirmation."""
+    
+    def __init__(self, bot: discord.Client, user: discord.User):
+        super().__init__(
+            style=discord.ButtonStyle.secondary,
+            label="🚫 Cancel",
+            emoji="❌",
+            custom_id=f"decline_unlock_{user.id}"
+        )
+        self.bot = bot
+        self.user = user
+    
+    async def callback(self, interaction: discord.Interaction):
+        """Handle skill unlock cancellation."""
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ This is not for you.", ephemeral=True)
+            return
+        
+        # Return to skill tree overview
+        async def do_work():
+            embed = await build_skill_tree_embed(self.bot, self.user)
+            view = SkillTreeView(self.bot, self.user, view_mode="overview")
+            return embed, view
         
         await run_with_animation(interaction, do_work)
 
@@ -1548,12 +1786,31 @@ async def check_has_unlockable_skills(user: discord.User, category_id: str, libr
         unlocked_skill_ids = {skill.get('node_id') for skill in unlocked_skills}  # Using new V2 API field names
         user_stats = profile_data.get('stats', {})
         
-        # Find category
+        # Find category using normalized ID matching (same logic as category view)
         categories = library_data.get('categories', [])
-        category_data = next((cat for cat in categories if cat.get('id') == category_id), None)
+        normalized_target = normalize_category_id(category_id)
+        category_data = None
+        
+        # First try exact match with normalized IDs
+        for cat in categories:
+            if normalize_category_id(cat.get('id', '')) == normalized_target:
+                category_data = cat
+                break
+        
+        # If no exact match, try name-based matching as fallback
+        if not category_data:
+            target_lower = normalized_target.lower()
+            for cat in categories:
+                cat_name = cat.get('name', '').lower()
+                if target_lower in cat_name or cat_name in target_lower:
+                    category_data = cat
+                    break
         
         if not category_data:
+            logger.warning(f"Category not found for ID '{category_id}' (normalized: '{normalized_target}')")
             return False
+        
+        logger.info(f"Checking unlockable skills for category '{category_data.get('name')}' (ID: {category_id})")
         
         # Check each skill node
         skill_tree = category_data.get('skill_tree', [])
@@ -1579,8 +1836,10 @@ async def check_has_unlockable_skills(user: discord.User, category_id: str, libr
                         user_tech >= req_tech)
             
             if can_unlock:
+                logger.info(f"Found unlockable skill: {node.get('name')} (Level {node.get('level')}) in category {category_id}")
                 return True
         
+        logger.info(f"No unlockable skills found in category {category_id}")
         return False
         
     except Exception as e:
