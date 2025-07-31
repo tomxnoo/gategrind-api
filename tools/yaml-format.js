@@ -156,7 +156,7 @@ async function lintYamlFile(filePath) {
 async function main() {
   await initializeModules();
   const args = process.argv.slice(2);
-  const glob = require('glob');
+  const { glob } = require('glob');
   
   if (args.length === 0) {
     console.error('Usage: node yaml-format.js <file1> [file2] ...');

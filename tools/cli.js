@@ -4,6 +4,13 @@ const { Command } = require('commander');
 const WebBuilder = require('./builders/web-builder');
 const V3ToV4Upgrader = require('./upgraders/v3-to-v4-upgrader');
 const IdeSetup = require('./installer/lib/ide-setup');
+const { 
+  discoverFiles, 
+  aggregateFileContents, 
+  generateXMLOutput, 
+  calculateStatistics,
+  filterFiles 
+} = require('./flattener/main');
 const path = require('path');
 
 const program = new Command();
@@ -147,6 +154,66 @@ program
       dryRun: options.dryRun,
       backup: options.backup
     });
+  });
+
+program
+  .command('flatten')
+  .description('Flatten codebase into a single XML file for AI analysis')
+  .option('-o, --output <path>', 'Output file path', 'flattened-codebase.xml')
+  .action(async (options) => {
+    console.log(`Flattening codebase to: ${options.output}`);
+
+    try {
+      // Import ora dynamically
+      const { default: ora } = await import('ora');
+      const fs = require('fs-extra');
+
+      // Start file discovery with spinner
+      const discoverySpinner = ora('🔍 Discovering files...').start();
+      const files = await discoverFiles(process.cwd());
+      const filteredFiles = await filterFiles(files, process.cwd());
+      discoverySpinner.succeed(`📁 Found ${filteredFiles.length} files to include`);
+
+      // Process files with progress tracking
+      console.log('Reading file contents');
+      const processingSpinner = ora('📄 Processing files...').start();
+      const aggregatedContent = await aggregateFileContents(filteredFiles, process.cwd(), processingSpinner);
+      processingSpinner.succeed(`✅ Processed ${aggregatedContent.processedFiles}/${filteredFiles.length} files`);
+
+      // Log processing results for test validation
+      console.log(`Processed ${aggregatedContent.processedFiles}/${filteredFiles.length} files`);
+      if (aggregatedContent.errors.length > 0) {
+        console.log(`Errors: ${aggregatedContent.errors.length}`);
+      }
+      console.log(`Text files: ${aggregatedContent.textFiles.length}`);
+      if (aggregatedContent.binaryFiles.length > 0) {
+        console.log(`Binary files: ${aggregatedContent.binaryFiles.length}`);
+      }
+
+      // Generate XML output using streaming
+      const xmlSpinner = ora('🔧 Generating XML output...').start();
+      await generateXMLOutput(aggregatedContent, options.output);
+      xmlSpinner.succeed('📝 XML generation completed');
+
+      // Calculate and display statistics
+      const outputStats = await fs.stat(options.output);
+      const stats = calculateStatistics(aggregatedContent, outputStats.size);
+
+      // Display completion summary
+      console.log('\n📊 Completion Summary:');
+      console.log(`✅ Successfully processed ${filteredFiles.length} files into ${options.output}`);
+      console.log(`📁 Output file: ${path.resolve(options.output)}`);
+      console.log(`📏 Total source size: ${stats.totalSize}`);
+      console.log(`📄 Generated XML size: ${stats.xmlSize}`);
+      console.log(`📝 Total lines of code: ${stats.totalLines.toLocaleString()}`);
+      console.log(`🔢 Estimated tokens: ${stats.estimatedTokens}`);
+      console.log(`📊 File breakdown: ${stats.textFiles} text, ${stats.binaryFiles} binary, ${stats.errorFiles} errors`);
+
+    } catch (error) {
+      console.error('❌ Critical error:', error.message);
+      console.error('An unexpected error occurred.');
+      process.exit(1);
+    }
   });
 
 program.parse();

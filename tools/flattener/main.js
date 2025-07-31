@@ -556,4 +556,13 @@ if (require.main === module) {
   program.parse();
 }
 
-module.exports = program;
+module.exports = {
+  program,
+  discoverFiles,
+  aggregateFileContents,
+  generateXMLOutput,
+  calculateStatistics,
+  filterFiles,
+  parseGitignore,
+  isBinaryFile
+};

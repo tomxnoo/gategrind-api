@@ -1622,7 +1622,7 @@ class Installer {
 
   async detectExpansionPacks(installDir) {
     const expansionPacks = {};
-    const glob = require("glob");
+    const { glob } = require("glob");
     
     // Find all dot folders that might be expansion packs
     const dotFolders = glob.sync(".*", {
@@ -1748,7 +1748,7 @@ class Installer {
   }
 
   async cleanupLegacyYmlFiles(installDir, spinner) {
-    const glob = require('glob');
+    const { glob } = require('glob');
     const fs = require('fs').promises;
     
     try {
