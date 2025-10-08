@@ -10,3 +10,16 @@ venv/
 .DS_Store
 replit.nix
 poetry.lock
+
+# TypeScript / Node.js
+node_modules/
+dist/
+*.js.map
+*.d.ts
+!src/**/*.d.ts
+.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock

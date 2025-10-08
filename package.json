@@ -1,0 +1,39 @@
+{
+  "name": "gategrind-discord-bot",
+  "version": "1.0.0",
+  "description": "Realm of Shadows Discord Bot - TypeScript Edition",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "dev": "ts-node src/main.ts",
+    "watch": "tsc -w",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "typescript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "redis": "^4.6.12",
+    "axios": "^1.6.5",
+    "@sentry/node": "^7.99.0",
+    "fastify": "^4.25.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/pg": "^8.10.9",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
