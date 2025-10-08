@@ -1,15 +1,20 @@
-FROM python:3.11
+# Use Node.js base image
+FROM node:18-alpine
 
+# Set working directory
 WORKDIR /app
 
-RUN pip install poetry
+# Copy package.json and package-lock.json
+COPY package*.json ./
 
-COPY pyproject.toml poetry.lock ./
+# Install dependencies
+RUN npm install
 
-RUN poetry install --no-root
-
+# Copy the rest of the application code
 COPY . .
 
-EXPOSE 8080
+# Build the TypeScript code
+RUN npm run build
 
-CMD ["poetry", "run", "python", "main.py"]
+# Start the application
+CMD ["npm", "start"]
